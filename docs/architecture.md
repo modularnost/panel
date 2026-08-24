@@ -252,6 +252,16 @@ shared volume. Consider moving to Postgres only if a real need for HA of the
 panel itself appears (several instances writing at once) — do not do it ahead of
 time "just in case".
 
+## Releases
+
+Pushing to `main` publishes `edge` and `sha-<commit>`. `latest` and the version
+tags come from a git tag: `git tag v0.1.0 && git push --tags`. That separation
+exists because the README tells people to deploy `latest` — it must mean a
+release someone chose to cut, not the last thing that happened to be pushed.
+
+The version compiled into the binary comes from `git describe --tags --always`,
+so `/healthz` answers `v0.1.0` on a release and `v0.1.0-4-gabc1234` in between.
+
 ## Style and general rules
 
 - Before adding a new feature, check it against the "anti-scope" section above

@@ -31,8 +31,17 @@ PANEL_ADMIN_PASSWORD=<password> PANEL_MODULE_SECRET=<secret> \
   docker stack deploy -c stack.yml panel
 ```
 
-That pulls `ghcr.io/modularnost/panel:latest`, published by CI for amd64 and
-arm64. To run your own build instead:
+That pulls `ghcr.io/modularnost/panel:latest` — the last release, built for
+amd64 and arm64.
+
+| Tag | |
+| --- | --- |
+| `latest` | the last release; what you want on a server |
+| `0.1.0`, `0.1` | a specific release, or the latest patch of a minor |
+| `edge` | the last commit on `main`; for trying a fix before it is released |
+| `sha-abc1234` | one exact commit |
+
+To run your own build instead:
 
 ```sh
 docker build -t modularnost:latest .
