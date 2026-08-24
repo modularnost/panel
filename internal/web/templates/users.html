@@ -1,0 +1,97 @@
+{{template "head"}}
+<div id="users">{{template "userlist" .}}</div>
+{{template "foot"}}
+
+{{define "userlist"}}
+{{if .NewToken}}
+<p class="ok">New token &mdash; copy it now, it will not be shown again:<br>
+  <code>{{.NewToken}}</code>
+</p>
+{{end}}
+
+<h1>Users</h1>
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Role</th>
+    <th>New password</th>
+    <th></th>
+  </tr>
+  {{range .Users}}
+  <tr>
+    <td>{{.Username}}{{if eq .ID $.Me.ID}} <small>(you)</small>{{end}}</td>
+    <td>
+      <form class="inline" hx-post="/users/{{.ID}}/role" hx-target="#users">
+        <select name="role" style="min-width:8rem" onchange="this.form.requestSubmit()">
+          <option {{if eq .Role "viewer" }}selected{{end}}>viewer</option>
+          <option {{if eq .Role "operator" }}selected{{end}}>operator</option>
+          <option {{if eq .Role "admin" }}selected{{end}}>admin</option>
+        </select>
+      </form>
+    </td>
+    <td>
+      <form class="inline" hx-post="/users/{{.ID}}/password" hx-target="#users">
+        <input name="password" type="password" style="min-width:9rem" placeholder="8+ characters">
+        <button>change</button>
+      </form>
+    </td>
+    <td>
+      <form class="inline" hx-post="/users/{{.ID}}/delete" hx-target="#users" hx-confirm="Delete {{.Username}}?"><button
+          class="danger">&times;</button></form>
+    </td>
+  </tr>
+  {{end}}
+</table>
+
+<h2>New user</h2>
+<form hx-post="/users" hx-target="#users">
+  <label>Name<br><input name="username"></label>
+  <label>Password<br><input name="password" type="password" placeholder="8+ characters"></label>
+  <label>Role<br>
+    <select name="role">
+      <option>viewer</option>
+      <option>operator</option>
+      <option>admin</option>
+    </select></label>
+  <button>Create</button>
+</form>
+
+<h2>CI tokens</h2>
+<p><small class="muted">Sent as <code>Authorization: Bearer &lt;token&gt;</code>.</small></p>
+<table>
+  <tr>
+    <th>Name</th>
+    <th>User</th>
+    <th>Role</th>
+    <th>Expires</th>
+    <th></th>
+  </tr>
+  {{range .Tokens}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td>{{.Username}}</td>
+    <td>{{if .Role}}{{.Role}}{{else}}same as user{{end}}</td>
+    <td>{{if .ExpiresAt.Valid}}{{.ExpiresAt.Time.Format "2006-01-02"}}{{else}}never{{end}}</td>
+    <td>
+      <form class="inline" hx-post="/tokens/{{.ID}}/delete" hx-target="#users" hx-confirm="Revoke?"><button
+          class="danger">&times;</button></form>
+    </td>
+  </tr>
+  {{end}}
+</table>
+
+<form hx-post="/tokens" hx-target="#users">
+  <label>Label<br><input name="name" placeholder="github-actions"></label>
+  <label>User<br>
+    <select name="user_id">{{range .Users}}<option value="{{.ID}}">{{.Username}}</option>{{end}}</select></label>
+  <label>Token role<br>
+    <select name="role">
+      <option value="">same as user</option>
+      <option>viewer</option>
+      <option>operator</option>
+      <option>admin</option>
+    </select></label>
+  <label>Days until expiry (0 = never)<br><input name="days" value="0"></label>
+  <button>Create token</button>
+</form>
+{{end}}

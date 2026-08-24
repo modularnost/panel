@@ -1,0 +1,40 @@
+{{template "head"}}
+<h1>{{.Module.Name}} <small class="muted">{{.Module.Version}}</small></h1>
+<iframe id="modframe" src="{{.Src}}" title="{{.Module.Name}}"
+  style="width:100%;height:60vh;border:1px solid var(--line);border-radius:var(--radius)"></iframe>
+<script>
+  const frame = document.getElementById('modframe');
+  let applied = 0;
+
+  function contentHeight(doc) {
+    let bottom = 0;
+    for (const el of doc.body.children) {
+      bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
+    }
+    return Math.ceil(bottom + 16); // a little breathing room under the last element
+  }
+
+  function fit() {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc || !doc.body) return;
+      const next = contentHeight(doc);
+      // Ignore sub-pixel jitter, otherwise the frame twitches forever.
+      if (next > 40 && Math.abs(next - applied) > 4) {
+        applied = next;
+        frame.style.height = next + 'px';
+      }
+    } catch (e) { /* module navigated somewhere we cannot measure */ }
+  }
+
+  frame.addEventListener('load', () => {
+    applied = 0;
+    fit();
+    // Follow content that changes after load (a module refreshing itself, a form
+    // result, an expanding list).
+    try {
+      new ResizeObserver(fit).observe(frame.contentDocument.body);
+    } catch (e) { /* no ResizeObserver: the load-time fit still applies */ }
+  });
+</script>
+{{template "foot"}}

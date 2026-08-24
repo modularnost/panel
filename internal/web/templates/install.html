@@ -1,0 +1,27 @@
+{{template "head"}}
+<h1>Install a module</h1>
+<p class="muted"><a href="https://github.com/modularnost/modularnost/blob/main/docs/catalog.md">Catalogue</a></p>
+
+{{if .Error}}<p class="bad">{{.Error}}</p>{{end}}
+
+<form hx-post="/modules/install" hx-swap="none">
+  <label>Image<br><input name="image" placeholder="ghcr.io/someone/backups:v1" autofocus></label>
+  <label>Name<br>
+    <input name="name" placeholder="backups"></label>
+  <label>Service name<br>
+    <input name="service" placeholder="backups_module"></label>
+  <label>Port<br><input name="port" value="8080" style="min-width:6rem"></label>
+  <label>Network<br>
+    <select name="network">
+      {{range .Networks}}<option {{if eq . $.Self.Network}}selected{{end}}>{{.}}</option>{{end}}
+    </select></label>
+  <label>Environment, one per line — <span class="mono">KEY=value</span><br>
+    <textarea name="env" rows="3" placeholder="LOG_LEVEL=info"></textarea></label>
+  <button>Install</button> <a href="/modules">cancel</a>
+</form>
+
+
+
+<p><small class="muted">A module runs code in your cluster with the permissions it
+asks for. Prefer a pinned tag over <span class="mono">:latest</span>.</small></p>
+{{template "foot"}}

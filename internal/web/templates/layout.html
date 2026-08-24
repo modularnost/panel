@@ -1,0 +1,64 @@
+{{define "head"}}
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>modularnost</title>
+  <script src="/static/htmx.min.js?v={{sv}}"></script>
+  <link rel="stylesheet" href="/static/panel.css?v={{sv}}">
+</head>
+
+<body>
+  <div class="app">
+    <aside class="side">
+      <a class="brand" href="/">modularnost</a>
+      <a class="item" href="/">Services</a>
+      <a class="item" href="/resources">Resources</a>
+      <a class="item" href="/deploys">Deploys</a>
+      <a class="item" href="/modules">Modules</a>
+      <span class="nav-slot" hx-get="/nav" hx-trigger="load"></span>
+    <div class="ver">{{version}}</div>
+    </aside>
+    <main class="main">
+      {{end}}
+
+      {{define "foot"}}
+    </main>
+  </div>
+  <script>
+    // Mark the sidebar link matching the current page. Runs again after htmx swaps
+    // in the part of the menu that comes from /nav.
+    function markActive() {
+      const path = location.pathname;
+      for (const a of document.querySelectorAll('.side a.item')) {
+        const href = a.getAttribute('href');
+        a.classList.toggle('on', href === path || (href !== '/' && path.startsWith(href)));
+      }
+    }
+    document.addEventListener('htmx:afterSwap', markActive);
+    markActive();
+  </script>
+</body>
+
+</html>
+{{end}}
+
+{{define "bare"}}
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>modularnost</title>
+  <link rel="stylesheet" href="/static/panel.css?v={{sv}}">
+</head>
+
+<body style="display:grid;place-items:center;min-height:100vh">
+  {{end}}
+
+  {{define "barefoot"}}</body>
+
+</html>{{end}}

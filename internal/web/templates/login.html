@@ -1,0 +1,10 @@
+{{template "bare"}}
+<form method="post" action="/login" class="card" style="min-width:20rem">
+  <h1 style="margin-bottom:.25rem">modularnost</h1>
+  
+  <input type="hidden" name="next" value="{{.}}">
+  <label>Username<br><input name="username" autofocus autocomplete="username"></label>
+  <label>Password<br><input name="password" type="password" autocomplete="current-password"></label>
+  <button style="margin-top:.5rem">Sign in</button>
+</form>
+{{template "barefoot"}}

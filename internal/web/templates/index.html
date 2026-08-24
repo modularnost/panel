@@ -1,0 +1,46 @@
+{{template "head"}}
+<h1>Services
+  <small style="font-weight:400;font-size:.8rem;margin-left:.5rem">
+    <a href="/stacks/new">+ stack</a> &middot; <a href="/services/new">+ service</a>
+  </small>
+</h1>
+<div id="services">{{template "services" .}}</div>
+{{template "foot"}}
+
+{{define "services"}}
+{{if not .}}<p>No services yet. Deploy a stack: <code>docker stack deploy -c stack.yml myapp</code></p>{{end}}
+{{range .}}
+<h2>{{.Name}}
+  <form class="inline" hx-post="/stacks/{{.Name}}/redeploy" hx-target="#services"
+    hx-confirm="Redeploy the whole {{.Name}} stack?">
+    <button>redeploy</button>
+  </form>
+  {{if ne .Name "(no stack)"}}<small><a href="/stacks/{{.Name}}/edit">edit compose</a></small>{{end}}
+</h2>
+<table>
+  <tr>
+    <th>Service</th>
+    <th>Image</th>
+    <th>Digest</th>
+    <th>Replicas</th>
+    <th></th>
+  </tr>
+  {{range .Services}}
+  <tr>
+    <td><a href="/services/{{.ID}}">{{.Name}}</a></td>
+    <td class="mono">{{.Image}}</td>
+    <td class="mono">{{short .Digest}}</td>
+    <td><span class="pill {{if .Healthy}}ok{{else}}bad{{end}}">{{.Running}}/{{.Desired}}</span>
+      <small class="muted">{{.Mode}}</small>
+    </td>
+    <td>
+      <form class="inline" hx-post="/services/{{.ID}}/update" hx-target="#services">
+        <button>update</button>
+      </form>
+      <a href="/services/{{.ID}}/logs">logs</a>
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+{{end}}

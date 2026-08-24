@@ -1,0 +1,22 @@
+{{template "head"}}
+<h1>Deploy history</h1>
+<table>
+  <tr>
+    <th>When</th>
+    <th>Target</th>
+    <th>Source</th>
+    <th>Status</th>
+    <th>Digest</th>
+  </tr>
+  {{range .}}
+  <tr>
+    <td>{{.StartedAt.Format "01-02 15:04:05"}}</td>
+    <td>{{if .ServiceName}}{{.ServiceName}}{{else}}{{.StackName}}{{end}}</td>
+    <td>{{.Source}}</td>
+    <td><span class="pill {{if eq .Status "success"}}ok{{else if eq .Status "failed" }}bad{{end}}">{{.Status}}</span>
+      {{if .ErrorMessage}}<small class="muted">{{.ErrorMessage}}</small>{{end}}</td>
+    <td class="mono">{{short .OldDigest}} → {{short .NewDigest}}</td>
+  </tr>
+  {{end}}
+</table>
+{{template "foot"}}

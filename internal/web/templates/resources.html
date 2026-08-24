@@ -1,0 +1,37 @@
+{{template "head"}}
+<h1>Resources</h1>
+
+<div hx-get="/resources/table" hx-trigger="load, every 10s" hx-swap="innerHTML">
+  <p class="muted">sampling&hellip;</p>
+</div>
+{{template "foot"}}
+
+{{define "stats-table"}}
+{{if .Err}}<p class="bad">{{.Err}}</p>{{end}}
+{{if not .Stats}}{{if not .Err}}<p class="muted">Nothing running.</p>{{end}}{{else}}
+<table>
+  <tr>
+    <th>Node</th>
+    {{if .WithService}}<th>Service</th>{{end}}
+    <th>Replica</th>
+    <th class="num">CPU</th>
+    <th class="num">Memory</th>
+  </tr>
+  {{$withService := .WithService}}
+  {{range .Stats}}
+  <tr>
+    {{if .Err}}
+    <td>{{.Node}}</td>
+    <td colspan="4" class="bad">{{.Err}}</td>
+    {{else}}
+    <td class="muted">{{.Node}}</td>
+    {{if $withService}}<td>{{.Service}}{{if .Stack}} <small class="muted">{{.Stack}}</small>{{end}}</td>{{end}}
+    <td>{{.Slot}}</td>
+    <td class="num">{{printf "%.1f" .CPU}} %</td>
+    <td class="num">{{human .Mem}}{{if .MemLimit}} <span class="muted">/ {{human .MemLimit}}</span>{{end}}</td>
+    {{end}}
+  </tr>
+  {{end}}
+</table>
+{{end}}
+{{end}}

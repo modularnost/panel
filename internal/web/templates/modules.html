@@ -1,0 +1,34 @@
+{{template "head"}}
+<h1>Modules
+  {{if eq .Me.Role "admin"}}<small style="font-weight:400;font-size:.8rem;margin-left:.5rem">
+    <a href="/modules/install">+ install</a></small>{{end}}
+</h1>
+{{if not .Modules}}
+<p>No modules found.</p>
+{{end}}
+<table>
+  <tr>
+    <th>Module</th>
+    <th>Version</th>
+    <th>Service</th>
+    <th>Permissions</th>
+    <th>Status</th>
+    <th></th>
+  </tr>
+  {{range .Modules}}
+  <tr>
+    <td>{{if .OK}}<a href="/modules/{{.Name}}/">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td>
+    <td>{{.Version}}</td>
+    <td class="mono">{{.Service}}</td>
+    <td class="mono">{{range .Manifest.Permissions}}{{.}} {{end}}</td>
+    <td>{{if .OK}}<span class="pill ok">ok</span>{{else}}<span class="pill bad">{{.Err}}</span>{{end}}</td>
+    <td>{{if eq $.Me.Role "admin"}}
+      <form class="inline" hx-post="/modules/{{.Name}}/uninstall" hx-swap="none"
+        hx-confirm="Remove the {{.Name}} module? Its service is deleted.">
+        <button class="danger">uninstall</button>
+      </form>{{end}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{template "foot"}}

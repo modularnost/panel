@@ -1,0 +1,40 @@
+{{template "head"}}
+<h1>Webhooks</h1>
+<div id="hooks">{{template "hooklist" .}}</div>
+{{template "foot"}}
+
+{{define "hooklist"}}
+<table>
+  <tr>
+    <th>Action</th>
+    <th>Target</th>
+    <th>URL</th>
+    <th>Last call</th>
+    <th></th>
+  </tr>
+  {{range .}}
+  <tr>
+    <td>{{.ActionType}}</td>
+    <td>{{if .ServiceName}}{{.ServiceName}}{{else}}{{.StackName}}{{end}}</td>
+    <td class="mono">POST /hook/{{.SecretToken}}</td>
+    <td>{{if .LastTriggered.Valid}}{{.LastTriggered.Time.Format "2006-01-02 15:04"}}{{else}}—{{end}}</td>
+    <td>
+      <form class="inline" hx-post="/webhooks/{{.ID}}/delete" hx-target="#hooks" hx-confirm="Delete?"><button
+          class="danger">&times;</button></form>
+    </td>
+  </tr>
+  {{end}}
+</table>
+
+<h2>New webhook</h2>
+<form hx-post="/webhooks" hx-target="#hooks">
+  <label>Action<br>
+    <select name="action_type">
+      <option value="force_update">force_update (one service)</option>
+      <option value="stack_redeploy">stack_redeploy (whole stack)</option>
+    </select></label>
+  <label>Service name<br><input name="service_name" placeholder="myapp_web"></label>
+  <label>Stack name<br><input name="stack_name" placeholder="myapp"></label>
+  <button>Create</button>
+</form>
+{{end}}

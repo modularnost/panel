@@ -1,0 +1,18 @@
+{{define "nav"}}
+{{$mods := .Modules}}
+{{if $mods}}<div class="sec">Modules</div>{{end}}
+{{range $mods}}{{if .OK}}{{$m := .}}{{range .Manifest.NavEntries}}
+<a class="item" href="/modules/{{$m.Name}}{{.Path}}">{{.Title}}</a>
+{{end}}{{end}}{{end}}
+{{if eq .Me.Role "admin"}}
+<div class="sec">Admin</div>
+<a class="item" href="/nodes">Nodes</a>
+<a class="item" href="/webhooks">Webhooks</a>
+<a class="item" href="/users">Users</a>
+{{end}}
+<div class="spacer"></div>
+<div class="me">
+  <span><b>{{.Me.Username}}</b><br>{{.Me.Role}}</span>
+  <form class="inline" method="post" action="/logout"><button>sign out</button></form>
+</div>
+{{end}}

@@ -1,0 +1,201 @@
+{{template "head"}}
+{{$s := .Service}}
+{{$admin := eq .Me.Role "admin"}}
+
+<h1>{{$s.Name}}</h1>
+<p class="muted" style="margin-top:-.75rem">
+  {{if $s.Stack}}stack <a href="/">{{$s.Stack}}</a> &middot; {{end}}
+  <span class="mono">{{$s.Image}}</span>
+  {{if $s.Digest}}<span class="mono">@{{short $s.Digest}}</span>{{end}}
+  &middot; <span class="pill {{if $s.Healthy}}ok{{else}}bad{{end}}">{{$s.Running}}/{{$s.Desired}}</span>
+  {{$s.Mode}}
+</p>
+
+<div class="tabs">
+  <a href="/services/{{$s.ID}}" class="{{if eq .Tab "overview"}}on{{end}}">Overview</a>
+  <a href="/services/{{$s.ID}}/logs" class="{{if eq .Tab "logs"}}on{{end}}">Logs</a>
+  <a href="/services/{{$s.ID}}/deploys" class="{{if eq .Tab "deploys"}}on{{end}}">Deploys</a>
+  {{if $admin}}
+  <a href="/services/{{$s.ID}}/traefik" class="{{if eq .Tab "traefik"}}on{{end}}">Traefik</a>
+  <a href="/services/{{$s.ID}}/webhooks" class="{{if eq .Tab "webhooks"}}on{{end}}">Webhooks</a>
+  {{end}}
+</div>
+
+{{if eq .Tab "overview"}}
+{{template "svc-actions" .}}
+
+<h2>Resources</h2>
+<div hx-get="/services/{{$s.ID}}/stats" hx-trigger="load, every 10s" hx-swap="innerHTML">
+  <p class="muted">sampling&hellip;</p>
+</div>
+
+<h2>Labels</h2>
+{{if $s.Labels}}
+<table>
+  {{range $k, $v := $s.Labels}}<tr>
+    <td class="mono">{{$k}}</td>
+    <td class="mono">{{$v}}</td>
+  </tr>{{end}}
+</table>
+{{else}}<p class="muted">No labels.</p>{{end}}
+
+{{else if eq .Tab "logs"}}
+{{template "svc-logs" .}}
+
+{{else if eq .Tab "deploys"}}
+{{if not .Deploys}}<p class="muted">Nothing deployed through the panel yet.</p>{{end}}
+<table>
+  {{if .Deploys}}<tr>
+    <th>When</th>
+    <th>Source</th>
+    <th>Status</th>
+    <th>Digest</th>
+  </tr>{{end}}
+  {{range .Deploys}}
+  <tr>
+    <td>{{.StartedAt.Format "2006-01-02 15:04:05"}}</td>
+    <td>{{.Source}}{{if .StackName}} <small class="muted">stack</small>{{end}}</td>
+    <td><span class="pill {{if eq .Status "success"}}ok{{else if eq .Status "failed" }}bad{{end}}">{{.Status}}</span>
+      {{if .ErrorMessage}}<small class="muted">{{.ErrorMessage}}</small>{{end}}</td>
+    <td class="mono">{{short .OldDigest}} &rarr; {{short .NewDigest}}</td>
+  </tr>
+  {{end}}
+</table>
+
+{{else if eq .Tab "traefik"}}
+{{with .Traefik}}
+<form hx-post="/services/{{.Service.ID}}/traefik">
+  <label>Domain (Host)<br><input name="host" value="{{.Host}}" placeholder="app.example.com"></label>
+  <label>Container port<br><input name="port" value="{{.Port}}" placeholder="8080"></label>
+  <label>Entrypoint<br><input name="entrypoint" value="{{.Entrypoint}}"></label>
+  <label>Cert resolver (empty = no TLS)<br><input name="certresolver" value="{{.CertResolv}}" placeholder="le"></label>
+  <button>Save labels</button>
+</form>
+{{end}}
+  <p><small class="muted">Empty domain and port take the service off Traefik.</small></p>
+
+{{else if eq .Tab "webhooks"}}
+<div id="svc-hooks">{{template "svc-hooks" .}}</div>
+{{end}}
+
+{{template "foot"}}
+
+
+{{define "svc-actions"}}
+{{$s := .Service}}
+<form class="inline" hx-post="/services/{{$s.ID}}/update" hx-swap="none" hx-on::after-request="location.reload()">
+  <button>Update &amp; repull image</button>
+</form>
+{{if and $s.Stack (eq .Me.Role "admin")}}
+<a class="inline" href="/stacks/{{$s.Stack}}/edit" style="margin-left:.5rem">edit compose</a>
+{{end}}
+{{if eq .Me.Role "admin"}}
+<form class="inline" hx-post="/services/{{$s.ID}}/remove" hx-swap="none" hx-confirm="Remove service {{$s.Name}}?">
+  <button class="danger">Remove</button>
+</form>
+{{end}}
+{{if $s.Stack}}
+<form class="inline" hx-post="/stacks/{{$s.Stack}}/redeploy" hx-swap="none" hx-on::after-request="location.reload()"
+  hx-confirm="Redeploy the whole {{$s.Stack}} stack?">
+  <button>Redeploy stack</button>
+</form>
+{{end}}
+{{end}}
+
+
+{{define "svc-logs"}}
+<label style="display:inline-block">Replica
+  <select id="task" style="min-width:12rem">
+    <option value="">all ({{len .Tasks}})</option>
+    {{range .Tasks}}<option value="{{.ID}}">slot {{.Slot}} &mdash; {{.State}}</option>{{end}}
+  </select>
+</label>
+<label style="display:inline-block">Tail
+  <select id="tail" style="min-width:6rem">
+    <option>200</option>
+    <option>1000</option>
+    <option>5000</option>
+  </select>
+</label>
+<button id="pause">pause</button>
+<span id="status" class="mono muted"></span>
+
+<pre id="out" style="height:65vh;overflow:auto;background:var(--panel);border:1px solid var(--line);
+     border-radius:var(--radius);padding:.75rem;font-size:.85em;margin-top:1rem"></pre>
+
+<script>
+  const out = document.getElementById('out'), status = document.getElementById('status');
+  let es = null, paused = false;
+
+  function connect() {
+    if (es) es.close();
+    out.textContent = '';
+    const task = document.getElementById('task').value, tail = document.getElementById('tail').value;
+    es = new EventSource(`/services/{{.Service.ID}}/logs/stream?task=${task}&tail=${tail}`);
+    status.textContent = 'connected';
+    es.onmessage = e => {
+      if (paused) return;
+      // Keep only the last 5000 lines in the DOM, or the tab eats memory.
+      const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 40;
+      out.append(e.data + '\n');
+      while (out.childNodes.length > 5000) out.firstChild.remove();
+      if (atBottom) out.scrollTop = out.scrollHeight;
+    };
+    es.onerror = () => { status.textContent = 'reconnecting...'; };
+  }
+
+  document.getElementById('task').onchange = connect;
+  document.getElementById('tail').onchange = connect;
+  document.getElementById('pause').onclick = e => {
+    paused = !paused;
+    e.target.textContent = paused ? 'resume' : 'pause';
+  };
+  connect();
+</script>
+{{end}}
+
+
+{{define "svc-hooks"}}
+{{$s := .Service}}
+{{if .NewHook}}
+<p class="ok">Webhook created. Call it from CI:<br>
+  <code>POST /hook/{{.NewHook}}</code>
+</p>
+{{end}}
+
+{{if not .Hooks}}<p class="muted">No webhooks for this service yet.</p>{{end}}
+{{if .Hooks}}
+<table>
+  <tr>
+    <th>Action</th>
+    <th>Scope</th>
+    <th>URL</th>
+    <th>Last call</th>
+    <th></th>
+  </tr>
+  {{range .Hooks}}
+  <tr>
+    <td>{{.ActionType}}</td>
+    <td>{{if .ServiceName}}this service{{else}}stack {{.StackName}}{{end}}</td>
+    <td class="mono">POST /hook/{{.SecretToken}}</td>
+    <td>{{if .LastTriggered.Valid}}{{.LastTriggered.Time.Format "2006-01-02 15:04"}}{{else}}&mdash;{{end}}</td>
+    <td>
+      <form class="inline" hx-post="/services/{{$s.ID}}/webhooks/{{.ID}}/delete" hx-target="#svc-hooks"
+        hx-confirm="Delete this webhook?"><button class="danger">&times;</button></form>
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+
+<h2>New webhook</h2>
+<form hx-post="/services/{{$s.ID}}/webhooks" hx-target="#svc-hooks">
+  <label>Action<br>
+    <select name="action_type">
+      <option value="force_update">force_update &mdash; this service</option>
+      {{if $s.Stack}}<option value="stack_redeploy">stack_redeploy &mdash; the {{$s.Stack}} stack</option>{{end}}
+    </select></label>
+  <button>Create</button>
+</form>
+<p><small class="muted">The secret in the URL is the authentication.</small></p>
+{{end}}

@@ -1,0 +1,29 @@
+{{template "head"}}
+<h1>{{if .Name}}Stack: {{.Name}}{{else}}New stack{{end}}</h1>
+
+<form hx-post="{{if .Name}}/stacks/{{.Name}}{{else}}/stacks{{end}}" hx-target="#result">
+  {{if not .Name}}
+  <label>Name<br><input name="name" placeholder="myapp" autofocus></label>
+  {{end}}
+  <label>docker-compose.yml<br>
+    <textarea name="compose" rows="22" spellcheck="false"
+      style="width:100%;font-family:ui-monospace,monospace;font-size:.85em">{{.Compose}}</textarea></label>
+  <button>Deploy</button>
+  {{if .Name}}
+  <button type="button" class="danger" hx-post="/stacks/{{.Name}}/remove" hx-swap="none"
+    hx-confirm="Remove every service of the {{.Name}} stack?">Remove stack</button>
+  {{end}}
+  <a href="/">back</a>
+</form>
+
+<div id="result">{{template "stack-result" .}}</div>
+
+<p><small class="muted">Services dropped from the file are removed from the
+cluster.</small></p>
+{{template "foot"}}
+
+{{define "stack-result"}}
+{{if .Output}}
+<pre class="mono" style="background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);padding:.75rem;overflow:auto">{{.Output}}</pre>{{end}}
+{{end}}

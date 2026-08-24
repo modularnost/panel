@@ -1,0 +1,64 @@
+{{template "head"}}
+<h1>Nodes</h1>
+
+<table>
+  <tr>
+    <th>Hostname</th>
+    <th>Role</th>
+    <th>Address</th>
+    <th>Engine</th>
+    <th>Status</th>
+    <th></th>
+  </tr>
+  {{range .Nodes}}
+  <tr>
+    <td>{{.Hostname}}</td>
+    <td>{{.Role}}{{if .Leader}} <small class="muted">leader</small>{{end}}</td>
+    <td class="mono">{{.Address}}</td>
+    <td class="mono">{{.Engine}} <small class="muted">{{.OS}}</small></td>
+    <td>
+      <span class="pill {{if .Healthy}}ok{{else}}bad{{end}}">{{.Status}}</span>
+      {{if ne .Availability "active"}}<span class="pill">{{.Availability}}</span>{{end}}
+    </td>
+    <td>
+      {{if eq .Availability "active"}}
+      <form class="inline" hx-post="/nodes/{{.ID}}/availability" hx-swap="none"
+        hx-confirm="Drain {{.Hostname}}? Its tasks move to other nodes.">
+        <input type="hidden" name="availability" value="drain">
+        <button>drain</button>
+      </form>
+      {{else}}
+      <form class="inline" hx-post="/nodes/{{.ID}}/availability" hx-swap="none">
+        <input type="hidden" name="availability" value="active">
+        <button>activate</button>
+      </form>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+
+<h2>Add a server</h2>
+<p><small class="muted">Runs on the joining machine, not here. It needs Docker
+and access to port 2377.</small></p>
+
+<div class="tabs">
+  <a href="/nodes?role=worker" class="{{if eq .Role "worker"}}on{{end}}">worker</a>
+  <a href="/nodes?role=manager" class="{{if eq .Role "manager"}}on{{end}}">manager</a>
+</div>
+
+{{$cmd := .Join.JoinCommand .Role}}
+{{if $cmd}}
+<pre id="joincmd" class="mono" style="background:var(--panel);border:1px solid var(--line);
+     border-radius:var(--radius);padding:.75rem;overflow:auto;white-space:pre-wrap">{{$cmd}}</pre>
+<button onclick="navigator.clipboard.writeText(document.getElementById('joincmd').textContent)">copy</button>
+<form class="inline" hx-post="/nodes/tokens/{{.Role}}/rotate" hx-swap="none"
+      hx-confirm="Rotate the {{.Role}} token? Servers already in the cluster stay; the old command stops working.">
+  <button class="danger">rotate token</button>
+</form>
+{{else}}
+<p class="bad">No join address available — is this node a manager?</p>
+{{end}}
+
+<p><small class="muted">Anyone with this token can add a machine to the cluster.</small></p>
+{{template "foot"}}

@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  panel:
+    # Published by CI; override with PANEL_IMAGE to run a locally built one.
+    image: ${PANEL_IMAGE:-ghcr.io/modularnost/panel:latest}
+    environment:
+      PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?set PANEL_ADMIN_PASSWORD}
+      # Shared with the agents below; must be a fixed value, not the per-start default.
+      PANEL_MODULE_SECRET: ${PANEL_MODULE_SECRET:?set PANEL_MODULE_SECRET}
+      PANEL_AGENT_SERVICE: panel_agent
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - panel-data:/data
+    ports:
+      - "8080:8080"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager      # docker.sock lives on managers only
+        # The SQLite file lives on one node; with several managers, uncomment:
+        #  - node.hostname == manager-1
+
+  # One agent per node: a manager's socket only sees its own containers, so
+  # cluster-wide metrics need a reader on every node. Same image, read-only
+  # socket, never reachable from outside the overlay network.
+  agent:
+    image: ${PANEL_IMAGE:-ghcr.io/modularnost/panel:latest}
+    environment:
+      PANEL_MODE: agent
+      PANEL_MODULE_SECRET: ${PANEL_MODULE_SECRET:?set PANEL_MODULE_SECRET}
+      PANEL_NODE: "{{.Node.Hostname}}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+
+volumes:
+  panel-data:
