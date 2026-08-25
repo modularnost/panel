@@ -53,7 +53,10 @@ through the panel, behind its authentication.
 
 ### `GET /manifest`
 
-The only required endpoint. The core fetches it during discovery.
+The only required endpoint. The core fetches it during discovery, every 15
+seconds, with `X-Panel-Module` and `X-Panel-Token` set — that is how a module
+receives its token, before any user request and again after the core restarts
+with a new secret. Keep the latest one and use it to call back.
 
 ```json
 {
@@ -158,13 +161,10 @@ cluster admin will judge your module by before installing it.
 
 ## Gotchas
 
-**The token only arrives with the first user request.** The core does not hand
-a module its token at startup; the module learns it from the first proxied
-request and remembers it (see `remember()` in
-[metrics-module](../examples/metrics-module/main.go)). Until someone opens the
-module, it cannot call the core. That's not enough for background work on a
-schedule — if you need that, open an issue and the contract will have to
-change.
+**The token arrives with the manifest request, not at startup.** Remember it
+from every request the core makes (see `remember()` in
+[metrics-module](../examples/metrics-module/main.go)) — a module that only reads
+it from page requests cannot work while nobody is watching.
 
 **Discovery is cached for 15 seconds.** Changed your manifest? Wait.
 

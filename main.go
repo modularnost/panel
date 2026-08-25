@@ -91,16 +91,21 @@ func main() {
 		log.Fatalf("first admin: %v", err)
 	}
 
-	// Secret for module tokens. New on every start by default: the token is
-	// handed to the module with every proxied request, so there is nothing to
-	// persist and no reason to.
+	// Secret for module tokens. New on every start by default: modules are
+	// handed the resulting token on the next discovery pass, so there is
+	// nothing to persist and no reason to.
 	secret := env("PANEL_MODULE_SECRET", store.NewToken())
 
 	web.Version = version
+	registry := modules.NewRegistry(dk, secret)
+	// Hands every module its token within a TTL of the panel starting, without
+	// waiting for someone to open a page.
+	go registry.Refresh(context.Background())
+
 	srv := &web.Server{
 		Docker:  dk,
 		DB:      db,
-		Modules: modules.NewRegistry(dk, secret),
+		Modules: registry,
 		Metrics: agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
 	}
 	addr := env("PANEL_ADDR", ":8080")

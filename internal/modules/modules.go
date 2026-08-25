@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -146,6 +147,11 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 	if err != nil {
 		return err
 	}
+	// Discovery is also how a module receives its token: it arrives before any
+	// user request, so a module can do background work, and it arrives again on
+	// every refresh, so a restarted core with a new secret repairs itself.
+	req.Header.Set("X-Panel-Module", m.Name)
+	req.Header.Set("X-Panel-Token", r.Token(m.Name))
 	resp, err := r.http.Do(req)
 	if err != nil {
 		return err
@@ -155,6 +161,22 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 		return fmt.Errorf("/manifest returned %s", resp.Status)
 	}
 	return json.NewDecoder(resp.Body).Decode(&m.Manifest)
+}
+
+// Refresh keeps discovery running with nobody watching. Modules that work on a
+// schedule need their token before the first page view, and it only reaches
+// them through a manifest fetch (see fetchManifest).
+func (r *Registry) Refresh(ctx context.Context) {
+	for {
+		if _, err := r.List(ctx); err != nil {
+			log.Printf("module discovery: %v", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(ttl):
+		}
+	}
 }
 
 // Forget drops the cache. Call it after installing or removing a module:

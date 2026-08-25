@@ -49,6 +49,7 @@ const manifest = `{
 
 func main() {
 	http.HandleFunc("/manifest", func(w http.ResponseWriter, r *http.Request) {
+		remember(r) // discovery carries the token, so this is where it arrives first
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, manifest)
 	})

@@ -181,11 +181,13 @@ feature — it renders what the panel already renders.
    which is exactly what the core must not grow. Scope it as CPU and memory per
    service over a few days with a chart on the service card, not as a Grafana
    clone with datasources, a query language and alerting.
-   - **Prerequisite, a core change**: a module currently learns its token only
-     from the first proxied user request, so it cannot poll on a schedule with
-     nobody watching. The install form should inject the token as an env var.
-     Note that PANEL_MODULE_SECRET defaults to a new value per start, so the
-     injected token goes stale on restart unless the secret is pinned
+   - **Prerequisite, done 2026-08-25**: a module used to learn its token only
+     from the first proxied user request, so it could not poll on a schedule
+     with nobody watching. The manifest request now carries the token, and the
+     panel refreshes discovery on a timer, so every module has one within a TTL
+     of the core starting. Injecting it as an env var is no longer needed: a
+     token that arrives on every refresh survives a new PANEL_MODULE_SECRET,
+     which an injected one would not
    - the hard part is retention, not charts: downsampling, a retention window,
      and what happens to services that disappear. Sampling every 10s forever is
      millions of rows a week on a modest cluster
