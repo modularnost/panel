@@ -11,6 +11,48 @@ Grafana or in a module, not in the core.
 
 Status: works, but the API and DB schema may still change.
 
+## Installing on a server
+
+One command on a fresh Ubuntu/Debian host with a domain pointed at it. It
+installs Docker, initialises a one-node swarm, and brings up Traefik with a
+Let's Encrypt certificate and the panel behind it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/install.sh | sudo sh
+```
+
+It asks for the domain and for an email for Let's Encrypt; an empty email skips
+TLS and serves plain HTTP — for an internal network Let's Encrypt cannot reach.
+The admin password is printed once at the end.
+
+Set the variables instead and it asks nothing, which is what an unattended run
+needs:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/install.sh |
+  sudo DOMAIN=panel.example.com EMAIL=you@example.com sh
+```
+
+Re-running it updates the panel and leaves your users alone: an existing swarm,
+network or stack is reused. The generated compose file and the module secret
+live in `/etc/modularnost`.
+
+| Variable | Default | |
+| --- | --- | --- |
+| `DOMAIN` | asked | |
+| `EMAIL` | asked | Let's Encrypt account; empty means plain HTTP |
+| `PANEL_VERSION` | `latest` | image tag, see the table below |
+| `PANEL_IMAGE` | `ghcr.io/modularnost/panel:$PANEL_VERSION` | your own build |
+| `PANEL_STACK` | `panel` | stack name |
+| `ADVERTISE_ADDR` | detected | swarm address, if the host has several |
+
+To remove it again — the swarm and other stacks are left alone:
+
+```sh
+sudo sh scripts/uninstall.sh            # keeps the database and certificates
+sudo sh scripts/uninstall.sh --purge    # deletes them too
+```
+
 ## Running it
 
 Requires Go 1.26+ and Docker with Swarm active (`docker swarm init` — even on a
