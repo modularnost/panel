@@ -3,6 +3,8 @@ package docker
 import (
 	"strings"
 	"testing"
+
+	"github.com/docker/docker/api/types/container"
 )
 
 func TestSplitImage(t *testing.T) {
@@ -70,5 +72,21 @@ func TestSlotFromTaskName(t *testing.T) {
 	}
 	if got := slotFromTaskName(""); got != 0 {
 		t.Fatalf("empty: %d", got)
+	}
+}
+
+func TestAddCounters(t *testing.T) {
+	st := TaskStats{}
+	addCounters(&st, container.StatsResponse{
+		Networks: map[string]container.NetworkStats{
+			"eth0": {RxBytes: 10, TxBytes: 20},
+			"eth1": {RxBytes: 1, TxBytes: 2},
+		},
+		BlkioStats: container.BlkioStats{IoServiceBytesRecursive: []container.BlkioStatEntry{
+			{Op: "Read", Value: 30}, {Op: "Write", Value: 40}, {Op: "Sync", Value: 50},
+		}},
+	})
+	if st.NetRX != 11 || st.NetTX != 22 || st.BlockRead != 30 || st.BlockWrite != 40 {
+		t.Fatalf("wrong counters: %+v", st)
 	}
 }

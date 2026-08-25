@@ -124,19 +124,24 @@ stores nothing, and the token can't be forged without that secret.
 | Endpoint | Permission | Returns |
 | --- | --- | --- |
 | `GET /internal/services` | `service:read` | services with their status |
-| `GET /internal/stats` | `stats:read` | CPU and memory per replica, every node; `?service=<name>` narrows it |
+| `GET /internal/stats` | `stats:read` | CPU, memory, network and block I/O counters per replica; `?service=<name>` narrows it |
 | `POST /internal/services/{name}/update` | `service:update` | force-update, recorded in deploy history |
 
 `/internal/stats` returns one object per replica:
 
 ```json
 {"node":"worker-2","service":"api","stack":"shop","slot":1,
- "cpu":3.7,"mem":74190848,"mem_limit":2147483648}
+ "cpu":3.7,"mem":74190848,"mem_limit":2147483648,
+ "net_rx":123456,"net_tx":654321,"block_read":789,"block_write":456}
 ```
 
 `cpu` is percent of one core, the way `docker stats` reports it, so a busy
 4-core replica reads above 100. `mem` excludes page cache. `mem_limit` is 0 when
 the service sets no limit, and the node's total memory otherwise.
+
+`net_rx`/`net_tx` and `block_read`/`block_write` are cumulative bytes since the
+container started. Calculate a rate from two samples; a restarted container
+resets its counters.
 
 `node` is the node the replica runs on. A node whose agent cannot be reached
 comes back as a single row with `err` set instead of numbers — render it, do not

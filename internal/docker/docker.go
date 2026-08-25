@@ -316,14 +316,18 @@ func (c *Client) Logs(ctx context.Context, serviceID, taskID string, tail int) (
 
 // TaskStats is a point-in-time sample for one replica.
 type TaskStats struct {
-	Node     string  `json:"node"`
-	Service  string  `json:"service"`
-	Stack    string  `json:"stack"`
-	Slot     int     `json:"slot"`
-	CPU      float64 `json:"cpu"`       // percent of one core, same as docker stats
-	Mem      uint64  `json:"mem"`       // bytes
-	MemLimit uint64  `json:"mem_limit"` // bytes, 0 when no limit is set
-	Err      string  `json:"err,omitempty"`
+	Node       string  `json:"node"`
+	Service    string  `json:"service"`
+	Stack      string  `json:"stack"`
+	Slot       int     `json:"slot"`
+	CPU        float64 `json:"cpu"`         // percent of one core, same as docker stats
+	Mem        uint64  `json:"mem"`         // bytes
+	MemLimit   uint64  `json:"mem_limit"`   // bytes, 0 when no limit is set
+	NetRX      uint64  `json:"net_rx"`      // cumulative received bytes
+	NetTX      uint64  `json:"net_tx"`      // cumulative transmitted bytes
+	BlockRead  uint64  `json:"block_read"`  // cumulative bytes read from block devices
+	BlockWrite uint64  `json:"block_write"` // cumulative bytes written to block devices
+	Err        string  `json:"err,omitempty"`
 }
 
 // Stats collects CPU and memory for the containers running on THIS node.
@@ -428,6 +432,7 @@ func (c *Client) containerStats(ctx context.Context, id string, st *TaskStats) e
 	if cache, ok := s.MemoryStats.Stats["inactive_file"]; ok && cache < st.Mem {
 		st.Mem -= cache
 	}
+	addCounters(st, s)
 	cpuDelta := float64(s.CPUStats.CPUUsage.TotalUsage) - float64(s.PreCPUStats.CPUUsage.TotalUsage)
 	sysDelta := float64(s.CPUStats.SystemUsage) - float64(s.PreCPUStats.SystemUsage)
 	if cpuDelta > 0 && sysDelta > 0 {
@@ -438,4 +443,19 @@ func (c *Client) containerStats(ctx context.Context, id string, st *TaskStats) e
 		st.CPU = cpuDelta / sysDelta * cores * 100
 	}
 	return nil
+}
+
+func addCounters(st *TaskStats, s container.StatsResponse) {
+	for _, n := range s.Networks {
+		st.NetRX += n.RxBytes
+		st.NetTX += n.TxBytes
+	}
+	for _, io := range s.BlkioStats.IoServiceBytesRecursive {
+		switch io.Op {
+		case "Read":
+			st.BlockRead += io.Value
+		case "Write":
+			st.BlockWrite += io.Value
+		}
+	}
 }
