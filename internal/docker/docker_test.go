@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/swarm"
 )
 
 func TestSplitImage(t *testing.T) {
@@ -88,5 +89,18 @@ func TestAddCounters(t *testing.T) {
 	})
 	if st.NetRX != 11 || st.NetTX != 22 || st.BlockRead != 30 || st.BlockWrite != 40 {
 		t.Fatalf("wrong counters: %+v", st)
+	}
+}
+
+func TestRunningTasksExcludesShutDownReplica(t *testing.T) {
+	got := runningTasks([]swarm.Task{
+		{ServiceID: "web", DesiredState: swarm.TaskStateRunning, Status: swarm.TaskStatus{State: swarm.TaskStateRunning}},
+		// A dead worker can leave this last reported as Running, but Swarm has
+		// already asked it to stop. It must not inflate the replica count.
+		{ServiceID: "web", DesiredState: swarm.TaskStateShutdown, Status: swarm.TaskStatus{State: swarm.TaskStateRunning}},
+		{ServiceID: "web", DesiredState: swarm.TaskStateRunning, Status: swarm.TaskStatus{State: swarm.TaskStateFailed}},
+	})
+	if got["web"] != 1 {
+		t.Fatalf("want 1 live task, got %d", got["web"])
 	}
 }

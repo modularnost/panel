@@ -64,6 +64,13 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	tasks, err := c.api.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(
+		filters.Arg("desired-state", string(swarm.TaskStateRunning)),
+	)})
+	if err != nil {
+		return nil, err
+	}
+	running := runningTasks(tasks)
 	out := make([]Service, 0, len(list))
 	for _, s := range list {
 		img, digest := splitImage(s.Spec.TaskTemplate.ContainerSpec.Image)
@@ -82,9 +89,20 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 		if s.ServiceStatus != nil {
 			svc.Running, svc.Desired = s.ServiceStatus.RunningTasks, s.ServiceStatus.DesiredTasks
 		}
+		svc.Running = running[s.ID]
 		out = append(out, svc)
 	}
 	return out, nil
+}
+
+func runningTasks(tasks []swarm.Task) map[string]uint64 {
+	out := make(map[string]uint64)
+	for _, t := range tasks {
+		if t.DesiredState == swarm.TaskStateRunning && t.Status.State == swarm.TaskStateRunning {
+			out[t.ServiceID]++
+		}
+	}
+	return out
 }
 
 func (c *Client) service(ctx context.Context, nameOrID string) (swarm.Service, error) {
