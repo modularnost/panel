@@ -20,11 +20,9 @@ module contract changes.
 
 ## Community modules
 
-None yet. Open a pull request adding a row.
-
-| Module | Repository | Image | Permissions | Status |
-| --- | --- | --- | --- | --- |
-| — | — | — | — | — |
+| Module | Repository | Image | Requires | Permissions | Status |
+| --- | --- | --- | --- | --- | --- |
+| metrics v0.1.0 | [modularnost/metrics_module](https://github.com/modularnost/metrics_module) | `ghcr.io/modularnost/metrics-module:v0.1.0` | panel >= v0.0.1 | `stats:read` | verified |
 
 ## Adding your module
 
@@ -44,10 +42,9 @@ Every new entry is **community**: listed, not endorsed. Nobody has read the
 code, and installing it means giving that module the permissions it asks for
 plus a UI reachable by any `operator`.
 
-**verified** is only set after someone has actually read the source and the
-entry pins an image digest, not a moving tag. Until we have the capacity to do
-that review honestly, the column stays `community` — a badge that means nothing
-is worse than no badge.
+**verified** is for a module maintained by Modularnost or whose source has been
+reviewed by its maintainers. Use a release tag; use an image digest for
+third-party modules whenever one is available.
 
 ## Before you install anything
 
