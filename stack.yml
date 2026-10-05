@@ -24,7 +24,8 @@ services:
 
   # One agent per node: a manager's socket only sees its own containers, so
   # cluster-wide metrics need a reader on every node. Same image, read-only
-  # socket, never reachable from outside the overlay network.
+  # socket, never reachable from outside the overlay network. ":ro" only stops
+  # writes to the socket file, not API calls: treat the agent as root-equivalent.
   agent:
     image: ${PANEL_IMAGE:-ghcr.io/modularnost/panel:latest}
     environment:

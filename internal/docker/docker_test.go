@@ -8,6 +8,23 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 )
 
+func TestPickNetwork(t *testing.T) {
+	all := []string{"traefik-public", "ingress", "panel_default"}
+	for _, c := range []struct {
+		names               []string
+		explicit, stack, to string
+	}{
+		{all, "", "panel", "panel_default"},
+		{all, "mine", "panel", "mine"},
+		{all, "", "", "panel_default"}, // sorted, ingress skipped
+		{[]string{"ingress", "bridge"}, "", "", ""},
+	} {
+		if got := pickNetwork(c.names, c.explicit, c.stack); got != c.to {
+			t.Errorf("pickNetwork(%v, %q, %q) = %q, want %q", c.names, c.explicit, c.stack, got, c.to)
+		}
+	}
+}
+
 func TestSplitImage(t *testing.T) {
 	name, digest := splitImage("ghcr.io/me/app:v1@sha256:abc")
 	if name != "ghcr.io/me/app:v1" || digest != "sha256:abc" {

@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"os"
+	"slices"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -29,15 +30,38 @@ func (c *Client) Self(ctx context.Context) (Self, error) {
 		return s, err
 	}
 	s.Service = ct.Config.Labels["com.docker.swarm.service.name"]
+	var names []string
 	for name := range ct.NetworkSettings.Networks {
+		names = append(names, name)
+	}
+	s.Network = pickNetwork(names, os.Getenv("PANEL_NETWORK"), ct.Config.Labels["com.docker.stack.namespace"])
+	return s, nil
+}
+
+// pickNetwork chooses the network modules join by default. Behind Traefik the
+// panel sits on several, and Go's map order made the answer random. Explicit
+// PANEL_NETWORK wins; otherwise the stack's private network, so modules are not
+// put on the public proxy network by accident; otherwise the first by name.
+func pickNetwork(names []string, explicit, stack string) string {
+	var usable []string
+	for _, n := range names {
 		// ingress carries published ports and is not usable for service
 		// discovery between services.
-		if name != "ingress" && name != "bridge" && name != "host" {
-			s.Network = name
-			break
+		if n != "ingress" && n != "bridge" && n != "host" {
+			usable = append(usable, n)
 		}
 	}
-	return s, nil
+	slices.Sort(usable)
+	if explicit != "" {
+		return explicit
+	}
+	if stack != "" && slices.Contains(usable, stack+"_default") {
+		return stack + "_default"
+	}
+	if len(usable) > 0 {
+		return usable[0]
+	}
+	return ""
 }
 
 // OverlayNetworks lists the networks a module could be attached to.
