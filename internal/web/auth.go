@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -63,7 +64,7 @@ func (s *Server) require(need string, next http.HandlerFunc) http.HandlerFunc {
 func (s *Server) denied(w http.ResponseWriter, r *http.Request, code int, msg string) {
 	browser := strings.Contains(r.Header.Get("Accept"), "text/html")
 	if code == http.StatusUnauthorized && browser && r.Method == http.MethodGet {
-		http.Redirect(w, r, "/login?next="+r.URL.Path, http.StatusSeeOther)
+		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
 		return
 	}
 	http.Error(w, msg, code)
@@ -92,16 +93,22 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		// TLS ends at the proxy, so the panel itself usually sees plain HTTP.
+		Secure: r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 		// Lax blocks cross-site POSTs, so no separate CSRF tokens are needed.
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(sessionTTL),
 	})
-	next := r.FormValue("next")
-	if !strings.HasPrefix(next, "/") {
-		next = "/"
+	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
+}
+
+// safeNext keeps the post-login redirect on this site: "//host" and "/\host"
+// start with a slash too, but browsers read them as another origin.
+func safeNext(next string) string {
+	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.HasPrefix(next, "/\\") {
+		return "/"
 	}
-	http.Redirect(w, r, next, http.StatusSeeOther)
+	return next
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
