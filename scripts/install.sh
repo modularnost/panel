@@ -55,7 +55,9 @@ if [ "$(docker info --format '{{.Swarm.LocalNodeState}}')" != active ]; then
 	if [ -z "$ADVERTISE" ]; then
 		# Whatever address this host uses to reach the internet is the one other
 		# nodes will be told to connect to.
-		ADVERTISE=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
+		# Taken from the word after "src": its position shifts when the route
+		# has no gateway ("via"), as on many VPS images.
+		ADVERTISE=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([^ ]*\).*/\1/p')
 	fi
 	[ -n "$ADVERTISE" ] || die "could not detect an address; set ADVERTISE_ADDR"
 	say "initialising the swarm on $ADVERTISE"
@@ -91,7 +93,7 @@ if [ -n "$EMAIL" ]; then
       - traefik.http.routers.panel.tls.certresolver=le"
 	ACME_ARGS="      - --certificatesresolvers.le.acme.email=$EMAIL
       - --certificatesresolvers.le.acme.storage=/acme/acme.json
-      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
       - --entrypoints.web.http.redirections.entrypoint.to=websecure"
 else
 	ENTRYPOINT=web
@@ -103,7 +105,7 @@ fi
 cat >"$CONFIG/stack.yml" <<COMPOSE
 services:
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3
     command:
       - --providers.swarm=true
       - --providers.swarm.network=$NET
@@ -111,9 +113,11 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
 $ACME_ARGS
+    # host mode: through the ingress mesh every client looks like the mesh's
+    # own address, which defeats anything that keys on the client IP.
     ports:
-      - "80:80"
-      - "443:443"
+      - {target: 80, published: 80, mode: host}
+      - {target: 443, published: 443, mode: host}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - acme:/acme
