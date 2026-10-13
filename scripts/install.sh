@@ -89,8 +89,8 @@ ADMIN_PASSWORD=${PANEL_ADMIN_PASSWORD:-$(head -c 12 /dev/urandom | od -An -tx1 |
 # publishes port 8080 directly.
 if [ -n "$EMAIL" ]; then
 	ENTRYPOINT=websecure
-	TLS_LABELS="      - traefik.http.routers.panel.tls=true
-      - traefik.http.routers.panel.tls.certresolver=le"
+	TLS_LABELS="        - traefik.http.routers.panel.tls=true
+        - traefik.http.routers.panel.tls.certresolver=le"
 	ACME_ARGS="      - --certificatesresolvers.le.acme.email=$EMAIL
       - --certificatesresolvers.le.acme.storage=/acme/acme.json
       - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
