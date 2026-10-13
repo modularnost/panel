@@ -62,10 +62,27 @@ ask() {
 	echo "$REPLY"
 }
 
-while [ -z "$DOMAIN" ]; do
-	DOMAIN=$(ask "domain for the panel (e.g. panel.example.com): ") ||
-		die "DOMAIN is required, e.g. DOMAIN=panel.example.com sh install.sh"
-	[ -n "$DOMAIN" ] || echo "the panel needs a domain — Traefik routes by host name" >&2
+# `curl | sudo sh` gives the script a pty of its own and forwards no keyboard
+# input to it when stdin is a pipe: the questions below would show what is typed
+# and never receive it. Run as root without sudo, or download the file first.
+if [ -n "${SUDO_USER:-}" ] && [ ! -t 0 ] && { [ -z "$DOMAIN" ] || [ -z "$EMAIL_GIVEN" ]; }; then
+	echo "note: if typing gets no response, press Ctrl+C and run it as root without sudo," >&2
+	echo "      or: curl -fsSL <url> -o install.sh && sudo sh install.sh" >&2
+fi
+
+# A typo here ends up in a Traefik rule and an ACME order, and shows up three
+# minutes later as a certificate that never arrives: refuse what is not a host name.
+while :; do
+	if [ -z "$DOMAIN" ]; then
+		DOMAIN=$(ask "domain for the panel (e.g. panel.example.com): ") ||
+			die "DOMAIN is required, e.g. DOMAIN=panel.example.com sh install.sh"
+	fi
+	case $DOMAIN in
+	"") echo "the panel needs a domain — Traefik routes by host name" >&2 ;;
+	*[!A-Za-z0-9.-]*) echo "not a valid host name: $DOMAIN (ASCII letters, digits, dots and hyphens only)" >&2 ;;
+	*) break ;;
+	esac
+	DOMAIN=
 done
 if [ -z "$EMAIL_GIVEN" ]; then
 	EMAIL=$(ask "email for the Let's Encrypt certificate (empty = plain HTTP): ") || EMAIL=
