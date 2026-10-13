@@ -191,6 +191,29 @@
           "compose": {
             "type": "string"
           },
+          "desired": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "running": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "serviceCount": {
+            "format": "int64",
+            "type": "integer"
+          },
           "services": {
             "items": {
               "$ref": "#/components/schemas/Service"
@@ -209,6 +232,12 @@
           }
         },
         "required": [
+          "name",
+          "serviceCount",
+          "running",
+          "desired",
+          "healthy",
+          "managed",
           "services"
         ],
         "type": "object"

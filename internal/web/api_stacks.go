@@ -25,8 +25,13 @@ type apiStack struct {
 }
 
 type apiStackDetail struct {
-	apiStack
-	Services []apiService `json:"services"`
+	Name         string       `json:"name"`
+	ServiceCount int          `json:"serviceCount"`
+	Running      uint64       `json:"running"`
+	Desired      uint64       `json:"desired"`
+	Healthy      bool         `json:"healthy"`
+	Managed      bool         `json:"managed"`
+	Services     []apiService `json:"services"`
 	// Compose is for admins only: a compose file is access to the whole cluster.
 	Compose   string     `json:"compose,omitempty"`
 	UpdatedBy string     `json:"updatedBy,omitempty"`
@@ -140,7 +145,8 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 		}
 		for _, st := range summarizeStacks(svcs) {
 			if st.Name == in.Name {
-				detail.apiStack = st
+				detail.ServiceCount, detail.Running = st.ServiceCount, st.Running
+				detail.Desired, detail.Healthy = st.Desired, st.Healthy
 			}
 		}
 		detail.Name, detail.Managed = in.Name, managed
