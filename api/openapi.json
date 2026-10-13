@@ -1,7 +1,25 @@
 {
   "components": {
     "schemas": {
-      "ApiProblem": {
+      "Login": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "username": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "type": "object"
+      },
+      "Problem": {
         "additionalProperties": false,
         "properties": {
           "error": {
@@ -13,7 +31,23 @@
         ],
         "type": "object"
       },
-      "ApiService": {
+      "ProblemBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "Service": {
         "additionalProperties": false,
         "properties": {
           "desired": {
@@ -65,7 +99,7 @@
         ],
         "type": "object"
       },
-      "ApiUser": {
+      "User": {
         "additionalProperties": false,
         "properties": {
           "id": {
@@ -83,22 +117,6 @@
           "id",
           "username",
           "role"
-        ],
-        "type": "object"
-      },
-      "ProblemBody": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "message"
         ],
         "type": "object"
       }
@@ -121,6 +139,79 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign in; the session cookie is set on the response"
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "End the session"
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "get-me",
@@ -129,7 +220,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiUser"
+                  "$ref": "#/components/schemas/User"
                 }
               }
             },
@@ -139,7 +230,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiProblem"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             },
@@ -166,7 +257,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/ApiService"
+                    "$ref": "#/components/schemas/Service"
                   },
                   "type": [
                     "array",
@@ -181,7 +272,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiProblem"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             },
@@ -217,7 +308,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiService"
+                  "$ref": "#/components/schemas/Service"
                 }
               }
             },
@@ -227,7 +318,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiProblem"
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             },
