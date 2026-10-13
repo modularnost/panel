@@ -109,6 +109,29 @@ func TestAddCounters(t *testing.T) {
 	}
 }
 
+func TestDesiredReplicas(t *testing.T) {
+	three := uint64(3)
+	replicated := swarm.Service{ID: "web", Spec: swarm.ServiceSpec{
+		Mode: swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &three}},
+	}}
+	global := swarm.Service{ID: "agent", Spec: swarm.ServiceSpec{
+		Mode: swarm.ServiceMode{Global: &swarm.GlobalService{}},
+	}}
+	tasks := []swarm.Task{
+		{ServiceID: "agent", DesiredState: swarm.TaskStateRunning},
+		{ServiceID: "agent", DesiredState: swarm.TaskStateRunning},
+		{ServiceID: "agent", DesiredState: swarm.TaskStateShutdown},
+	}
+	scheduled := scheduledTasks(tasks)
+
+	if got := desiredReplicas(replicated, scheduled); got != 3 {
+		t.Errorf("replicated: want 3 from the spec, got %d", got)
+	}
+	if got := desiredReplicas(global, scheduled); got != 2 {
+		t.Errorf("global: want 2 scheduled tasks, got %d", got)
+	}
+}
+
 func TestRunningTasksExcludesShutDownReplica(t *testing.T) {
 	got := runningTasks([]swarm.Task{
 		{ServiceID: "web", DesiredState: swarm.TaskStateRunning, Status: swarm.TaskStatus{State: swarm.TaskStateRunning}},
