@@ -298,3 +298,56 @@ func TestToAPIModules(t *testing.T) {
 		t.Fatalf("broken module must keep its error and still list empty arrays, not null: %+v", got[1])
 	}
 }
+
+func TestAPIUsersAndTokensNeverExposeSecrets(t *testing.T) {
+	c, base, db := apiServer(t)
+	root, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := db.CreateToken(root.ID, "ci", store.RoleOperator, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, path := range []string{"/api/v1/users", "/api/v1/tokens"} {
+		if status, _ := send(t, c, "GET", base+path, "", ""); status != 401 {
+			t.Errorf("%s anonymous: %d", path, status)
+		}
+	}
+	signIn(t, c, base) // ann, a viewer
+	for _, path := range []string{"/api/v1/users", "/api/v1/tokens"} {
+		if status, body := send(t, c, "GET", base+path, "", ""); status != 403 || errorCode(body) != "forbidden" {
+			t.Errorf("%s as viewer: %d %v", path, status, body)
+		}
+	}
+
+	if status, body := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatalf("admin sign in: %d %v", status, body)
+	}
+	get := func(path string) string {
+		t.Helper()
+		resp, err := c.Get(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != 200 {
+			t.Fatalf("%s: %d %s", path, resp.StatusCode, b)
+		}
+		return string(b)
+	}
+
+	users := get("/api/v1/users")
+	if !strings.Contains(users, `"ann"`) || !strings.Contains(users, `"root"`) || strings.Contains(users, "pass") {
+		t.Errorf("users: %s", users)
+	}
+	tokens := get("/api/v1/tokens")
+	if !strings.Contains(tokens, `"ci"`) || !strings.Contains(tokens, `"operator"`) {
+		t.Errorf("tokens: %s", tokens)
+	}
+	if strings.Contains(tokens, secret) {
+		t.Errorf("the token value must never be listed: %s", tokens)
+	}
+}
