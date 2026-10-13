@@ -45,7 +45,6 @@ func (s *Server) identify(r *http.Request) (store.User, bool) {
 	return store.User{}, false
 }
 
-// require lets a request through only with a role of at least need.
 func (s *Server) require(need string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u, ok := s.identify(r)
@@ -69,8 +68,6 @@ func (s *Server) denied(w http.ResponseWriter, r *http.Request, code int, msg st
 	}
 	http.Error(w, msg, code)
 }
-
-// --- Login and logout ---
 
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "login.html", r.FormValue("next"))
@@ -118,8 +115,6 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
-
-// --- Users and tokens (admin only) ---
 
 type usersPage struct {
 	Me       store.User
@@ -198,7 +193,6 @@ func (s *Server) setUserPassword(w http.ResponseWriter, r *http.Request) {
 	s.renderFragment(w, r, "")
 }
 
-// guardLastAdmin keeps you from locking yourself out by removing the last admin.
 func (s *Server) guardLastAdmin(id int64) error {
 	last, err := s.DB.IsLastAdmin(id)
 	if err != nil {

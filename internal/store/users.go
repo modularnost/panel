@@ -28,11 +28,8 @@ func AtLeast(have, need string) bool { return rank[need] > 0 && rank[have] >= ra
 
 func ValidRole(r string) bool { return rank[r] > 0 }
 
-// --- Passwords ---
-
-// ponytail: PBKDF2-SHA256 from the stdlib instead of a bcrypt/argon2 dependency.
-// The iteration count follows the OWASP recommendation; raise it here when that
-// changes — old hashes stay valid because the count lives in the hash string.
+// PBKDF2-SHA256 from the stdlib, no bcrypt dependency. The iteration count is
+// stored in the hash, so raising it keeps old hashes valid.
 const pbkdf2Iter = 600_000
 
 func HashPassword(password string) (string, error) {
@@ -71,8 +68,6 @@ func CheckPassword(hash, password string) bool {
 	}
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
-
-// --- Users ---
 
 type User struct {
 	ID       int64
@@ -144,8 +139,7 @@ func (d *DB) CountUsers() (int, error) {
 	return n, d.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
 }
 
-// IsLastAdmin reports whether this user is the only admin left. It exists so
-// the last one cannot be deleted or demoted.
+// IsLastAdmin reports whether this user is the only admin left.
 func (d *DB) IsLastAdmin(id int64) (bool, error) {
 	var admins int
 	var role string
@@ -162,7 +156,6 @@ func (d *DB) SetRole(id int64, role string) error {
 	return err
 }
 
-// Authenticate checks a username and password.
 func (d *DB) Authenticate(username, password string) (User, error) {
 	var u User
 	var hash string
@@ -188,8 +181,6 @@ var dummyHash = func() string {
 	h, _ := HashPassword("-")
 	return h
 }()
-
-// --- Tokens (browser sessions and CI keys) ---
 
 type Token struct {
 	ID        int64

@@ -1,9 +1,6 @@
-// A demo panel module. One file: its own HTTP server, a manifest, and one
-// action that asks the core to redeploy a service.
-//
-// The module has NO access to docker.sock. Everything it needs from Swarm it
-// asks the core for at PANEL_CORE_URL, identifying itself with the
-// X-Panel-Module / X-Panel-Token headers the core sends with every request.
+// A demo panel module: its own HTTP server, a manifest, and one action that
+// asks the core (PANEL_CORE_URL) to redeploy a service. It has no docker.sock;
+// it identifies itself with the X-Panel-Module / X-Panel-Token headers.
 package main
 
 import (
@@ -28,12 +25,9 @@ func cmp(v, def string) string {
 	return def
 }
 
-// docHead makes every response a real document. A module is rendered inside a
-// frame in the panel, and a page without a doctype lands in quirks mode, where
-// the panel cannot measure its height correctly.
-//
-// Linking the panel's own stylesheet is optional but free: same origin, and the
-// module then matches the surrounding UI including its dark theme.
+// docHead makes every response a real document: without a doctype the frame
+// is in quirks mode and the panel cannot measure its height. The stylesheet
+// link is optional and makes the module match the panel's theme.
 const docHead = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>hello-module</title>
 <link rel="stylesheet" href="/static/panel.css">

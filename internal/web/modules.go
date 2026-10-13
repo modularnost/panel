@@ -14,8 +14,6 @@ import (
 	"modularnost/internal/store"
 )
 
-// --- UI ---
-
 func (s *Server) modulesPage(w http.ResponseWriter, r *http.Request) {
 	mods, err := s.Modules.List(r.Context())
 	if err != nil {
@@ -28,8 +26,7 @@ func (s *Server) modulesPage(w http.ResponseWriter, r *http.Request) {
 	}{userFrom(r), mods})
 }
 
-// nav is the top-menu fragment: module entries plus who is logged in. Fetched
-// separately so it need not be threaded through every handler's data.
+// nav is the menu fragment, fetched separately so handlers need not pass it.
 func (s *Server) nav(w http.ResponseWriter, r *http.Request) {
 	mods, _ := s.Modules.List(r.Context())
 	s.render(w, "nav", struct {
@@ -38,10 +35,7 @@ func (s *Server) nav(w http.ResponseWriter, r *http.Request) {
 	}{userFrom(r), mods})
 }
 
-// moduleProxy forwards the request to the module as is. The module renders its
-// own page — the core neither parses nor embeds its HTML.
-// ponytail: no wrapping in the panel layout. If a uniform look is ever wanted,
-// modules can return a fragment and the core can wrap it.
+// moduleProxy forwards the request as is: the module renders its own page.
 func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	m, ok := s.Modules.Get(r.Context(), name)
@@ -58,11 +52,8 @@ func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	// A top-level navigation gets the panel shell with the module in a frame;
-	// the frame's own request (and anything else: fetch, form posts inside it)
-	// gets the module's page as is.
-	// ponytail: Sec-Fetch-Dest is sent by every current browser. Anything that
-	// omits it simply gets the bare module page — no recursion, no breakage.
+	// A top-level navigation gets the shell with the module in a frame; the
+	// frame's own requests, and browsers without Sec-Fetch-Dest, get the bare page.
 	if r.Header.Get("Sec-Fetch-Dest") == "document" {
 		s.render(w, "module.html", struct {
 			Module modules.Module
@@ -88,8 +79,6 @@ func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	proxy.ServeHTTP(w, r)
 }
-
-// --- Internal API: this is what modules call ---
 
 // moduleAuth admits only a module with a valid token and the required permission.
 func (s *Server) moduleAuth(perm string, next func(http.ResponseWriter, *http.Request, modules.Module)) http.HandlerFunc {
@@ -157,8 +146,6 @@ func (s *Server) apiUpdateService(w http.ResponseWriter, r *http.Request, m modu
 	writeJSON(w, d)
 }
 
-// --- installing a module ---
-
 type installPage struct {
 	Networks []string
 	Self     docker.Self
@@ -176,9 +163,8 @@ func (s *Server) installPage(r *http.Request, errMsg string) installPage {
 	return p
 }
 
-// installModule deploys a module image with the labels that make the panel see
-// it. Everything error-prone is filled in by the panel: the labels themselves,
-// the overlay network, and the address the module calls back on.
+// installModule deploys a module image; the panel fills in the labels, the
+// network and the callback address.
 func (s *Server) installModule(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	image := strings.TrimSpace(r.FormValue("image"))
@@ -191,7 +177,6 @@ func (s *Server) installModule(w http.ResponseWriter, r *http.Request) {
 	}
 	env := lines(r.FormValue("env"))
 	if self.Service != "" {
-		// The module needs to reach the core; the panel knows its own address.
 		env = append(env, "PANEL_CORE_URL=http://"+self.Service+":8080")
 	}
 
@@ -212,15 +197,13 @@ func (s *Server) installModule(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "install.html", s.installPage(r, err.Error()))
 		return
 	}
-	// The new service will not answer /manifest for a second or two, but the
-	// list must at least stop being the pre-install one.
+	// The module is not up yet, but the list must stop showing the old state.
 	s.Modules.Forget()
 	w.Header().Set("HX-Redirect", "/modules")
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// uninstallModule removes the module's service. Its image and any data it kept
-// elsewhere are not the panel's business.
+// uninstallModule removes the module's service only, not its image or data.
 func (s *Server) uninstallModule(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.Modules.Get(r.Context(), r.PathValue("name"))
 	if !ok {

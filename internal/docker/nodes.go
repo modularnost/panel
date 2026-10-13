@@ -51,10 +51,8 @@ func (c *Client) Nodes(ctx context.Context) ([]Node, error) {
 	return out, nil
 }
 
-// JoinInfo is everything needed to write the command that adds a server.
-//
-// The panel cannot run it: `docker swarm join` executes on the machine that is
-// joining. All a manager can do is hand out the address and the token.
+// JoinInfo is what the join command needs: `docker swarm join` runs on the
+// joining machine, so a manager can only hand out the address and the token.
 type JoinInfo struct {
 	Address      string // host:2377 of a manager
 	WorkerToken  string

@@ -22,8 +22,7 @@ func Open(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// ponytail: single connection — the panel is one process with few writers.
-	// Lift this if concurrent reads ever become the bottleneck.
+	// One connection: SQLite has a single writer and the panel few clients.
 	db.SetMaxOpenConns(1)
 	if err := migrate(db); err != nil {
 		return nil, err
@@ -203,8 +202,6 @@ func (d *DB) deploys(where string, args []any, limit int) ([]DeployEvent, error)
 	}
 	return out, rows.Err()
 }
-
-// --- Stacks (compose files) ---
 
 type Stack struct {
 	Name      string

@@ -7,9 +7,8 @@
 //	panel.module.version=<semver>
 //	panel.module.port=<port>   (optional, defaults to 8080)
 //
-// The core talks to it over HTTP inside the overlay network. A module gets no
-// direct access to docker.sock — it asks the core to act on Swarm instead (see
-// the internal API).
+// The core talks to it over HTTP inside the overlay network; a module has no
+// docker.sock and asks the core to act.
 package modules
 
 import (
@@ -74,7 +73,6 @@ type Registry struct {
 	at     time.Time
 }
 
-// ponytail: TTL is hardcoded. Move it to an env var if anyone needs a different one.
 const ttl = 15 * time.Second
 
 func NewRegistry(dk *docker.Client, secret string) *Registry {
@@ -126,7 +124,6 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 			Name:    name,
 			Version: sv.Labels[LabelVersion],
 			Service: sv.Name,
-			// Resolved by Swarm's DNS inside the overlay network.
 			BaseURL: "http://" + sv.Name + ":" + port,
 		}
 		if err := r.fetchManifest(ctx, &m); err != nil {
@@ -147,9 +144,8 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 	if err != nil {
 		return err
 	}
-	// Discovery is also how a module receives its token: it arrives before any
-	// user request, so a module can do background work, and it arrives again on
-	// every refresh, so a restarted core with a new secret repairs itself.
+	// Discovery also hands the module its token, before any user request and
+	// again on every refresh, so a restarted core repairs itself.
 	req.Header.Set("X-Panel-Module", m.Name)
 	req.Header.Set("X-Panel-Token", r.Token(m.Name))
 	resp, err := r.http.Do(req)
@@ -163,9 +159,8 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 	return json.NewDecoder(resp.Body).Decode(&m.Manifest)
 }
 
-// Refresh keeps discovery running with nobody watching. Modules that work on a
-// schedule need their token before the first page view, and it only reaches
-// them through a manifest fetch (see fetchManifest).
+// Refresh keeps discovery running with nobody watching, so scheduled modules
+// get their token before the first page view.
 func (r *Registry) Refresh(ctx context.Context) {
 	for {
 		if _, err := r.List(ctx); err != nil {
@@ -179,9 +174,7 @@ func (r *Registry) Refresh(ctx context.Context) {
 	}
 }
 
-// Forget drops the cache. Call it after installing or removing a module:
-// otherwise the list keeps showing the old answer for up to a TTL, which reads
-// as "the button did nothing".
+// Forget drops the cache; call it after installing or removing a module.
 func (r *Registry) Forget() {
 	r.mu.Lock()
 	r.at = time.Time{}

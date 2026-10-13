@@ -23,20 +23,17 @@ import (
 	"modularnost/internal/store"
 )
 
-// Version is stamped by main at build time and shown in the UI and on /healthz,
-// so an admin can tell what is actually deployed.
+// Version is set by main at build time.
 var Version = "dev"
 
 //go:embed templates/*.html
 var files embed.FS
 
-// Everything the browser needs is bundled: a panel on an air-gapped cluster
-// must not depend on a CDN.
+// Bundled so that an air-gapped cluster needs no CDN.
 //
 //go:embed static
 var staticFS embed.FS
 
-// staticVersion busts the browser cache exactly when the bundle changes.
 var staticVersion = func() string {
 	sum := sha256.New()
 	fs.WalkDir(staticFS, ".", func(path string, d fs.DirEntry, err error) error {
@@ -50,8 +47,7 @@ var staticVersion = func() string {
 	return hex.EncodeToString(sum.Sum(nil))[:12]
 }()
 
-// staticHandler serves the bundled CSS and htmx without authentication: they
-// are not secrets, and module pages link the stylesheet from their own frame.
+// staticHandler serves the bundle without auth: module frames link the stylesheet.
 func staticHandler() http.Handler {
 	sub, err := fs.Sub(staticFS, "static")
 	if err != nil {
@@ -59,8 +55,7 @@ func staticHandler() http.Handler {
 	}
 	files := http.FileServerFS(sub)
 	return http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// An hour is enough for modules linking the plain URL; our own pages
-		// carry ?v=<hash> and refresh the moment the bundle changes.
+		// Plain URLs (modules) may be an hour stale; our pages use ?v=<hash>.
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		files.ServeHTTP(w, r)
 	}))
@@ -98,16 +93,14 @@ type Server struct {
 
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
-	// Webhooks authenticate with their own secret and modules with their HMAC
-	// token, so the role model does not apply to either.
+	// Webhooks and modules authenticate themselves; roles do not apply.
 	mux.HandleFunc("POST /hook/{token}", s.hook)
 	mux.HandleFunc("GET /internal/services", s.moduleAuth("service:read", s.apiServices))
 	mux.HandleFunc("GET /internal/stats", s.moduleAuth("stats:read", s.apiStats))
 	mux.HandleFunc("POST /internal/services/{name}/update", s.moduleAuth("service:update", s.apiUpdateService))
 
 	mux.Handle("GET /static/", staticHandler())
-	// Unauthenticated on purpose: this is what a load balancer, an uptime check
-	// or a HEALTHCHECK asks, and it reveals nothing a visitor cannot see anyway.
+	// Unauthenticated: load balancers and HEALTHCHECK call it.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "ok %s\n", Version)
 	})
@@ -121,7 +114,6 @@ func (s *Server) Routes() http.Handler {
 		operator = store.RoleOperator
 		admin    = store.RoleAdmin
 	)
-	// Read-only: viewer.
 	mux.HandleFunc("GET /{$}", s.require(viewer, s.index))
 	mux.HandleFunc("GET /deploys", s.require(viewer, s.deploys))
 	mux.HandleFunc("GET /resources", s.require(viewer, s.resources))
@@ -134,7 +126,6 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /modules", s.require(viewer, s.modulesPage))
 	mux.HandleFunc("GET /nav", s.require(viewer, s.nav))
 
-	// Rolling things out: operator.
 	mux.HandleFunc("POST /services/{id}/update", s.require(operator, s.updateService))
 	mux.HandleFunc("POST /stacks/{name}/redeploy", s.require(operator, s.redeployStack))
 	mux.HandleFunc("GET /services/new", s.require(admin, s.newServiceForm))
@@ -145,12 +136,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /stacks/{name}/edit", s.require(admin, s.editStackForm))
 	mux.HandleFunc("POST /stacks/{name}", s.require(admin, s.deployStack))
 	mux.HandleFunc("POST /stacks/{name}/remove", s.require(admin, s.removeStack))
-	// ponytail: a module's whole UI sits behind operator — the core has no idea
-	// what buttons are in there. If read-only modules appear, the manifest can
-	// declare a minimum role.
+	// A module's whole UI needs operator: the core cannot tell what is inside.
 	mux.HandleFunc("/modules/{name}/", s.require(operator, s.moduleProxy))
 
-	// Changing configuration: admin.
 	mux.HandleFunc("GET /services/{id}/traefik", s.require(admin, s.serviceTab("traefik")))
 	mux.HandleFunc("POST /services/{id}/traefik", s.require(admin, s.saveTraefik))
 	mux.HandleFunc("GET /services/{id}/webhooks", s.require(admin, s.serviceTab("webhooks")))
@@ -252,9 +240,7 @@ func (s *Server) updateService(w http.ResponseWriter, r *http.Request) {
 	s.serviceList(w, r)
 }
 
-// logWarnings: Swarm warnings (an image with no digest in the registry, say)
-// are not errors — the deploy happened. ponytail: log only; surface them in the
-// UI if anyone actually asks.
+// logWarnings: Swarm warnings are not errors, the deploy happened.
 func logWarnings(ds ...docker.Deploy) {
 	for _, d := range ds {
 		for _, warn := range d.Warnings {
@@ -269,9 +255,8 @@ func (s *Server) redeployStack(w http.ResponseWriter, r *http.Request) {
 	finish, _ := s.DB.StartDeploy(store.DeployEvent{
 		StackName: stack, Source: "ui", TriggeredBy: me.Username})
 
-	// With a compose file on hand this is a real `docker stack deploy`, which
-	// also picks up changes to the file. Without one — an adopted stack, or one
-	// deployed before the panel existed — fall back to force-updating what runs.
+	// A stored compose file means a real `docker stack deploy`; an adopted stack
+	// has none, so fall back to force-updating what runs.
 	var err error
 	if st, ok := s.DB.Stack(stack); ok {
 		_, err = s.Docker.DeployStack(r.Context(), stack, st.Compose)
@@ -287,8 +272,6 @@ func (s *Server) redeployStack(w http.ResponseWriter, r *http.Request) {
 	}
 	s.serviceList(w, r)
 }
-
-// --- Traefik labels ---
 
 type traefikForm struct {
 	Service    docker.Service
@@ -314,7 +297,6 @@ func (s *Server) findService(ctx context.Context, id string) (docker.Service, bo
 	return docker.Service{}, false
 }
 
-// traefikFrom reads the current Traefik labels back into form fields.
 func traefikFrom(sv docker.Service) traefikForm {
 	l := sv.Labels
 	return traefikForm{
@@ -369,8 +351,6 @@ func (s *Server) saveTraefik(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// --- Webhooks ---
-
 // webhooks renders the whole page; hookList is the htmx fragment after a
 // create or delete.
 func (s *Server) webhooks(w http.ResponseWriter, r *http.Request) { s.renderHooks(w, "webhooks.html") }
@@ -422,10 +402,8 @@ func (s *Server) deleteWebhook(w http.ResponseWriter, r *http.Request) {
 	s.hookList(w)
 }
 
-// hook is the entry point for CI and registries. The secret is in the path and
-// the body is ignored.
-// ponytail: image_pattern is not matched against the payload yet — GHCR and
-// Docker Hub disagree on the format. Add parsing once a specific registry shows up.
+// hook is the entry point for CI and registries: the secret is in the path, the
+// body is ignored.
 func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
 	hook, err := s.DB.WebhookByToken(r.PathValue("token"))
 	if err != nil {
@@ -466,9 +444,6 @@ func (s *Server) deploys(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "deploys.html", events)
 }
 
-// --- Logs ---
-
-// logsStream is the SSE stream. It ends when the client goes away (ctx is cancelled).
 func (s *Server) logsStream(w http.ResponseWriter, r *http.Request) {
 	tail, err := strconv.Atoi(r.FormValue("tail"))
 	if err != nil || tail < 1 || tail > 5000 {

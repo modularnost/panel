@@ -12,10 +12,8 @@ type nodesPage struct {
 	Role  string // which join command is on screen: worker | manager
 }
 
-// nodes lists the cluster and hands out the join command.
-//
-// Join tokens are secrets — anyone holding one can add a machine to the
-// cluster. Hence admin only, and never written to the log.
+// nodes lists the cluster and the join command. Join tokens let anyone add a
+// machine, hence admin only and never logged.
 func (s *Server) nodes(w http.ResponseWriter, r *http.Request) {
 	role := r.FormValue("role")
 	if role != "manager" {
