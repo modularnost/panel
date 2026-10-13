@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 
+	"modularnost/internal/docker"
 	"modularnost/internal/store"
 )
 
@@ -95,4 +96,59 @@ func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, toAPIUser(userFrom(r)))
+}
+
+type apiService struct {
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Stack   string            `json:"stack,omitempty"`
+	Image   string            `json:"image"`
+	Digest  string            `json:"digest,omitempty"`
+	Mode    string            `json:"mode"`
+	Running uint64            `json:"running"`
+	Desired uint64            `json:"desired"`
+	Healthy bool              `json:"healthy"`
+	Labels  map[string]string `json:"labels,omitempty"`
+}
+
+// toAPIService leaves labels out of the list: there can be dozens per service,
+// and only the detail view needs them.
+func toAPIService(sv docker.Service, withLabels bool) apiService {
+	out := apiService{
+		ID: sv.ID, Name: sv.Name, Stack: sv.Stack, Image: sv.Image, Digest: sv.Digest,
+		Mode: sv.Mode, Running: sv.Running, Desired: sv.Desired, Healthy: sv.Healthy(),
+	}
+	if withLabels {
+		out.Labels = sv.Labels
+	}
+	return out
+}
+
+func (s *Server) apiServiceList(w http.ResponseWriter, r *http.Request) {
+	svcs, err := s.Docker.Services(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusBadGateway, "docker_unavailable", err.Error())
+		return
+	}
+	out := make([]apiService, 0, len(svcs))
+	for _, sv := range svcs {
+		out = append(out, toAPIService(sv, false))
+	}
+	writeJSON(w, out)
+}
+
+func (s *Server) apiServiceGet(w http.ResponseWriter, r *http.Request) {
+	svcs, err := s.Docker.Services(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusBadGateway, "docker_unavailable", err.Error())
+		return
+	}
+	id := r.PathValue("id")
+	for _, sv := range svcs {
+		if sv.ID == id || sv.Name == id {
+			writeJSON(w, toAPIService(sv, true))
+			return
+		}
+	}
+	writeAPIError(w, http.StatusNotFound, "not_found", "no such service")
 }

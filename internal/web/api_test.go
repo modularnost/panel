@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"modularnost/internal/docker"
 	"modularnost/internal/store"
 )
 
@@ -96,5 +97,32 @@ func TestAPIUnknownEndpointIsJSON(t *testing.T) {
 	c, base := apiClient(t)
 	if status, body := send(t, c, "GET", base+"/api/v1/nothing", "", ""); status != 404 || errorCode(body) != "not_found" {
 		t.Fatalf("%d %v", status, body)
+	}
+}
+
+func TestAPIServicesNeedSignIn(t *testing.T) {
+	c, base := apiClient(t)
+	for _, path := range []string{"/api/v1/services", "/api/v1/services/web"} {
+		if status, body := send(t, c, "GET", base+path, "", ""); status != 401 || errorCode(body) != "unauthorized" {
+			t.Errorf("%s: %d %v", path, status, body)
+		}
+	}
+}
+
+func TestToAPIService(t *testing.T) {
+	sv := docker.Service{
+		ID: "abc", Name: "web", Image: "nginx:1", Mode: "replicated",
+		Running: 2, Desired: 2, Labels: map[string]string{"a": "b"},
+	}
+	list := toAPIService(sv, false)
+	if !list.Healthy || list.Labels != nil {
+		t.Errorf("list entry: %+v", list)
+	}
+	if detail := toAPIService(sv, true); detail.Labels["a"] != "b" {
+		t.Errorf("detail lost its labels: %+v", detail)
+	}
+	sv.Running = 1
+	if toAPIService(sv, false).Healthy {
+		t.Error("1 of 2 replicas must not be healthy")
 	}
 }
