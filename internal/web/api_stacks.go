@@ -15,7 +15,7 @@ import (
 
 type apiStack struct {
 	Name         string `json:"name"`
-	ServiceCount int    `json:"serviceCount"`
+	ServiceCount int    `json:"service_count"`
 	Running      uint64 `json:"running"`
 	Desired      uint64 `json:"desired"`
 	Healthy      bool   `json:"healthy"`
@@ -26,7 +26,7 @@ type apiStack struct {
 
 type apiStackDetail struct {
 	Name         string       `json:"name"`
-	ServiceCount int          `json:"serviceCount"`
+	ServiceCount int          `json:"service_count"`
 	Running      uint64       `json:"running"`
 	Desired      uint64       `json:"desired"`
 	Healthy      bool         `json:"healthy"`
@@ -34,8 +34,8 @@ type apiStackDetail struct {
 	Services     []apiService `json:"services"`
 	// Compose is for admins only: a compose file is access to the whole cluster.
 	Compose   string     `json:"compose,omitempty"`
-	UpdatedBy string     `json:"updatedBy,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedBy string     `json:"updated_by,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
 type apiDeploy struct {
@@ -43,13 +43,13 @@ type apiDeploy struct {
 	Service     string     `json:"service"`
 	Stack       string     `json:"stack,omitempty"`
 	Source      string     `json:"source"`
-	TriggeredBy string     `json:"triggeredBy,omitempty"`
-	OldDigest   string     `json:"oldDigest,omitempty"`
-	NewDigest   string     `json:"newDigest,omitempty"`
+	TriggeredBy string     `json:"triggered_by,omitempty"`
+	OldDigest   string     `json:"old_digest,omitempty"`
+	NewDigest   string     `json:"new_digest,omitempty"`
 	Status      string     `json:"status"`
 	Error       string     `json:"error,omitempty"`
-	StartedAt   time.Time  `json:"startedAt"`
-	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
+	StartedAt   time.Time  `json:"started_at"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
 }
 
 func toAPIDeploy(e store.DeployEvent) apiDeploy {

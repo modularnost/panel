@@ -210,7 +210,7 @@ func TestAPIDeploys(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != 200 || len(list) != 1 || list[0]["service"] != "web" || list[0]["status"] != "success" || list[0]["newDigest"] != "sha256:new" {
+	if resp.StatusCode != 200 || len(list) != 1 || list[0]["service"] != "web" || list[0]["status"] != "success" || list[0]["new_digest"] != "sha256:new" {
 		t.Fatalf("%d %v", resp.StatusCode, list)
 	}
 	if status, body := send(t, c, "GET", base+"/api/v1/deploys?limit=0", "", ""); status != 422 {

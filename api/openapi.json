@@ -7,7 +7,7 @@
           "error": {
             "type": "string"
           },
-          "finishedAt": {
+          "finished_at": {
             "format": "date-time",
             "type": "string"
           },
@@ -15,10 +15,10 @@
             "format": "int64",
             "type": "integer"
           },
-          "newDigest": {
+          "new_digest": {
             "type": "string"
           },
-          "oldDigest": {
+          "old_digest": {
             "type": "string"
           },
           "service": {
@@ -30,14 +30,14 @@
           "stack": {
             "type": "string"
           },
-          "startedAt": {
+          "started_at": {
             "format": "date-time",
             "type": "string"
           },
           "status": {
             "type": "string"
           },
-          "triggeredBy": {
+          "triggered_by": {
             "type": "string"
           }
         },
@@ -46,7 +46,7 @@
           "service",
           "source",
           "status",
-          "startedAt"
+          "started_at"
         ],
         "type": "object"
       },
@@ -240,14 +240,14 @@
             "minimum": 0,
             "type": "integer"
           },
-          "serviceCount": {
+          "service_count": {
             "format": "int64",
             "type": "integer"
           }
         },
         "required": [
           "name",
-          "serviceCount",
+          "service_count",
           "running",
           "desired",
           "healthy",
@@ -280,7 +280,7 @@
             "minimum": 0,
             "type": "integer"
           },
-          "serviceCount": {
+          "service_count": {
             "format": "int64",
             "type": "integer"
           },
@@ -293,17 +293,17 @@
               "null"
             ]
           },
-          "updatedAt": {
+          "updated_at": {
             "format": "date-time",
             "type": "string"
           },
-          "updatedBy": {
+          "updated_by": {
             "type": "string"
           }
         },
         "required": [
           "name",
-          "serviceCount",
+          "service_count",
           "running",
           "desired",
           "healthy",
@@ -315,13 +315,13 @@
       "TaskStats": {
         "additionalProperties": false,
         "properties": {
-          "blockRead": {
+          "block_read": {
             "description": "Cumulative bytes read from block devices",
             "format": "int64",
             "minimum": 0,
             "type": "integer"
           },
-          "blockWrite": {
+          "block_write": {
             "description": "Cumulative bytes written to block devices",
             "format": "int64",
             "minimum": 0,
@@ -342,19 +342,19 @@
             "minimum": 0,
             "type": "integer"
           },
-          "memLimit": {
+          "mem_limit": {
             "description": "Bytes; 0 when no limit is set",
             "format": "int64",
             "minimum": 0,
             "type": "integer"
           },
-          "netRx": {
+          "net_rx": {
             "description": "Cumulative received bytes",
             "format": "int64",
             "minimum": 0,
             "type": "integer"
           },
-          "netTx": {
+          "net_tx": {
             "description": "Cumulative transmitted bytes",
             "format": "int64",
             "minimum": 0,
@@ -380,11 +380,11 @@
           "slot",
           "cpu",
           "mem",
-          "memLimit",
-          "netRx",
-          "netTx",
-          "blockRead",
-          "blockWrite"
+          "mem_limit",
+          "net_rx",
+          "net_tx",
+          "block_read",
+          "block_write"
         ],
         "type": "object"
       },

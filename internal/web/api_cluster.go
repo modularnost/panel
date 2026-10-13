@@ -17,11 +17,11 @@ type apiTaskStats struct {
 	Slot       int     `json:"slot"`
 	CPU        float64 `json:"cpu" doc:"Percent of one core, as docker stats reports it"`
 	Mem        uint64  `json:"mem" doc:"Bytes"`
-	MemLimit   uint64  `json:"memLimit" doc:"Bytes; 0 when no limit is set"`
-	NetRX      uint64  `json:"netRx" doc:"Cumulative received bytes"`
-	NetTX      uint64  `json:"netTx" doc:"Cumulative transmitted bytes"`
-	BlockRead  uint64  `json:"blockRead" doc:"Cumulative bytes read from block devices"`
-	BlockWrite uint64  `json:"blockWrite" doc:"Cumulative bytes written to block devices"`
+	MemLimit   uint64  `json:"mem_limit" doc:"Bytes; 0 when no limit is set"`
+	NetRX      uint64  `json:"net_rx" doc:"Cumulative received bytes"`
+	NetTX      uint64  `json:"net_tx" doc:"Cumulative transmitted bytes"`
+	BlockRead  uint64  `json:"block_read" doc:"Cumulative bytes read from block devices"`
+	BlockWrite uint64  `json:"block_write" doc:"Cumulative bytes written to block devices"`
 	Error      string  `json:"error,omitempty" doc:"Set on a row for a node that could not be reached"`
 }
 
