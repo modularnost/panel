@@ -13,12 +13,7 @@ import (
 	"modularnost/internal/web"
 )
 
-// version is stamped at build time:
-//
-//	go build -ldflags "-X main.version=$(git describe --tags --always)"
-//
-// Left as "dev" for a plain `go build`, which is honest — that binary came from
-// a working tree, not a release.
+// version is set at build time with -ldflags "-X main.version=..."; "dev" otherwise.
 var version = "dev"
 
 func env(key, def string) string {
@@ -28,9 +23,8 @@ func env(key, def string) string {
 	return def
 }
 
-// bootstrapAdmin creates the first admin if there are no users yet.
-// The password comes from PANEL_ADMIN_PASSWORD, or is generated and printed to
-// the log once — the panel never comes up without a way to log in.
+// bootstrapAdmin creates the first admin when there are no users: the password
+// is PANEL_ADMIN_PASSWORD, or generated and logged once.
 func bootstrapAdmin(db *store.DB) error {
 	n, err := db.CountUsers()
 	if err != nil || n > 0 {
@@ -60,8 +54,7 @@ func main() {
 	}
 	defer dk.Close()
 
-	// Agent mode: same binary, deployed as a global service so every node has
-	// one. It only reads container stats and answers the panel.
+	// Agent mode: the same binary, one per node, only reads container stats.
 	if os.Getenv("PANEL_MODE") == "agent" {
 		node := os.Getenv("PANEL_NODE")
 		if node == "" {
@@ -91,15 +84,12 @@ func main() {
 		log.Fatalf("first admin: %v", err)
 	}
 
-	// Secret for module tokens. New on every start by default: modules are
-	// handed the resulting token on the next discovery pass, so there is
-	// nothing to persist and no reason to.
+	// Random per start by default: modules get the new token on the next discovery.
 	secret := env("PANEL_MODULE_SECRET", store.NewToken())
 
 	web.Version = version
 	registry := modules.NewRegistry(dk, secret)
-	// Hands every module its token within a TTL of the panel starting, without
-	// waiting for someone to open a page.
+	// Gives modules their token without waiting for someone to open a page.
 	go registry.Refresh(context.Background())
 
 	srv := &web.Server{

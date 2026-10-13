@@ -105,13 +105,8 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 	return resp.ID, nil
 }
 
-// DeployStack runs `docker stack deploy`.
-//
-// ponytail: compose is a client-side format — the daemon API knows nothing
-// about it, and re-implementing the loader (services, networks, volumes,
-// configs, secrets, extends, interpolation) is a project of its own. The panel
-// image ships the CLI that already does it. Swap this for a library only if the
-// CLI dependency ever becomes a problem.
+// DeployStack runs `docker stack deploy`: compose is a client-side format the
+// daemon API does not know, so the image ships the CLI.
 func (c *Client) DeployStack(ctx context.Context, name, compose string) (string, error) {
 	if !ValidName(name) {
 		return "", fmt.Errorf("stack name %q: letters, digits, dot, dash and underscore only", name)
@@ -132,8 +127,7 @@ func (c *Client) DeployStack(ctx context.Context, name, compose string) (string,
 	return string(out), nil
 }
 
-// RemoveStack drops every service of a stack. Uses the API, not the CLI: this
-// one is just a filtered delete.
+// RemoveStack deletes every service of a stack through the API.
 func (c *Client) RemoveStack(ctx context.Context, name string) error {
 	list, err := c.stackServices(ctx, name)
 	if err != nil {
@@ -150,7 +144,6 @@ func (c *Client) RemoveStack(ctx context.Context, name string) error {
 	return nil
 }
 
-// RemoveService deletes one service.
 func (c *Client) RemoveService(ctx context.Context, nameOrID string) error {
 	s, err := c.service(ctx, nameOrID)
 	if err != nil {

@@ -1,14 +1,6 @@
-// An EXAMPLE module, not a feature: the panel shows the same numbers on its own
-// Resources page. This exists to demonstrate the module contract end to end —
-// a manifest, a permission (stats:read), and a call back into the core — and to
-// be copied as a skeleton.
-//
-// The module has no docker.sock access of its own. It gets the numbers from the
-// core via GET /internal/stats, identifying itself with the headers the core
-// sent it in the proxied request.
-//
-// A metrics module worth installing would do what the core deliberately does
-// not: keep history, draw graphs, alert on thresholds. This one keeps nothing.
+// An example module, not a feature: the panel already shows these numbers. It
+// demonstrates the contract (a manifest, the stats:read permission, a call to
+// GET /internal/stats) and is meant to be copied as a skeleton.
 package main
 
 import (

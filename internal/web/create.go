@@ -20,8 +20,6 @@ func lines(s string) []string {
 	return out
 }
 
-// --- single service ---
-
 func (s *Server) newServiceForm(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "new-service.html", nil)
 }
@@ -48,8 +46,6 @@ func (s *Server) createService(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Redirect", "/services/"+id)
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// --- stacks from compose ---
 
 type stackForm struct {
 	Name    string

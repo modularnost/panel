@@ -1,12 +1,6 @@
-// Package agent collects container stats on nodes the panel itself does not run
-// on.
-//
-// Docker has no cross-node stats API: a manager's socket only sees its own
-// containers. So the same binary runs as a global Swarm service in agent mode,
-// each replica reporting its own node, and the panel merges the answers.
-//
-// The agent is the panel's own code, not a module: docker.sock stays with us
-// (ADR 3). It only ever reads.
+// Package agent collects container stats per node: a manager's socket only sees
+// its own containers, so the panel's binary also runs as a global agent service
+// (ADR 3) and the panel merges the answers.
 package agent
 
 import (
@@ -104,8 +98,7 @@ func (c *Collector) Stats(ctx context.Context, service string) ([]docker.TaskSta
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
-				// A node that cannot be reached is worth showing as a row, not
-				// worth failing the whole page for.
+				// An unreachable node becomes a row, not a failed page.
 				out = append(out, docker.TaskStats{Node: addr, Err: err.Error()})
 				return
 			}

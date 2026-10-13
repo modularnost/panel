@@ -9,9 +9,8 @@ import (
 	"github.com/docker/docker/api/types/network"
 )
 
-// Self is what the panel knows about its own deployment. Installing a module
-// needs it: the module has to land on the same overlay network and be told how
-// to call back, and asking the user for both is asking them to get it wrong.
+// Self is what the panel knows about its own deployment: a new module needs
+// its network and address.
 type Self struct {
 	Service string // the panel's own swarm service name, e.g. "panel_panel"
 	Network string // the overlay network it is attached to
@@ -38,15 +37,12 @@ func (c *Client) Self(ctx context.Context) (Self, error) {
 	return s, nil
 }
 
-// pickNetwork chooses the network modules join by default. Behind Traefik the
-// panel sits on several, and Go's map order made the answer random. Explicit
-// PANEL_NETWORK wins; otherwise the stack's private network, so modules are not
-// put on the public proxy network by accident; otherwise the first by name.
+// pickNetwork chooses the default module network: PANEL_NETWORK, else the
+// stack's private network (not the public proxy one), else the first by name.
 func pickNetwork(names []string, explicit, stack string) string {
 	var usable []string
 	for _, n := range names {
-		// ingress carries published ports and is not usable for service
-		// discovery between services.
+		// ingress is not usable for service discovery.
 		if n != "ingress" && n != "bridge" && n != "host" {
 			usable = append(usable, n)
 		}

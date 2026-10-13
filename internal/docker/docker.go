@@ -1,5 +1,4 @@
 // Package docker is the only place that touches the Docker Swarm API.
-// Handlers and modules never call the SDK directly.
 package docker
 
 import (
@@ -158,9 +157,7 @@ func (c *Client) ForceUpdate(ctx context.Context, nameOrID string) (Deploy, erro
 	return d, fmt.Errorf("%s: the service is changing too fast, try again", nameOrID)
 }
 
-// SetLabels merges labels into the service spec (an empty value deletes a key).
-// This is how the Traefik form works: the panel only writes labels and Traefik
-// picks them up on its own.
+// SetLabels merges labels into the service spec; an empty value deletes the key.
 func (c *Client) SetLabels(ctx context.Context, nameOrID string, labels map[string]string) error {
 	s, err := c.service(ctx, nameOrID)
 	if err != nil {
@@ -182,8 +179,6 @@ func (c *Client) SetLabels(ctx context.Context, nameOrID string, labels map[stri
 }
 
 // RedeployStack force-updates every service in a stack.
-// ponytail: no `docker stack deploy` — the panel has no compose file and is not
-// going to store one. Upgrade path: a real redeploy from compose, if ever needed.
 func (c *Client) RedeployStack(ctx context.Context, stack string) ([]Deploy, error) {
 	list, err := c.stackServices(ctx, stack)
 	if err != nil {
@@ -192,8 +187,7 @@ func (c *Client) RedeployStack(ctx context.Context, stack string) ([]Deploy, err
 	if len(list) == 0 {
 		return nil, fmt.Errorf("stack %q not found", stack)
 	}
-	// One failing service must not leave the stack half-redeployed: walk them
-	// all and collect the errors.
+	// Keep going on failure so the stack is not left half-redeployed.
 	var done []Deploy
 	var errs []error
 	for _, s := range list {
@@ -207,10 +201,7 @@ func (c *Client) RedeployStack(ctx context.Context, stack string) ([]Deploy, err
 	return done, errors.Join(errs...)
 }
 
-// --- Logs ---
-
-// withSlot turns "<ts> <attrs> <msg>" into "<ts> [slot] <msg>".
-// For single-replica logs (an empty map) the line is left alone.
+// withSlot turns "<ts> <attrs> <msg>" into "<ts> [slot] <msg>"; an empty map leaves the line alone.
 func withSlot(line string, slotByTask map[string]int) string {
 	if len(slotByTask) == 0 {
 		return line
@@ -330,8 +321,6 @@ func (c *Client) Logs(ctx context.Context, serviceID, taskID string, tail int) (
 	return lines, nil
 }
 
-// --- Metrics ---
-
 // TaskStats is a point-in-time sample for one replica.
 type TaskStats struct {
 	Node       string  `json:"node"`
@@ -348,16 +337,9 @@ type TaskStats struct {
 	Err        string  `json:"err,omitempty"`
 }
 
-// Stats collects CPU and memory for the containers running on THIS node.
-//
-// Deliberately built on ContainerList, not on the Swarm API: a worker node
-// cannot list services or tasks at all ("this node is not a swarm manager"),
-// and a manager lists tasks for the whole cluster while only holding its own
-// containers. Task containers carry everything needed as labels, and those are
-// readable on any node.
-//
-// A non-empty service name narrows the sweep: one service page should not open
-// a stats stream for every container in the cluster.
+// Stats samples the containers on THIS node. It uses ContainerList, not the
+// Swarm API: workers cannot list services or tasks, and task containers carry
+// what is needed as labels. A service name narrows the sweep.
 func (c *Client) Stats(ctx context.Context, service string) ([]TaskStats, error) {
 	f := filters.NewArgs(filters.Arg("label", "com.docker.swarm.task.id"))
 	if service != "" {
@@ -409,8 +391,7 @@ func slotFromTaskName(name string) int {
 	return slot
 }
 
-// SortStats orders rows the way the UI shows them: by node, then service, then
-// replica. Exported because the panel merges what several agents send back.
+// SortStats orders by node, service, replica. Exported: the panel merges agents' answers.
 func SortStats(out []TaskStats) {
 	slices.SortFunc(out, func(a, b TaskStats) int {
 		return cmp.Or(
@@ -420,7 +401,6 @@ func SortStats(out []TaskStats) {
 	})
 }
 
-// NodeName is the name of the node this daemon runs on.
 func (c *Client) NodeName(ctx context.Context) (string, error) {
 	info, err := c.api.Info(ctx)
 	if err != nil {

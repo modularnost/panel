@@ -21,7 +21,6 @@ type servicePage struct {
 	NewHook string // shown once, right after a hook is created
 }
 
-// service loads the service behind the URL and the data its tab needs.
 func (s *Server) service(w http.ResponseWriter, r *http.Request, tab string) (servicePage, bool) {
 	sv, ok := s.findService(r.Context(), r.PathValue("id"))
 	if !ok {
@@ -67,8 +66,6 @@ func (s *Server) serviceStats(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "stats-table", s.statsView(r, p.Service.Name, false))
 }
-
-// --- webhooks scoped to one service ---
 
 func (s *Server) serviceCreateHook(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.service(w, r, "webhooks")
