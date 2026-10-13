@@ -2,8 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"errors"
-	"mime"
 	"net/http"
 
 	"modularnost/internal/docker"
@@ -26,56 +24,8 @@ func writeAPIError(w http.ResponseWriter, status int, code, msg string) {
 	json.NewEncoder(w).Encode(map[string]map[string]string{"error": {"code": code, "message": msg}})
 }
 
-// jsonOnly refuses state-changing requests that are not JSON. A plain HTML form
-// cannot send application/json, so this is the CSRF guard for cookie sessions.
-func jsonOnly(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet, http.MethodHead, http.MethodOptions:
-		default:
-			if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
-				writeAPIError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "send application/json")
-				return
-			}
-		}
-		next(w, r)
-	}
-}
-
 func apiNotFound(w http.ResponseWriter, _ *http.Request) {
 	writeAPIError(w, http.StatusNotFound, "not_found", "no such endpoint")
-}
-
-func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "bad_request", "expected {\"username\", \"password\"}")
-		return
-	}
-	u, err := s.DB.Authenticate(in.Username, in.Password)
-	if errors.Is(err, store.ErrNoUser) {
-		writeAPIError(w, http.StatusUnauthorized, "invalid_credentials", err.Error())
-		return
-	}
-	if err == nil {
-		err = s.startSession(w, r, u.ID)
-	}
-	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	writeJSON(w, toAPIUser(u))
-}
-
-func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
-	if err := s.endSession(w, r); err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 type apiService struct {

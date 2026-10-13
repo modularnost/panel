@@ -117,8 +117,6 @@ func (s *Server) Routes() http.Handler {
 		operator = store.RoleOperator
 		admin    = store.RoleAdmin
 	)
-	mux.HandleFunc("POST /api/v1/auth/login", jsonOnly(s.apiLogin))
-	mux.HandleFunc("POST /api/v1/auth/logout", jsonOnly(s.apiLogout))
 	s.registerAPI(mux)
 	mux.HandleFunc("/api/v1/", apiNotFound)
 

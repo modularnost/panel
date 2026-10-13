@@ -88,19 +88,21 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "login.html", "")
 		return
 	}
-	if err := s.startSession(w, r, u.ID); err != nil {
+	c, err := s.sessionCookie(r, u.ID)
+	if err != nil {
 		fail(w, err)
 		return
 	}
+	http.SetCookie(w, c)
 	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
 }
 
-func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) error {
+func (s *Server) sessionCookie(r *http.Request, userID int64) (*http.Cookie, error) {
 	token, err := s.DB.CreateToken(userID, "", "", sessionTTL)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	http.SetCookie(w, &http.Cookie{
+	return &http.Cookie{
 		Name:     sessionCookie,
 		Value:    token,
 		Path:     "/",
@@ -110,18 +112,18 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int
 		// Lax blocks cross-site POSTs, so no separate CSRF tokens are needed.
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(sessionTTL),
-	})
+	}, nil
+}
+
+func (s *Server) revokeSession(r *http.Request) error {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		return s.DB.DeleteTokenByValue(c.Value)
+	}
 	return nil
 }
 
-func (s *Server) endSession(w http.ResponseWriter, r *http.Request) error {
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		if err := s.DB.DeleteTokenByValue(c.Value); err != nil {
-			return err
-		}
-	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
-	return nil
+func clearedCookie() *http.Cookie {
+	return &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1}
 }
 
 // safeNext keeps the post-login redirect on this site: "//host" and "/\host"
@@ -134,10 +136,11 @@ func safeNext(next string) string {
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	if err := s.endSession(w, r); err != nil {
+	if err := s.revokeSession(r); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	http.SetCookie(w, clearedCookie())
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
