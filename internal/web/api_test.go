@@ -1,12 +1,14 @@
 package web
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -124,5 +126,35 @@ func TestToAPIService(t *testing.T) {
 	sv.Running = 1
 	if toAPIService(sv, false).Healthy {
 		t.Error("1 of 2 replicas must not be healthy")
+	}
+}
+
+// api/openapi.json is generated from the handlers and committed, so a change to
+// the API shows up in review. Regenerate with UPDATE_OPENAPI=1 go test ./internal/web.
+func TestOpenAPIIsCommitted(t *testing.T) {
+	rec := httptest.NewRecorder()
+	(&Server{}).Routes().ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/openapi.json", nil))
+	if rec.Code != 200 {
+		t.Fatalf("spec: %d", rec.Code)
+	}
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, rec.Body.Bytes(), "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	buf.WriteByte('\n')
+
+	const path = "../../api/openapi.json"
+	if os.Getenv("UPDATE_OPENAPI") != "" {
+		if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n")), buf.Bytes()) {
+		t.Fatal("api/openapi.json is out of date: UPDATE_OPENAPI=1 go test ./internal/web")
 	}
 }
