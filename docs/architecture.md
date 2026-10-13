@@ -25,8 +25,9 @@ Open source is planned. Positioning: **Swarm-native, lightweight, modular**.
   **Swarm only**, with no support for plain Docker/docker-compose as a separate
   backend (see the ADR below)
 - **Database**: SQLite (see the "Database" section)
-- **Frontend**: HTMX + a template engine (templ or html/template) — no separate
-  SPA build unless there is an explicit reason to move to one
+- **Frontend**: a React + TypeScript SPA (Vite, Bun for install and scripts)
+  over the JSON API, embedded in the binary; the HTMX pages stay until the SPA
+  has parity (see ADR 6)
 - **Docker API access**: only over the Unix socket on a manager node; never
   expose `docker.sock` externally without an authenticating layer in front
 
@@ -113,6 +114,23 @@ or Grafana is for.
 `examples/metrics-module` is a skeleton demonstrating that permission, not a
 feature — it renders what the panel already renders.
 
+### 6. A SPA over a JSON API (decided 2026-10-14)
+
+The UI is a React + TypeScript single-page app talking to `/api/v1`. The reason
+is the work ahead, not the current screens: live status, logs and later
+features want client state, and one API serves scripts and CI as well.
+
+- the built bundle is embedded in the binary: still one binary, one image
+- migration is gradual: the API first, then screens one by one; the HTMX pages
+  stay until the SPA has parity and are then removed
+- `/api/v1` is the contract for the UI and external clients, authenticated as
+  today (session cookie or token); `/internal/*` stays the module API
+- modules are unchanged: the SPA frames their pages
+- `api/openapi.yaml` is the contract and the TypeScript types are generated
+  from it
+- state-changing requests accept only `application/json`, which a plain HTML
+  form cannot send: that is the CSRF guard
+
 ## Feature order (do not change without discussion)
 
 1. **Core MVP**:
@@ -194,7 +212,10 @@ feature — it renders what the panel already renders.
    - if several consumers start polling, teach the core to sample continuously
      and serve the last snapshot: every /internal/stats call costs a second,
      because CPU percent needs two readings for a delta
-8. Everything else (a build system, git integration for building images) is out
+8. **SPA and JSON API** (decided 2026-10-14, ADR 6): the API read before write,
+   then the frontend scaffold, then screens until parity, then the cutover and
+   removal of the HTML templates
+9. Everything else (a build system, git integration for building images) is out
    of the current scope — do not implement without an explicit request
 
 ## Deliberate non-goals (anti-scope)
