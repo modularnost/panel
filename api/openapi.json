@@ -93,6 +93,70 @@
         ],
         "type": "object"
       },
+      "Module": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "description": "Why the manifest could not be fetched",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nav_entries": {
+            "items": {
+              "$ref": "#/components/schemas/NavEntry"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "service": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "service",
+          "ok",
+          "nav_entries",
+          "permissions"
+        ],
+        "type": "object"
+      },
+      "NavEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "path"
+        ],
+        "type": "object"
+      },
       "Node": {
         "additionalProperties": false,
         "properties": {
@@ -408,6 +472,49 @@
           "role"
         ],
         "type": "object"
+      },
+      "Webhook": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "force_update",
+              "stack_redeploy"
+            ],
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "image_pattern": {
+            "type": "string"
+          },
+          "last_triggered_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "path",
+          "created_at"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -591,6 +698,48 @@
           }
         ],
         "summary": "The signed-in user"
+      }
+    },
+    "/api/v1/modules": {
+      "get": {
+        "operationId": "list-modules",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Module"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Installed modules with their manifests"
       }
     },
     "/api/v1/nodes": {
@@ -838,6 +987,58 @@
         "summary": "Deploys of one service, including redeploys of its stack"
       }
     },
+    "/api/v1/services/{id}/webhooks": {
+      "get": {
+        "operationId": "list-service-webhooks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Webhook"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Webhooks that fire for one service, its own and its stack's"
+      }
+    },
     "/api/v1/stacks": {
       "get": {
         "operationId": "list-stacks",
@@ -978,6 +1179,48 @@
           }
         ],
         "summary": "Current CPU and memory per replica, across nodes"
+      }
+    },
+    "/api/v1/webhooks": {
+      "get": {
+        "operationId": "list-webhooks",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Webhook"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "All webhooks"
       }
     }
   }
