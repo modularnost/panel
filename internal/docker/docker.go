@@ -59,7 +59,7 @@ func splitImage(img string) (name, digest string) {
 }
 
 func (c *Client) Services(ctx context.Context) ([]Service, error) {
-	list, err := c.api.ServiceList(ctx, swarm.ServiceListOptions{Status: true})
+	list, err := c.api.ServiceList(ctx, swarm.ServiceListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	running := runningTasks(tasks)
+	running, scheduled := runningTasks(tasks), scheduledTasks(tasks)
 	out := make([]Service, 0, len(list))
 	for _, s := range list {
 		img, digest := splitImage(s.Spec.TaskTemplate.ContainerSpec.Image)
@@ -85,13 +85,31 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 		if s.Spec.Mode.Global != nil {
 			svc.Mode = "global"
 		}
-		if s.ServiceStatus != nil {
-			svc.Running, svc.Desired = s.ServiceStatus.RunningTasks, s.ServiceStatus.DesiredTasks
-		}
 		svc.Running = running[s.ID]
+		svc.Desired = desiredReplicas(s, scheduled)
 		out = append(out, svc)
 	}
 	return out, nil
+}
+
+// desiredReplicas reads the count from the spec for a replicated service. A
+// global one wants a task per eligible node, which is what Swarm has scheduled;
+// the status block Docker offers for this came back as 0 for global services.
+func desiredReplicas(s swarm.Service, scheduled map[string]uint64) uint64 {
+	if r := s.Spec.Mode.Replicated; r != nil && r.Replicas != nil {
+		return *r.Replicas
+	}
+	return scheduled[s.ID]
+}
+
+func scheduledTasks(tasks []swarm.Task) map[string]uint64 {
+	out := make(map[string]uint64)
+	for _, t := range tasks {
+		if t.DesiredState == swarm.TaskStateRunning {
+			out[t.ServiceID]++
+		}
+	}
+	return out
 }
 
 func runningTasks(tasks []swarm.Task) map[string]uint64 {
