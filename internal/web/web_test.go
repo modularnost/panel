@@ -12,8 +12,6 @@ func TestHostFromRule(t *testing.T) {
 	}
 }
 
-// Routes panics on a pattern conflict, and that happens at startup — which is
-// far too late to find out. One call catches it here instead.
 func TestSafeNext(t *testing.T) {
 	for in, want := range map[string]string{
 		"/stacks?x=1":     "/stacks?x=1",
@@ -28,6 +26,8 @@ func TestSafeNext(t *testing.T) {
 	}
 }
 
+// Routes panics on a pattern conflict, and that happens at startup — which is
+// far too late to find out. One call catches it here instead.
 func TestRoutesRegister(t *testing.T) {
 	(&Server{}).Routes()
 }

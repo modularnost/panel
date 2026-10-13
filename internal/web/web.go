@@ -117,6 +117,11 @@ func (s *Server) Routes() http.Handler {
 		operator = store.RoleOperator
 		admin    = store.RoleAdmin
 	)
+	mux.HandleFunc("POST /api/v1/auth/login", jsonOnly(s.apiLogin))
+	mux.HandleFunc("POST /api/v1/auth/logout", jsonOnly(s.apiLogout))
+	mux.HandleFunc("GET /api/v1/me", s.apiRequire(viewer, s.apiMe))
+	mux.HandleFunc("/api/v1/", apiNotFound)
+
 	mux.HandleFunc("GET /{$}", s.require(viewer, s.index))
 	mux.HandleFunc("GET /deploys", s.require(viewer, s.deploys))
 	mux.HandleFunc("GET /resources", s.require(viewer, s.resources))
