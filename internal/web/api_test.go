@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -394,5 +395,25 @@ func TestAPITraefikRejectsLabelInjection(t *testing.T) {
 		if status, resp := send(t, c, "PUT", base+"/api/v1/services/web/traefik", "application/json", body); status != 422 {
 			t.Errorf("%s -> %d %v", body, status, resp)
 		}
+	}
+}
+
+func TestHTMLTraefikFormRefusesBadHost(t *testing.T) {
+	c, base, db := apiServer(t)
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatal("sign in")
+	}
+	resp, err := c.PostForm(base+"/services/web/traefik", url.Values{
+		"host": {"a`) || Host(`b"}, "port": {"80"}, "entrypoint": {"web"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("the HTML form must refuse it too: %d", resp.StatusCode)
 	}
 }

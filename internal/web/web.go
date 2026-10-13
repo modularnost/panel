@@ -8,11 +8,13 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -323,6 +325,31 @@ func hostFromRule(rule string) string {
 	return strings.TrimSuffix(rule, backtick+")")
 }
 
+var (
+	hostRe = regexp.MustCompile(`^[A-Za-z0-9.-]*$`)
+	nameRe = regexp.MustCompile(`^[A-Za-z0-9_-]*$`)
+)
+
+// validateTraefik keeps what lands in a Traefik rule to host-name characters:
+// a backtick in the host would let the form rewrite the whole rule.
+func validateTraefik(host, port, entrypoint, resolver string) error {
+	if len(host) > 253 || !hostRe.MatchString(host) {
+		return errors.New("host: letters, digits, dots and hyphens only")
+	}
+	if port != "" {
+		if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
+			return errors.New("port: a number from 1 to 65535")
+		}
+	}
+	if len(entrypoint) > 64 || !nameRe.MatchString(entrypoint) {
+		return errors.New("entrypoint: letters, digits, hyphens and underscores only")
+	}
+	if len(resolver) > 64 || !nameRe.MatchString(resolver) {
+		return errors.New("certresolver: letters, digits, hyphens and underscores only")
+	}
+	return nil
+}
+
 // traefikLabels is what the Traefik form writes; an empty value removes a label.
 func traefikLabels(service, host, port, entrypoint, resolver string) map[string]string {
 	labels := map[string]string{
@@ -346,13 +373,18 @@ func traefikLabels(service, host, port, entrypoint, resolver string) map[string]
 }
 
 func (s *Server) saveTraefik(w http.ResponseWriter, r *http.Request) {
+	host, port := r.FormValue("host"), r.FormValue("port")
+	entrypoint, resolver := r.FormValue("entrypoint"), r.FormValue("certresolver")
+	if err := validateTraefik(host, port, entrypoint, resolver); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	sv, ok := s.findService(r.Context(), r.PathValue("id"))
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	labels := traefikLabels(sv.Name, r.FormValue("host"), r.FormValue("port"),
-		r.FormValue("entrypoint"), r.FormValue("certresolver"))
+	labels := traefikLabels(sv.Name, host, port, entrypoint, resolver)
 	if err := s.Docker.SetLabels(r.Context(), sv.ID, labels); err != nil {
 		fail(w, err)
 		return

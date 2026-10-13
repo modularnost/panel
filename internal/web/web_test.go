@@ -56,3 +56,30 @@ func TestTraefikLabels(t *testing.T) {
 		t.Errorf("host and port both empty must disable Traefik: %q", off["traefik.enable"])
 	}
 }
+
+func TestValidateTraefik(t *testing.T) {
+	ok := [][4]string{
+		{"app.example.com", "8080", "websecure", "le"},
+		{"", "", "", ""},
+		{"a-b.example.com", "65535", "web_2", ""},
+	}
+	for _, c := range ok {
+		if err := validateTraefik(c[0], c[1], c[2], c[3]); err != nil {
+			t.Errorf("%v: %v", c, err)
+		}
+	}
+	bad := [][4]string{
+		{"a" + backtick + ") || Host(" + backtick + "b", "80", "web", ""},
+		{"a b.com", "80", "web", ""},
+		{"app.example.com", "0", "web", ""},
+		{"app.example.com", "65536", "web", ""},
+		{"app.example.com", "http", "web", ""},
+		{"app.example.com", "80", "web,admin", ""},
+		{"app.example.com", "80", "web", "le/../x"},
+	}
+	for _, c := range bad {
+		if err := validateTraefik(c[0], c[1], c[2], c[3]); err == nil {
+			t.Errorf("%v must be refused", c)
+		}
+	}
+}
