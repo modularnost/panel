@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -166,9 +167,12 @@ func (d *DB) StartDeploy(e DeployEvent) (finish func(oldDigest, newDigest string
 		if err != nil {
 			status, msg = "failed", err.Error()
 		}
-		d.Exec(`UPDATE deploy_events SET status=?, old_image_digest=?, new_image_digest=?,
+		_, e := d.Exec(`UPDATE deploy_events SET status=?, old_image_digest=?, new_image_digest=?,
 			error_message=?, finished_at=CURRENT_TIMESTAMP WHERE id=?`,
 			status, oldDigest, newDigest, msg, id)
+		if e != nil {
+			log.Printf("deploy event %d: %v", id, e)
+		}
 	}, id
 }
 
