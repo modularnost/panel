@@ -230,6 +230,34 @@
         ],
         "type": "object"
       },
+      "Redeploy": {
+        "additionalProperties": false,
+        "properties": {
+          "new_digest": {
+            "type": "string"
+          },
+          "old_digest": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "service",
+          "warnings"
+        ],
+        "type": "object"
+      },
       "Service": {
         "additionalProperties": false,
         "properties": {
@@ -483,6 +511,42 @@
           "user_id",
           "username",
           "name"
+        ],
+        "type": "object"
+      },
+      "Traefik": {
+        "additionalProperties": false,
+        "properties": {
+          "cert_resolver": {
+            "description": "Empty serves plain HTTP",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]*$",
+            "type": "string"
+          },
+          "entrypoint": {
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]*$",
+            "type": "string"
+          },
+          "host": {
+            "description": "Empty for none",
+            "maxLength": 253,
+            "pattern": "^[A-Za-z0-9.-]*$",
+            "type": "string"
+          },
+          "port": {
+            "description": "Container port; 0 for none",
+            "format": "int64",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "entrypoint",
+          "cert_resolver"
         ],
         "type": "object"
       },
@@ -912,6 +976,43 @@
       }
     },
     "/api/v1/services/{id}": {
+      "delete": {
+        "operationId": "delete-service",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a service"
+      },
       "get": {
         "operationId": "get-service",
         "parameters": [
@@ -1019,6 +1120,152 @@
           }
         ],
         "summary": "Deploys of one service, including redeploys of its stack"
+      }
+    },
+    "/api/v1/services/{id}/redeploy": {
+      "post": {
+        "operationId": "redeploy-service",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Redeploy"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pull the image again and replace the replicas"
+      }
+    },
+    "/api/v1/services/{id}/traefik": {
+      "get": {
+        "operationId": "get-service-traefik",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Traefik"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The Traefik routing the service's labels describe"
+      },
+      "put": {
+        "operationId": "set-service-traefik",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Traefik"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Traefik"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write the Traefik labels; an empty host and port take the service off Traefik"
       }
     },
     "/api/v1/services/{id}/webhooks": {

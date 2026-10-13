@@ -351,3 +351,48 @@ func TestAPIUsersAndTokensNeverExposeSecrets(t *testing.T) {
 		t.Errorf("the token value must never be listed: %s", tokens)
 	}
 }
+
+func TestAPIServiceActionsAreGated(t *testing.T) {
+	c, base, db := apiServer(t)
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	const j = "application/json"
+	actions := []struct{ method, path, body string }{
+		{"POST", "/api/v1/services/web/redeploy", `{}`},
+		{"DELETE", "/api/v1/services/web", ``},
+		{"GET", "/api/v1/services/web/traefik", ``},
+		{"PUT", "/api/v1/services/web/traefik", `{"host":"","port":0,"entrypoint":"","cert_resolver":""}`},
+	}
+	for _, a := range actions {
+		if status, _ := send(t, c, a.method, base+a.path, j, a.body); status != 401 {
+			t.Errorf("%s %s anonymous: %d", a.method, a.path, status)
+		}
+	}
+	signIn(t, c, base) // ann, a viewer
+	for _, a := range actions {
+		if status, body := send(t, c, a.method, base+a.path, j, a.body); status != 403 || errorCode(body) != "forbidden" {
+			t.Errorf("%s %s as viewer: %d %v", a.method, a.path, status, body)
+		}
+	}
+}
+
+func TestAPITraefikRejectsLabelInjection(t *testing.T) {
+	c, base, db := apiServer(t)
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, body := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatalf("sign in: %d %v", status, body)
+	}
+	// Both would end up inside a Traefik rule or a label value.
+	for _, body := range []string{
+		`{"host":"a` + "`" + `) || Host(` + "`" + `b","port":80,"entrypoint":"web","cert_resolver":""}`,
+		`{"host":"a.example.com","port":70000,"entrypoint":"web","cert_resolver":""}`,
+		`{"host":"a.example.com","port":80,"entrypoint":"web,admin","cert_resolver":""}`,
+	} {
+		if status, resp := send(t, c, "PUT", base+"/api/v1/services/web/traefik", "application/json", body); status != 422 {
+			t.Errorf("%s -> %d %v", body, status, resp)
+		}
+	}
+}

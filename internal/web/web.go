@@ -323,32 +323,36 @@ func hostFromRule(rule string) string {
 	return strings.TrimSuffix(rule, backtick+")")
 }
 
+// traefikLabels is what the Traefik form writes; an empty value removes a label.
+func traefikLabels(service, host, port, entrypoint, resolver string) map[string]string {
+	labels := map[string]string{
+		"traefik.enable":                                 "true",
+		router(service) + ".rule":                        "",
+		router(service) + ".entrypoints":                 entrypoint,
+		router(service) + ".tls.certresolver":            resolver,
+		router(service) + ".tls":                         "",
+		lbService(service) + ".loadbalancer.server.port": port,
+	}
+	if host != "" {
+		labels[router(service)+".rule"] = "Host(" + backtick + host + backtick + ")"
+	}
+	if resolver != "" {
+		labels[router(service)+".tls"] = "true"
+	}
+	if host == "" && port == "" {
+		labels["traefik.enable"] = "" // nothing set: take the service off Traefik
+	}
+	return labels
+}
+
 func (s *Server) saveTraefik(w http.ResponseWriter, r *http.Request) {
 	sv, ok := s.findService(r.Context(), r.PathValue("id"))
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	host, port := r.FormValue("host"), r.FormValue("port")
-	ep, cr := r.FormValue("entrypoint"), r.FormValue("certresolver")
-
-	labels := map[string]string{
-		"traefik.enable":                                 "true",
-		router(sv.Name) + ".rule":                        "",
-		router(sv.Name) + ".entrypoints":                 ep,
-		router(sv.Name) + ".tls.certresolver":            cr,
-		router(sv.Name) + ".tls":                         "",
-		lbService(sv.Name) + ".loadbalancer.server.port": port,
-	}
-	if host != "" {
-		labels[router(sv.Name)+".rule"] = "Host(" + backtick + host + backtick + ")"
-	}
-	if cr != "" {
-		labels[router(sv.Name)+".tls"] = "true"
-	}
-	if host == "" && port == "" {
-		labels["traefik.enable"] = "" // nothing set: take the service off Traefik
-	}
+	labels := traefikLabels(sv.Name, r.FormValue("host"), r.FormValue("port"),
+		r.FormValue("entrypoint"), r.FormValue("certresolver"))
 	if err := s.Docker.SetLabels(r.Context(), sv.ID, labels); err != nil {
 		fail(w, err)
 		return
