@@ -45,15 +45,23 @@ func (s *Server) identify(r *http.Request) (store.User, bool) {
 	return store.User{}, false
 }
 
+// authorize returns the caller, or a non-zero status and message to refuse with.
+func (s *Server) authorize(r *http.Request, need string) (store.User, int, string) {
+	u, ok := s.identify(r)
+	if !ok {
+		return u, http.StatusUnauthorized, "log in first"
+	}
+	if !store.AtLeast(u.Role, need) {
+		return u, http.StatusForbidden, "role " + need + " required, you have " + u.Role
+	}
+	return u, 0, ""
+}
+
 func (s *Server) require(need string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		u, ok := s.identify(r)
-		if !ok {
-			s.denied(w, r, http.StatusUnauthorized, "log in first")
-			return
-		}
-		if !store.AtLeast(u.Role, need) {
-			s.denied(w, r, http.StatusForbidden, "role "+need+" required, you have "+u.Role)
+		u, status, msg := s.authorize(r, need)
+		if status != 0 {
+			s.denied(w, r, status, msg)
 			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))
@@ -80,10 +88,17 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "login.html", "")
 		return
 	}
-	token, err := s.DB.CreateToken(u.ID, "", "", sessionTTL)
-	if err != nil {
+	if err := s.startSession(w, r, u.ID); err != nil {
 		fail(w, err)
 		return
+	}
+	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
+}
+
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) error {
+	token, err := s.DB.CreateToken(userID, "", "", sessionTTL)
+	if err != nil {
+		return err
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
@@ -96,7 +111,17 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(sessionTTL),
 	})
-	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
+	return nil
+}
+
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) error {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		if err := s.DB.DeleteTokenByValue(c.Value); err != nil {
+			return err
+		}
+	}
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
+	return nil
 }
 
 // safeNext keeps the post-login redirect on this site: "//host" and "/\host"
@@ -109,13 +134,10 @@ func safeNext(next string) string {
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		if err := s.DB.DeleteTokenByValue(c.Value); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	if err := s.endSession(w, r); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
