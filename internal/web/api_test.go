@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"modularnost/internal/docker"
+	"modularnost/internal/modules"
 	"modularnost/internal/store"
 )
 
@@ -244,5 +245,56 @@ func TestToAPITaskStatsKeepsNodeErrors(t *testing.T) {
 	})
 	if len(got) != 2 || got[0].CPU != 12.5 || got[0].MemLimit != 200 || got[1].Error != "agent unreachable" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestAPIWebhooksAreAdminOnly(t *testing.T) {
+	c, base, db := apiServer(t)
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	hook, err := db.CreateWebhook(store.Webhook{ServiceName: "web", ActionType: "force_update"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status, _ := send(t, c, "GET", base+"/api/v1/webhooks", "", ""); status != 401 {
+		t.Fatalf("anonymous: %d", status)
+	}
+	signIn(t, c, base) // ann, a viewer
+	if status, body := send(t, c, "GET", base+"/api/v1/webhooks", "", ""); status != 403 || errorCode(body) != "forbidden" {
+		t.Fatalf("viewer: %d %v", status, body)
+	}
+
+	if status, body := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatalf("admin sign in: %d %v", status, body)
+	}
+	resp, err := c.Get(base + "/api/v1/webhooks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var list []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 || len(list) != 1 || list[0]["path"] != "/hook/"+hook.SecretToken || list[0]["action"] != "force_update" {
+		t.Fatalf("%d %v", resp.StatusCode, list)
+	}
+}
+
+func TestToAPIModules(t *testing.T) {
+	got := toAPIModules([]modules.Module{
+		{Name: "metrics", Version: "0.1.0", Service: "metrics_module", Manifest: modules.Manifest{
+			NavEntries:  []modules.NavEntry{{Title: "Metrics", Path: "/"}},
+			Permissions: []string{"stats:read"},
+		}},
+		{Name: "broken", Err: "connection refused"},
+	})
+	if len(got) != 2 || !got[0].OK || got[0].NavEntries[0].Title != "Metrics" || got[0].Permissions[0] != "stats:read" {
+		t.Fatalf("working module: %+v", got)
+	}
+	if got[1].OK || got[1].Error != "connection refused" || got[1].NavEntries == nil || got[1].Permissions == nil {
+		t.Fatalf("broken module must keep its error and still list empty arrays, not null: %+v", got[1])
 	}
 }
