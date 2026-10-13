@@ -50,6 +50,31 @@
         ],
         "type": "object"
       },
+      "Join": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "command": {
+            "description": "Run this on the machine that should join; it contains the join token",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "worker",
+              "manager"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "address",
+          "command"
+        ],
+        "type": "object"
+      },
       "Login": {
         "additionalProperties": false,
         "properties": {
@@ -65,6 +90,51 @@
         "required": [
           "username",
           "password"
+        ],
+        "type": "object"
+      },
+      "Node": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "availability": {
+            "type": "string"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "leader": {
+            "type": "boolean"
+          },
+          "os": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "worker",
+              "manager"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "hostname",
+          "role",
+          "leader",
+          "status",
+          "availability"
         ],
         "type": "object"
       },
@@ -239,6 +309,82 @@
           "healthy",
           "managed",
           "services"
+        ],
+        "type": "object"
+      },
+      "TaskStats": {
+        "additionalProperties": false,
+        "properties": {
+          "blockRead": {
+            "description": "Cumulative bytes read from block devices",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "blockWrite": {
+            "description": "Cumulative bytes written to block devices",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "cpu": {
+            "description": "Percent of one core, as docker stats reports it",
+            "format": "double",
+            "type": "number"
+          },
+          "error": {
+            "description": "Set on a row for a node that could not be reached",
+            "type": "string"
+          },
+          "mem": {
+            "description": "Bytes",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "memLimit": {
+            "description": "Bytes; 0 when no limit is set",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "netRx": {
+            "description": "Cumulative received bytes",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "netTx": {
+            "description": "Cumulative transmitted bytes",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "node": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "slot": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "stack": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "service",
+          "slot",
+          "cpu",
+          "mem",
+          "memLimit",
+          "netRx",
+          "netTx",
+          "blockRead",
+          "blockWrite"
         ],
         "type": "object"
       },
@@ -445,6 +591,99 @@
           }
         ],
         "summary": "The signed-in user"
+      }
+    },
+    "/api/v1/nodes": {
+      "get": {
+        "operationId": "list-nodes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Node"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cluster members"
+      }
+    },
+    "/api/v1/nodes/join": {
+      "get": {
+        "operationId": "get-join",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "default": "worker",
+              "enum": [
+                "worker",
+                "manager"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Join"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The command that adds a server to the cluster"
       }
     },
     "/api/v1/services": {
@@ -685,6 +924,60 @@
           }
         ],
         "summary": "One stack with its services"
+      }
+    },
+    "/api/v1/stats": {
+      "get": {
+        "operationId": "list-stats",
+        "parameters": [
+          {
+            "description": "Narrow to one service name",
+            "explode": false,
+            "in": "query",
+            "name": "service",
+            "schema": {
+              "description": "Narrow to one service name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaskStats"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Current CPU and memory per replica, across nodes"
       }
     }
   }
