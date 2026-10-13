@@ -39,7 +39,7 @@ var staticFS embed.FS
 // staticVersion busts the browser cache exactly when the bundle changes.
 var staticVersion = func() string {
 	sum := sha256.New()
-	fs.WalkDir(staticFS, ".", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(staticFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
@@ -47,6 +47,9 @@ var staticVersion = func() string {
 		sum.Write(b)
 		return err
 	})
+	if err != nil {
+		panic(err)
+	}
 	return hex.EncodeToString(sum.Sum(nil))[:12]
 }()
 
@@ -432,7 +435,9 @@ func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	s.DB.TouchWebhook(hook.ID)
+	if err := s.DB.TouchWebhook(hook.ID); err != nil {
+		log.Printf("webhook %d: %v", hook.ID, err)
+	}
 	finish, _ := s.DB.StartDeploy(store.DeployEvent{
 		ServiceName: hook.ServiceName, StackName: hook.StackName,
 		Source: "webhook", TriggeredBy: "webhook#" + strconv.FormatInt(hook.ID, 10),
