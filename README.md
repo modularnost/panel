@@ -18,19 +18,21 @@ installs Docker, initialises a one-node swarm, and brings up Traefik with a
 Let's Encrypt certificate and the panel behind it:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/install.sh | sh
 ```
 
 It asks for the domain and for an email for Let's Encrypt; an empty email skips
 TLS and serves plain HTTP — for an internal network Let's Encrypt cannot reach.
 The admin password is printed once at the end.
 
+Run it as root.
+
 Set the variables instead and it asks nothing, which is what an unattended run
 needs:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/install.sh |
-  sudo DOMAIN=panel.example.com EMAIL=you@example.com sh
+  DOMAIN=panel.example.com EMAIL=you@example.com sh
 ```
 
 Re-running it updates the panel and leaves your users alone: an existing swarm,
