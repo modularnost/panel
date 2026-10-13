@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"slices"
 	"testing"
 	"time"
@@ -57,6 +58,9 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"Stack":       apiStack{},
 		"StackDetail": apiStackDetail{},
 		"Deploy":      apiDeploy{},
+		"TaskStats":   apiTaskStats{},
+		"Node":        apiNode{},
+		"Join":        apiJoin{},
 		"Login":       apiLogin{},
 		"Problem":     apiProblem{},
 		"ProblemBody": problemBody{},
@@ -102,6 +106,45 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		slices.Sort(specKeys)
 		if !slices.Equal(sentKeys, specKeys) {
 			t.Errorf("%s: handlers send %v, the spec describes %v", name, sentKeys, specKeys)
+		}
+	}
+}
+
+// One naming convention for everything a client sees: snake_case, like the
+// module API and the database.
+func TestSpecNamesAreSnakeCase(t *testing.T) {
+	rec := httptest.NewRecorder()
+	(&Server{}).Routes().ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/openapi.json", nil))
+	var spec struct {
+		Paths map[string]map[string]struct {
+			Parameters []struct {
+				Name string `json:"name"`
+			} `json:"parameters"`
+		} `json:"paths"`
+		Components struct {
+			Schemas map[string]struct {
+				Properties map[string]any `json:"properties"`
+			} `json:"schemas"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &spec); err != nil {
+		t.Fatal(err)
+	}
+	snake := regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
+	for name, schema := range spec.Components.Schemas {
+		for prop := range schema.Properties {
+			if !snake.MatchString(prop) {
+				t.Errorf("%s.%s is not snake_case", name, prop)
+			}
+		}
+	}
+	for path, ops := range spec.Paths {
+		for _, op := range ops {
+			for _, p := range op.Parameters {
+				if !snake.MatchString(p.Name) {
+					t.Errorf("%s parameter %s is not snake_case", path, p.Name)
+				}
+			}
 		}
 	}
 }

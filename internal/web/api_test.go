@@ -210,10 +210,39 @@ func TestAPIDeploys(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != 200 || len(list) != 1 || list[0]["service"] != "web" || list[0]["status"] != "success" || list[0]["newDigest"] != "sha256:new" {
+	if resp.StatusCode != 200 || len(list) != 1 || list[0]["service"] != "web" || list[0]["status"] != "success" || list[0]["new_digest"] != "sha256:new" {
 		t.Fatalf("%d %v", resp.StatusCode, list)
 	}
 	if status, body := send(t, c, "GET", base+"/api/v1/deploys?limit=0", "", ""); status != 422 {
 		t.Fatalf("limit=0 should fail validation: %d %v", status, body)
+	}
+}
+
+func TestAPIClusterRoutesAreGated(t *testing.T) {
+	c, base := apiClient(t)
+	for _, path := range []string{"/api/v1/stats", "/api/v1/nodes", "/api/v1/nodes/join"} {
+		if status, _ := send(t, c, "GET", base+path, "", ""); status != 401 {
+			t.Errorf("%s anonymous: %d", path, status)
+		}
+	}
+	signIn(t, c, base)
+	// ann is a viewer: the node list and join tokens are for admins.
+	for _, path := range []string{"/api/v1/nodes", "/api/v1/nodes/join"} {
+		if status, body := send(t, c, "GET", base+path, "", ""); status != 403 || errorCode(body) != "forbidden" {
+			t.Errorf("%s as viewer: %d %v", path, status, body)
+		}
+	}
+	if status, body := send(t, c, "GET", base+"/api/v1/nodes/join?role=owner", "", ""); status != 403 && status != 422 {
+		t.Errorf("an unknown role must not reach Docker: %d %v", status, body)
+	}
+}
+
+func TestToAPITaskStatsKeepsNodeErrors(t *testing.T) {
+	got := toAPITaskStats([]docker.TaskStats{
+		{Node: "n1", Service: "web", Slot: 1, CPU: 12.5, Mem: 100, MemLimit: 200},
+		{Node: "n2", Err: "agent unreachable"},
+	})
+	if len(got) != 2 || got[0].CPU != 12.5 || got[0].MemLimit != 200 || got[1].Error != "agent unreachable" {
+		t.Fatalf("%+v", got)
 	}
 }

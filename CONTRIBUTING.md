@@ -41,6 +41,7 @@ CI rejects a PR whose title does not match.
   There is no coverage threshold.
 - Standard library first. A new dependency needs a reason in the PR, and
   `THIRD-PARTY.md` is regenerated with `scripts/licenses.sh`.
+- JSON field and parameter names are `snake_case` everywhere; a test enforces it.
 - A change to `/api/v1` regenerates the spec: `UPDATE_OPENAPI=1 go test
   ./internal/web`. CI fails when `api/openapi.json` is stale.
 - Docker only through `internal/docker`, the database only through
