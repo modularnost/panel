@@ -1,7 +1,6 @@
 package web
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"mime"
@@ -43,21 +42,6 @@ func jsonOnly(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (s *Server) apiRequire(need string, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		u, status, msg := s.authorize(r, need)
-		if status == http.StatusUnauthorized {
-			writeAPIError(w, status, "unauthorized", msg)
-			return
-		}
-		if status != 0 {
-			writeAPIError(w, status, "forbidden", msg)
-			return
-		}
-		next(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))
-	}
-}
-
 func apiNotFound(w http.ResponseWriter, _ *http.Request) {
 	writeAPIError(w, http.StatusNotFound, "not_found", "no such endpoint")
 }
@@ -94,10 +78,6 @@ func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) apiMe(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, toAPIUser(userFrom(r)))
-}
-
 type apiService struct {
 	ID      string            `json:"id"`
 	Name    string            `json:"name"`
@@ -122,33 +102,4 @@ func toAPIService(sv docker.Service, withLabels bool) apiService {
 		out.Labels = sv.Labels
 	}
 	return out
-}
-
-func (s *Server) apiServiceList(w http.ResponseWriter, r *http.Request) {
-	svcs, err := s.Docker.Services(r.Context())
-	if err != nil {
-		writeAPIError(w, http.StatusBadGateway, "docker_unavailable", err.Error())
-		return
-	}
-	out := make([]apiService, 0, len(svcs))
-	for _, sv := range svcs {
-		out = append(out, toAPIService(sv, false))
-	}
-	writeJSON(w, out)
-}
-
-func (s *Server) apiServiceGet(w http.ResponseWriter, r *http.Request) {
-	svcs, err := s.Docker.Services(r.Context())
-	if err != nil {
-		writeAPIError(w, http.StatusBadGateway, "docker_unavailable", err.Error())
-		return
-	}
-	id := r.PathValue("id")
-	for _, sv := range svcs {
-		if sv.ID == id || sv.Name == id {
-			writeJSON(w, toAPIService(sv, true))
-			return
-		}
-	}
-	writeAPIError(w, http.StatusNotFound, "not_found", "no such service")
 }

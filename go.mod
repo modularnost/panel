@@ -2,7 +2,11 @@ module modularnost
 
 go 1.26
 
-require github.com/docker/docker v28.3.2+incompatible
+require (
+	github.com/danielgtaylor/huma/v2 v2.39.1
+	github.com/docker/docker v28.3.2+incompatible
+	modernc.org/sqlite v1.57.0
+)
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -41,5 +45,4 @@ require (
 	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.57.0 // indirect
 )

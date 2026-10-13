@@ -119,9 +119,7 @@ func (s *Server) Routes() http.Handler {
 	)
 	mux.HandleFunc("POST /api/v1/auth/login", jsonOnly(s.apiLogin))
 	mux.HandleFunc("POST /api/v1/auth/logout", jsonOnly(s.apiLogout))
-	mux.HandleFunc("GET /api/v1/me", s.apiRequire(viewer, s.apiMe))
-	mux.HandleFunc("GET /api/v1/services", s.apiRequire(viewer, s.apiServiceList))
-	mux.HandleFunc("GET /api/v1/services/{id}", s.apiRequire(viewer, s.apiServiceGet))
+	s.registerAPI(mux)
 	mux.HandleFunc("/api/v1/", apiNotFound)
 
 	mux.HandleFunc("GET /{$}", s.require(viewer, s.index))
