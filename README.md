@@ -246,7 +246,8 @@ Docker API; [internal/store](internal/store) — SQLite and versioned migrations
 [internal/modules](internal/modules) — module discovery.
 
 Project boundaries, the decisions behind them and the order of work live in
-[docs/architecture.md](docs/architecture.md).
+[docs/architecture.md](docs/architecture.md); how to contribute is in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
