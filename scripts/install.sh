@@ -8,6 +8,9 @@
 # Safe to re-run: an existing swarm, network or stack is reused, not recreated.
 # Leave EMAIL empty to skip TLS and serve plain HTTP — for an internal network
 # where Let's Encrypt cannot reach the host.
+#
+# The screen gets one line per step; the chatty output of Docker goes to
+# /var/log/modularnost-install.log, and the tail of it is shown on failure.
 set -eu
 
 DOMAIN=${DOMAIN:-}
@@ -19,11 +22,36 @@ STACK=${PANEL_STACK:-panel}
 NET=${PANEL_NETWORK:-modularnost}
 CONFIG=${PANEL_CONFIG:-/etc/modularnost}
 ADVERTISE=${ADVERTISE_ADDR:-}
+LOG=${PANEL_INSTALL_LOG:-/var/log/modularnost-install.log}
+TOTAL=5
+N=0
+
+# Blue marks what the reader will want to copy. Only on a terminal, and not when
+# NO_COLOR is set (https://no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	BLUE=$(printf '\033[34m')
+	OFF=$(printf '\033[0m')
+else
+	BLUE=
+	OFF=
+fi
 
 die() { echo "error: $*" >&2; exit 1; }
-say() { echo "==> $*"; }
+step() { N=$((N + 1)); echo "[$N/$TOTAL] $*"; }
+warn() { echo "      warning: $*"; }
+
+# Runs a command with its output in the log. A failure shows the end of the log,
+# because that is where the reason is.
+run() {
+	"$@" >>"$LOG" 2>&1 || {
+		tail -n 15 "$LOG" >&2
+		die "'$*' failed; the full output is in $LOG"
+	}
+}
 
 [ "$(id -u)" = 0 ] || die "run as root"
+command -v curl >/dev/null 2>&1 || die "curl is required"
+: >"$LOG"
 
 # Read from the terminal, not stdin: under `curl ... | sh` stdin is the script.
 # No terminal (CI, a pipe with no tty) means the variables must be set already.
@@ -43,29 +71,63 @@ if [ -z "$EMAIL_GIVEN" ]; then
 	EMAIL=$(ask "email for the Let's Encrypt certificate (empty = plain HTTP): ") || EMAIL=
 fi
 
+if [ -n "$EMAIL" ]; then
+	SCHEME=https
+	PORT=443
+else
+	SCHEME=http
+	PORT=80
+fi
+
+# --- DNS ---
+# Let's Encrypt validates the domain from outside, and a wrong record burns
+# attempts against its rate limits. A domain that resolves nowhere cannot work;
+# one that resolves to another address may still be right (NAT, a proxy).
+step "Checking DNS for $DOMAIN"
+if [ -z "${SKIP_DNS_CHECK:-}" ] && command -v getent >/dev/null 2>&1; then
+	RESOLVED=$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u)
+	if [ -z "$RESOLVED" ]; then
+		[ -z "$EMAIL" ] ||
+			die "$DOMAIN does not resolve: create an A record for this server first (SKIP_DNS_CHECK=1 to ignore)"
+		warn "$DOMAIN does not resolve from this server"
+	else
+		LOCAL=$(ip -4 -o addr show 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+		MATCH=no
+		for ip in $RESOLVED; do
+			if echo "$LOCAL" | grep -qx "$ip"; then MATCH=yes; fi
+		done
+		if [ -n "$LOCAL" ] && [ "$MATCH" = no ]; then
+			warn "$DOMAIN points to $(echo $RESOLVED), which is not an address of this server"
+			warn "fine behind NAT or a proxy; otherwise the certificate will not be issued"
+		fi
+	fi
+fi
+
 # --- Docker ---
-if ! command -v docker >/dev/null 2>&1; then
-	say "installing Docker"
-	curl -fsSL https://get.docker.com | sh
+if command -v docker >/dev/null 2>&1; then
+	step "Docker is already installed"
+else
+	step "Installing Docker"
+	GET_DOCKER=$(mktemp)
+	run curl -fsSL https://get.docker.com -o "$GET_DOCKER"
+	run sh "$GET_DOCKER"
 fi
 docker info >/dev/null 2>&1 || die "the Docker daemon is not running"
 
 # --- Swarm ---
+step "Preparing the swarm and the $NET network"
 if [ "$(docker info --format '{{.Swarm.LocalNodeState}}')" != active ]; then
 	if [ -z "$ADVERTISE" ]; then
 		# Whatever address this host uses to reach the internet is the one other
-		# nodes will be told to connect to.
-		# Taken from the word after "src": its position shifts when the route
-		# has no gateway ("via"), as on many VPS images.
+		# nodes will be told to connect to. Taken from the word after "src": its
+		# position shifts when the route has no gateway ("via"), as on many VPS.
 		ADVERTISE=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([^ ]*\).*/\1/p')
 	fi
 	[ -n "$ADVERTISE" ] || die "could not detect an address; set ADVERTISE_ADDR"
-	say "initialising the swarm on $ADVERTISE"
-	docker swarm init --advertise-addr "$ADVERTISE" >/dev/null
+	run docker swarm init --advertise-addr "$ADVERTISE"
 fi
-
 docker network inspect "$NET" >/dev/null 2>&1 ||
-	{ say "creating the $NET network"; docker network create --driver overlay --attachable "$NET" >/dev/null; }
+	run docker network create --driver overlay --attachable "$NET"
 
 # --- Secrets ---
 # The module secret must survive a re-run: the agents authenticate with it.
@@ -99,7 +161,6 @@ else
 	ENTRYPOINT=web
 	TLS_LABELS=""
 	ACME_ARGS=""
-	say "EMAIL is empty: serving plain HTTP, no certificate"
 fi
 
 cat >"$CONFIG/stack.yml" <<COMPOSE
@@ -169,20 +230,47 @@ volumes:
 COMPOSE
 chmod 600 "$CONFIG/stack.yml"
 
-say "deploying the $STACK stack from $IMAGE"
-docker stack deploy --detach=true -c "$CONFIG/stack.yml" "$STACK"
+step "Deploying the panel from $IMAGE"
+run docker stack deploy --detach=true -c "$CONFIG/stack.yml" "$STACK"
+
+# --- Wait ---
+# Asked on this host with the domain pinned to localhost: it does not depend on
+# the record or on NAT hairpinning, and over https a valid certificate has to
+# have been issued before the answer comes — which is what "ready" means here.
+step "Waiting for the panel to answer (up to 3 minutes)"
+READY=no
+i=0
+while [ "$i" -lt 90 ]; do
+	if curl -fsS --max-time 5 -o /dev/null --resolve "$DOMAIN:$PORT:127.0.0.1" \
+		"$SCHEME://$DOMAIN/healthz" >>"$LOG" 2>&1; then
+		READY=yes
+		break
+	fi
+	i=$((i + 1))
+	sleep 2
+done
+
+if [ "$READY" != yes ]; then
+	echo >&2
+	echo "The panel did not answer. The last lines of Traefik's log:" >&2
+	docker service logs --tail 10 "${STACK}_traefik" 2>&1 | sed 's/^/    /' >&2 || true
+	echo >&2
+	echo "More: docker service ps ${STACK}_panel --no-trunc" >&2
+	echo "      docker service logs ${STACK}_panel" >&2
+	echo "      full install log: $LOG" >&2
+	exit 1
+fi
 
 echo
-if [ -n "$EMAIL" ]; then
-	say "panel: https://$DOMAIN"
-else
-	say "panel: http://$DOMAIN"
-fi
+echo "The panel is ready."
+echo
+printf '  Address   %s%s://%s%s\n' "$BLUE" "$SCHEME" "$DOMAIN" "$OFF"
 if [ "$FIRST_RUN" = yes ]; then
-	say "sign in as admin with password: $ADMIN_PASSWORD"
-	say "this is shown once — change it on the Users page"
+	printf '  Login     %sadmin%s\n' "$BLUE" "$OFF"
+	printf '  Password  %s%s%s   (shown once; change it on the Users page)\n' "$BLUE" "$ADMIN_PASSWORD" "$OFF"
 else
-	say "existing installation updated; your users are unchanged"
+	echo "  Existing installation updated; your users are unchanged."
 fi
 echo
-say "the first replicas take a moment; watch with: docker service ls"
+echo "  Logs      docker service logs ${STACK}_panel"
+echo "  Remove    curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/uninstall.sh | sh"
