@@ -17,6 +17,11 @@ import (
 )
 
 func apiClient(t *testing.T) (*http.Client, string) {
+	c, base, _ := apiServer(t)
+	return c, base
+}
+
+func apiServer(t *testing.T) (*http.Client, string, *store.DB) {
 	t.Helper()
 	db, err := store.Open(t.TempDir() + "/t.db")
 	if err != nil {
@@ -29,7 +34,7 @@ func apiClient(t *testing.T) (*http.Client, string) {
 	srv := httptest.NewServer((&Server{DB: db}).Routes())
 	t.Cleanup(srv.Close)
 	jar, _ := cookiejar.New(nil)
-	return &http.Client{Jar: jar}, srv.URL
+	return &http.Client{Jar: jar}, srv.URL, db
 }
 
 func send(t *testing.T, c *http.Client, method, url, contentType, body string) (int, map[string]any) {
@@ -156,5 +161,59 @@ func TestOpenAPIIsCommitted(t *testing.T) {
 	}
 	if !bytes.Equal(bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n")), buf.Bytes()) {
 		t.Fatal("api/openapi.json is out of date: UPDATE_OPENAPI=1 go test ./internal/web")
+	}
+}
+
+func signIn(t *testing.T, c *http.Client, base string) {
+	t.Helper()
+	status, body := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"ann","password":"s3cret-pass"}`)
+	if status != 200 {
+		t.Fatalf("sign in: %d %v", status, body)
+	}
+}
+
+func TestSummarizeStacks(t *testing.T) {
+	svcs := []docker.Service{
+		{Name: "web", Stack: "shop", Running: 2, Desired: 2},
+		{Name: "db", Stack: "shop", Running: 0, Desired: 1},
+		{Name: "api", Stack: "blog", Running: 1, Desired: 1},
+		{Name: "loner", Running: 1, Desired: 1},
+	}
+	got := summarizeStacks(svcs)
+	if len(got) != 2 || got[0].Name != "blog" || got[1].Name != "shop" {
+		t.Fatalf("want blog and shop, sorted: %+v", got)
+	}
+	if !got[0].Healthy || got[1].Healthy {
+		t.Errorf("one failing service makes the stack unhealthy: %+v", got)
+	}
+	if shop := got[1]; shop.ServiceCount != 2 || shop.Running != 2 || shop.Desired != 3 {
+		t.Errorf("shop totals: %+v", shop)
+	}
+}
+
+func TestAPIDeploys(t *testing.T) {
+	c, base, db := apiServer(t)
+	finish, _ := db.StartDeploy(store.DeployEvent{ServiceName: "web", Source: "ui", TriggeredBy: "ann"})
+	finish("sha256:old", "sha256:new", nil)
+
+	if status, _ := send(t, c, "GET", base+"/api/v1/deploys", "", ""); status != 401 {
+		t.Fatalf("anonymous: %d", status)
+	}
+	signIn(t, c, base)
+
+	resp, err := c.Get(base + "/api/v1/deploys")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var list []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 || len(list) != 1 || list[0]["service"] != "web" || list[0]["status"] != "success" || list[0]["newDigest"] != "sha256:new" {
+		t.Fatalf("%d %v", resp.StatusCode, list)
+	}
+	if status, body := send(t, c, "GET", base+"/api/v1/deploys?limit=0", "", ""); status != 422 {
+		t.Fatalf("limit=0 should fail validation: %d %v", status, body)
 	}
 }
