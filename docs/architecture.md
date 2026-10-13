@@ -126,8 +126,8 @@ features want client state, and one API serves scripts and CI as well.
 - `/api/v1` is the contract for the UI and external clients, authenticated as
   today (session cookie or token); `/internal/*` stays the module API
 - modules are unchanged: the SPA frames their pages
-- `api/openapi.yaml` is the contract and the TypeScript types are generated
-  from it
+- the API is written with Huma: `api/openapi.json` is generated from the
+  handlers and committed, and the TypeScript types are generated from it
 - state-changing requests accept only `application/json`, which a plain HTML
   form cannot send: that is the CSRF guard
 
