@@ -19,10 +19,10 @@ type apiRedeploy struct {
 }
 
 type apiTraefik struct {
-	Host         string `json:"host" pattern:"^[A-Za-z0-9.-]*$" maxLength:"253" doc:"Empty for none"`
-	Port         int    `json:"port" minimum:"0" maximum:"65535" doc:"Container port; 0 for none"`
-	Entrypoint   string `json:"entrypoint" pattern:"^[A-Za-z0-9_-]*$" maxLength:"64"`
-	CertResolver string `json:"cert_resolver" pattern:"^[A-Za-z0-9_-]*$" maxLength:"64" doc:"Empty serves plain HTTP"`
+	Host         string `json:"host" doc:"Host name; empty for none"`
+	Port         int    `json:"port" doc:"Container port; 0 for none"`
+	Entrypoint   string `json:"entrypoint" doc:"Letters, digits, hyphens and underscores"`
+	CertResolver string `json:"cert_resolver" doc:"Empty serves plain HTTP"`
 }
 
 func toAPITraefik(sv docker.Service) apiTraefik {
@@ -112,13 +112,16 @@ func (s *Server) registerServiceActions(api huma.API) {
 		ID   string `path:"id"`
 		Body apiTraefik
 	}) (*traefikOutput, error) {
+		port := ""
+		if in.Body.Port != 0 {
+			port = strconv.Itoa(in.Body.Port)
+		}
+		if err := validateTraefik(in.Body.Host, port, in.Body.Entrypoint, in.Body.CertResolver); err != nil {
+			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
+		}
 		sv, err := s.apiFindService(ctx, in.ID)
 		if err != nil {
 			return nil, err
-		}
-		port := ""
-		if in.Body.Port > 0 {
-			port = strconv.Itoa(in.Body.Port)
 		}
 		labels := traefikLabels(sv.Name, in.Body.Host, port, in.Body.Entrypoint, in.Body.CertResolver)
 		if err := s.Docker.SetLabels(ctx, sv.ID, labels); err != nil {

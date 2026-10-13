@@ -519,26 +519,19 @@
         "properties": {
           "cert_resolver": {
             "description": "Empty serves plain HTTP",
-            "maxLength": 64,
-            "pattern": "^[A-Za-z0-9_-]*$",
             "type": "string"
           },
           "entrypoint": {
-            "maxLength": 64,
-            "pattern": "^[A-Za-z0-9_-]*$",
+            "description": "Letters, digits, hyphens and underscores",
             "type": "string"
           },
           "host": {
-            "description": "Empty for none",
-            "maxLength": 253,
-            "pattern": "^[A-Za-z0-9.-]*$",
+            "description": "Host name; empty for none",
             "type": "string"
           },
           "port": {
             "description": "Container port; 0 for none",
             "format": "int64",
-            "maximum": 65535,
-            "minimum": 0,
             "type": "integer"
           }
         },
