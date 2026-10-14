@@ -257,18 +257,37 @@ run docker stack deploy --detach=true -c "$CONFIG/stack.yml" "$STACK"
 # Asked on this host with the domain pinned to localhost: it does not depend on
 # the record or on NAT hairpinning, and over https a valid certificate has to
 # have been issued before the answer comes — which is what "ready" means here.
+# wait_for_panel polls for up to $1 tries, two seconds apart.
+wait_for_panel() {
+	i=0
+	while [ "$i" -lt "$1" ]; do
+		if curl -fsS --max-time 5 -o /dev/null --resolve "$DOMAIN:$PORT:127.0.0.1" \
+			"$SCHEME://$DOMAIN/healthz" >>"$LOG" 2>&1; then
+			return 0
+		fi
+		i=$((i + 1))
+		sleep 2
+	done
+	return 1
+}
+
+acme_failed() {
+	docker service logs --tail 50 "${STACK}_traefik" 2>&1 | grep -q "Unable to obtain ACME certificate"
+}
+
 step "Waiting for the panel to answer (up to 3 minutes)"
 READY=no
-i=0
-while [ "$i" -lt 90 ]; do
-	if curl -fsS --max-time 5 -o /dev/null --resolve "$DOMAIN:$PORT:127.0.0.1" \
-		"$SCHEME://$DOMAIN/healthz" >>"$LOG" 2>&1; then
-		READY=yes
-		break
-	fi
-	i=$((i + 1))
-	sleep 2
-done
+ACME_FAILED=no
+if wait_for_panel 90; then READY=yes; fi
+# Traefik asks Let's Encrypt once and does not try again by itself. A reset
+# right after Docker was installed went away within the minute, so one more
+# try is worth it; Let's Encrypt limits failed validations, so only one.
+if [ "$READY" != yes ] && [ "$SCHEME" = https ] && acme_failed; then
+	ACME_FAILED=yes
+	warn "Traefik could not get a certificate; asking it to try once more"
+	run docker service update --force --detach=true "${STACK}_traefik"
+	if wait_for_panel 30; then READY=yes; fi
+fi
 
 # The stack is deployed and the password is already in its compose file, so a
 # timeout still shows it: the user would otherwise have a panel they cannot sign in to.
@@ -290,6 +309,12 @@ if [ "$READY" != yes ]; then
 	echo "The panel did not answer. The last lines of Traefik's log:" >&2
 	docker service logs --tail 10 "${STACK}_traefik" 2>&1 | sed 's/^/    /' >&2 || true
 	echo >&2
+	if [ "$ACME_FAILED" = yes ] || { [ "$SCHEME" = https ] && acme_failed; }; then
+		echo "Traefik could not get a certificate from Let's Encrypt. That is the network" >&2
+		echo "between this host and Let's Encrypt, not the panel. Once it works, run:" >&2
+		echo "    docker service update --force ${STACK}_traefik" >&2
+		echo >&2
+	fi
 	echo "It may still come up, a certificate can take longer. Sign-in details:" >&2
 	echo >&2
 	summary >&2
