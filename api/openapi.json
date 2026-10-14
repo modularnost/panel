@@ -143,7 +143,7 @@
         "additionalProperties": false,
         "properties": {
           "error": {
-            "description": "Why the manifest could not be fetched",
+            "description": "Why the module is not ready",
             "type": "string"
           },
           "name": {
@@ -167,6 +167,16 @@
           "service": {
             "type": "string"
           },
+          "state": {
+            "description": "starting: not all replicas run yet; failed: Swarm rejects or fails its tasks, error holds the reason; error: it runs but serves no manifest",
+            "enum": [
+              "ready",
+              "starting",
+              "failed",
+              "error"
+            ],
+            "type": "string"
+          },
           "version": {
             "type": "string"
           }
@@ -176,6 +186,7 @@
           "version",
           "service",
           "ok",
+          "state",
           "nav_entries",
           "permissions"
         ],

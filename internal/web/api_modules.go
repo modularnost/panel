@@ -21,7 +21,8 @@ type apiModule struct {
 	Version     string        `json:"version"`
 	Service     string        `json:"service"`
 	OK          bool          `json:"ok"`
-	Error       string        `json:"error,omitempty" doc:"Why the manifest could not be fetched"`
+	State       string        `json:"state" enum:"ready,starting,failed,error" doc:"starting: not all replicas run yet; failed: Swarm rejects or fails its tasks, error holds the reason; error: it runs but serves no manifest"`
+	Error       string        `json:"error,omitempty" doc:"Why the module is not ready"`
 	NavEntries  []apiNavEntry `json:"nav_entries" nullable:"false"`
 	Permissions []string      `json:"permissions" nullable:"false"`
 }
@@ -29,8 +30,15 @@ type apiModule struct {
 func toAPIModules(in []modules.Module) []apiModule {
 	out := make([]apiModule, 0, len(in))
 	for _, m := range in {
+		state := m.State
+		if state == "" { // a module built by hand, not by discovery
+			state = modules.StateReady
+			if !m.OK() {
+				state = modules.StateError
+			}
+		}
 		mod := apiModule{
-			Name: m.Name, Version: m.Version, Service: m.Service, OK: m.OK(), Error: m.Err,
+			Name: m.Name, Version: m.Version, Service: m.Service, OK: m.OK(), State: state, Error: m.Err,
 			NavEntries: []apiNavEntry{}, Permissions: []string{},
 		}
 		for _, e := range m.Manifest.NavEntries {

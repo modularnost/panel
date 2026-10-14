@@ -48,16 +48,39 @@ type NavEntry struct {
 	Path  string `json:"path"`
 }
 
+// What a module that does not answer is doing: a service that has not come up
+// is not the same as one that came up and serves no manifest.
+const (
+	StateReady    = "ready"
+	StateStarting = "starting" // fewer replicas running than wanted, nothing has failed
+	StateFailed   = "failed"   // its tasks are rejected or fail: Err is Swarm's reason
+	StateError    = "error"    // it runs, and the manifest could not be fetched
+)
+
 type Module struct {
 	Name     string // from the label, not the manifest: labels are the routing truth
 	Version  string
 	Service  string // swarm service name
 	BaseURL  string
 	Manifest Manifest
-	Err      string // manifest could not be fetched: shown as broken
+	State    string
+	Err      string // why it is not ready
 }
 
 func (m Module) OK() bool { return m.Err == "" }
+
+// classify says why a module's manifest could not be fetched. failure is what
+// Swarm reports for its tasks, and only matters while not all replicas run.
+func classify(running, desired uint64, failure string, fetch error) (state, msg string) {
+	switch {
+	case running >= desired:
+		return StateError, fetch.Error()
+	case failure != "":
+		return StateFailed, failure
+	default:
+		return StateStarting, fmt.Sprintf("starting (%d/%d)", running, desired)
+	}
+}
 
 func (m Module) Allowed(perm string) bool {
 	return slices.Contains(m.Manifest.Permissions, perm)
@@ -127,10 +150,17 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 			BaseURL: "http://" + sv.Name + ":" + port,
 		}
 		if err := r.fetchManifest(ctx, &m); err != nil {
-			m.Err = err.Error()
-		} else if m.Version == "" {
-			// The version label is optional; the manifest always has one.
-			m.Version = m.Manifest.Version
+			var failure string
+			if sv.Running < sv.Desired {
+				failure, _ = r.dk.LastFailure(ctx, sv.ID)
+			}
+			m.State, m.Err = classify(sv.Running, sv.Desired, failure, err)
+		} else {
+			m.State = StateReady
+			if m.Version == "" {
+				// The version label is optional; the manifest always has one.
+				m.Version = m.Manifest.Version
+			}
 		}
 		mods = append(mods, m)
 	}

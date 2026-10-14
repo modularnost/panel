@@ -282,6 +282,35 @@ type Task struct {
 	State string
 }
 
+// LastFailure is why the service's recent tasks were rejected or failed, such
+// as "No such image" or "no matching manifest", and empty when none were.
+func (c *Client) LastFailure(ctx context.Context, serviceID string) (string, error) {
+	list, err := c.tasks(ctx, serviceID)
+	if err != nil {
+		return "", err
+	}
+	return lastFailure(list), nil
+}
+
+// lastFailure looks through the newest few tasks, not only the newest one: a
+// service that cannot start is retried, and the retry in progress has no
+// error yet while the one before it has.
+func lastFailure(tasks []swarm.Task) string {
+	recent := slices.Clone(tasks)
+	slices.SortFunc(recent, func(a, b swarm.Task) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	for _, t := range recent[:min(len(recent), 5)] {
+		switch t.Status.State {
+		case swarm.TaskStateRunning:
+			return ""
+		case swarm.TaskStateRejected, swarm.TaskStateFailed:
+			if t.Status.Err != "" {
+				return t.Status.Err
+			}
+		}
+	}
+	return ""
+}
+
 func (c *Client) tasks(ctx context.Context, serviceID string) ([]swarm.Task, error) {
 	f := filters.NewArgs(filters.Arg("service", serviceID))
 	return c.api.TaskList(ctx, swarm.TaskListOptions{Filters: f})
