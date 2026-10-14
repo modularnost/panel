@@ -154,8 +154,8 @@ func TestImageRepo(t *testing.T) {
 		"localhost:5000/panel":                       "localhost:5000/panel",
 		"traefik:v3@sha256:575fa15b1350":             "traefik",
 	} {
-		if got := imageRepo(in); got != want {
-			t.Errorf("imageRepo(%q) = %q, want %q", in, got, want)
+		if got := ImageRepo(in); got != want {
+			t.Errorf("ImageRepo(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

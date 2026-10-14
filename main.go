@@ -10,6 +10,7 @@ import (
 	"modularnost/internal/agent"
 	"modularnost/internal/docker"
 	"modularnost/internal/modules"
+	"modularnost/internal/stackfile"
 	"modularnost/internal/store"
 	"modularnost/internal/updates"
 	"modularnost/internal/web"
@@ -47,6 +48,24 @@ func bootstrapAdmin(db *store.DB) error {
 		log.Printf("created user %q", u.Username)
 	}
 	return nil
+}
+
+// syncStackFile makes the stack file say what runs now. An update from the
+// panel moves the service, not the file: a later install.sh or stack deploy
+// would put the old image back. Doing it on start also covers a rollback.
+func syncStackFile(dk *docker.Client, path string) {
+	self, err := dk.Self(context.Background())
+	if err != nil || self.Image == "" {
+		log.Printf("stack file: cannot tell which image runs: %v", err)
+		return
+	}
+	changed, err := stackfile.Retag(path, self.Image)
+	switch {
+	case err != nil:
+		log.Printf("stack file %s: %v", path, err)
+	case changed:
+		log.Printf("stack file %s now uses %s", path, self.Image)
+	}
 }
 
 func main() {
@@ -97,6 +116,10 @@ func main() {
 	checker := updates.New(version, os.Getenv("PANEL_UPDATE_CHECK") != "off")
 	go checker.Run(context.Background(), 6*time.Hour)
 
+	if path := os.Getenv("PANEL_STACK_FILE"); path != "" {
+		go syncStackFile(dk, path)
+	}
+
 	addr := env("PANEL_ADDR", ":8080")
 	srv := &web.Server{
 		Addr:         addr,
@@ -105,6 +128,7 @@ func main() {
 		Modules:      registry,
 		Updates:      checker,
 		AgentService: os.Getenv("PANEL_AGENT_SERVICE"),
+		StackFile:    os.Getenv("PANEL_STACK_FILE"),
 		Metrics:      agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
 	}
 	log.Printf("modularnost %s listening on %s", version, addr)

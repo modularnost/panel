@@ -846,12 +846,17 @@
               "$ref": "#/components/schemas/Release"
             },
             "type": "array"
+          },
+          "stack_file": {
+            "description": "True when the panel can keep its stack file in step with an update",
+            "type": "boolean"
           }
         },
         "required": [
           "current",
           "release_build",
           "enabled",
+          "stack_file",
           "releases"
         ],
         "type": "object"
