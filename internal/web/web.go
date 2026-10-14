@@ -23,6 +23,7 @@ import (
 	"modularnost/internal/docker"
 	"modularnost/internal/modules"
 	"modularnost/internal/store"
+	webui "modularnost/web"
 )
 
 // Version is set by main at build time.
@@ -105,6 +106,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /internal/services/{name}/update", s.moduleAuth("service:update", s.apiUpdateService))
 
 	mux.Handle("GET /static/", staticHandler())
+	if dist, err := fs.Sub(webui.Dist, "dist"); err == nil {
+		mux.HandleFunc("GET /app/", spaHandler(dist))
+		mux.HandleFunc("GET /app", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/app/", http.StatusMovedPermanently)
+		})
+	}
 	// Unauthenticated: load balancers and HEALTHCHECK call it.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "ok %s\n", Version)
