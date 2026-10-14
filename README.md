@@ -117,6 +117,15 @@ it.
 | `PANEL_MODE` | unset | `agent` runs this binary as a node agent instead of the panel |
 | `PANEL_UPDATE_CHECK` | on | `off` stops the panel from asking GitHub for new releases |
 | `PANEL_STACK_FILE` | unset | the installer's compose file, mounted into the panel: an update from the panel retags its image lines |
+| `PANEL_TRUSTED_PROXIES` | unset | addresses or CIDR ranges of the proxies in front of the panel, comma separated; see below |
+
+Sign-in attempts are slowed down per client address and per user name: after five
+wrong passwords the wait doubles, up to a minute, and the answer is `429` with
+`Retry-After`. Behind a proxy the panel sees the proxy's address for every
+client, so it reads the client from `X-Forwarded-For` only when the request
+comes from an address in `PANEL_TRUSTED_PROXIES`; the installer sets it to its
+own network. Unset, the header is ignored. Do not put a range there that
+clients can reach the panel from.
 
 ## What it does
 

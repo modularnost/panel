@@ -145,6 +145,9 @@ if [ "$(docker info --format '{{.Swarm.LocalNodeState}}')" != active ]; then
 fi
 docker network inspect "$NET" >/dev/null 2>&1 ||
 	run docker network create --driver overlay --attachable "$NET"
+# Traefik reaches the panel from this network, so its address is the one whose
+# X-Forwarded-For the panel may believe; nothing outside the network is trusted.
+NET_SUBNETS=$(docker network inspect "$NET" --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}' | tr -s ' ' ',' | sed 's/,$//')
 
 # --- Secrets ---
 # The module secret must survive a re-run: the agents authenticate with it.
@@ -211,6 +214,7 @@ $ACME_ARGS
       PANEL_MODULE_SECRET: "$SECRET"
       PANEL_AGENT_SERVICE: ${STACK}_agent
       PANEL_STACK_FILE: /config/stack.yml
+      PANEL_TRUSTED_PROXIES: "$NET_SUBNETS"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - panel-data:/data

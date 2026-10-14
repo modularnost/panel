@@ -120,6 +120,11 @@ func main() {
 		go syncStackFile(dk, path)
 	}
 
+	proxies, err := web.ParseProxies(os.Getenv("PANEL_TRUSTED_PROXIES"))
+	if err != nil {
+		log.Fatalf("PANEL_TRUSTED_PROXIES: %v", err)
+	}
+
 	addr := env("PANEL_ADDR", ":8080")
 	srv := &web.Server{
 		Addr:         addr,
@@ -129,7 +134,9 @@ func main() {
 		Updates:      checker,
 		AgentService: os.Getenv("PANEL_AGENT_SERVICE"),
 		StackFile:    os.Getenv("PANEL_STACK_FILE"),
-		Metrics:      agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
+
+		TrustedProxies: proxies,
+		Metrics:        agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
 	}
 	log.Printf("modularnost %s listening on %s", version, addr)
 	log.Fatal(http.ListenAndServe(addr, srv.Routes()))

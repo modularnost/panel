@@ -25,6 +25,11 @@ func apiClient(t *testing.T) (*http.Client, string) {
 
 func apiServer(t *testing.T) (*http.Client, string, *store.DB) {
 	t.Helper()
+	return apiServerWith(t, nil)
+}
+
+func apiServerWith(t *testing.T, tweak func(*Server)) (*http.Client, string, *store.DB) {
+	t.Helper()
 	db, err := store.Open(t.TempDir() + "/t.db")
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +38,11 @@ func apiServer(t *testing.T) (*http.Client, string, *store.DB) {
 	if _, err := db.CreateUser("ann", "s3cret-pass", store.RoleViewer); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer((&Server{DB: db}).Routes())
+	s := &Server{DB: db}
+	if tweak != nil {
+		tweak(s)
+	}
+	srv := httptest.NewServer(s.Routes())
 	t.Cleanup(srv.Close)
 	jar, _ := cookiejar.New(nil)
 	return &http.Client{Jar: jar}, srv.URL, db

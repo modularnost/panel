@@ -3,9 +3,11 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"mime"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -129,14 +131,23 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 		OperationID: "login", Method: http.MethodPost, Path: "/api/v1/auth/login",
 		Summary: "Sign in; the session cookie is set on the response",
 	}, func(ctx context.Context, in *loginInput) (*loginOutput, error) {
+		r, _ := ctx.Value(reqKey{}).(*http.Request)
+		if wait := s.loginBlocked(r, in.Body.Username); wait > 0 {
+			secs := retryAfterSeconds(wait)
+			return nil, huma.ErrorWithHeaders(
+				problem(http.StatusTooManyRequests, "too_many_attempts",
+					fmt.Sprintf("too many attempts, try again in %d seconds", secs)),
+				http.Header{"Retry-After": {strconv.Itoa(secs)}})
+		}
 		u, err := s.DB.Authenticate(in.Body.Username, in.Body.Password)
 		if errors.Is(err, store.ErrNoUser) {
+			s.loginFailed(r, in.Body.Username)
 			return nil, problem(http.StatusUnauthorized, "invalid_credentials", err.Error())
 		}
 		if err != nil {
 			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
 		}
-		r, _ := ctx.Value(reqKey{}).(*http.Request)
+		s.loginSucceeded(r, in.Body.Username)
 		c, err := s.sessionCookie(r, u.ID)
 		if err != nil {
 			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
