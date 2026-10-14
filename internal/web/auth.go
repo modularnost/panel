@@ -31,10 +31,13 @@ func (s *Server) identify(r *http.Request) (store.User, bool) {
 			return u, true
 		}
 	}
-	if name, pass, ok := r.BasicAuth(); ok {
+	if name, pass, ok := r.BasicAuth(); ok && s.loginBlocked(r, name) == 0 {
+		// The same counters as the sign-in form: this is a password guess too.
 		if u, err := s.DB.Authenticate(name, pass); err == nil {
+			s.loginSucceeded(r, name)
 			return u, true
 		}
+		s.loginFailed(r, name)
 	}
 	return store.User{}, false
 }

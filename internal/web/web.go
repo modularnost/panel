@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -61,6 +62,11 @@ type Server struct {
 	// StackFile is the compose file the installer wrote, when it is mounted here.
 	StackFile string
 	updating  atomic.Bool
+
+	// TrustedProxies are the peers whose X-Forwarded-For is believed; empty
+	// means none, and a client is whoever connected.
+	TrustedProxies []netip.Prefix
+	logins         loginLimiter
 }
 
 func (s *Server) Routes() http.Handler {
