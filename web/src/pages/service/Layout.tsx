@@ -40,15 +40,15 @@ export function ServiceLayout() {
         </Chip>
       </h1>
       <Tabs label="Service">
-        <Tab to="." end>
+        <Tab icon="info" to="." end>
           Overview
         </Tab>
-        <Tab to="logs">Logs</Tab>
-        <Tab to="deploys">Deploys</Tab>
-        {admin && <Tab to="traefik">Traefik</Tab>}
-        {admin && <Tab to="webhooks">Webhooks</Tab>}
+        <Tab icon="terminal" to="logs">Logs</Tab>
+        <Tab icon="rocket_launch" to="deploys">Deploys</Tab>
+        {admin && <Tab icon="alt_route" to="traefik">Traefik</Tab>}
+        {admin && <Tab icon="webhook" to="webhooks">Webhooks</Tab>}
         {serviceTabs(modules.data, me.data?.role, s).map(({ module, contribution: c }) => (
-          <Tab key={`${module}${c.path}`} to={`module/${module}${c.path}`}>
+          <Tab key={`${module}${c.path}`} icon="extension" to={`module/${module}${c.path}`}>
             {c.title}
           </Tab>
         ))}

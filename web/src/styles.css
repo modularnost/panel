@@ -87,10 +87,14 @@ body {
   padding: 16px 16px 20px;
 }
 
+.icon {
+  flex: none;
+}
+
 .item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   height: 56px;
   padding: 0 16px;
   border-radius: var(--md-sys-shape-full);
@@ -111,6 +115,7 @@ body {
 .item.sub {
   height: 40px;
   padding-left: 32px;
+  gap: 12px;
 }
 
 .who {
@@ -379,7 +384,10 @@ pre.notes {
 }
 
 .tab-item {
+  display: inline-flex;
   flex: none;
+  align-items: center;
+  gap: 8px;
   padding: 0 16px;
   color: var(--md-sys-color-on-surface-variant);
   font: var(--md-sys-typescale-title-small);

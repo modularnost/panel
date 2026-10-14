@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink, type NavLinkProps } from "react-router";
+import { Icon, type IconName } from "./Icon";
 
 export function Tabs({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -9,6 +10,11 @@ export function Tabs({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-export function Tab(props: Omit<NavLinkProps, "className">) {
-  return <NavLink className="tab-item" {...props} />;
+export function Tab({ icon, children, ...rest }: Omit<NavLinkProps, "className" | "children"> & { icon?: IconName; children: ReactNode }) {
+  return (
+    <NavLink className="tab-item" {...rest}>
+      {icon && <Icon name={icon} size={18} />}
+      {children}
+    </NavLink>
+  );
 }
