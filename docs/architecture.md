@@ -175,9 +175,8 @@ against hostile code: a module's page is served from the panel's origin.
   query, so the role check, not the context, is what protects an action.
 
 **Rendering.** A contribution is a page in a frame, as module pages already
-are. The field `render` is reserved for a declarative renderer later (a form, a
-table, a chart from a small vocabulary), which would be safer and consistent
-with the panel without a frame.
+are. The field `render` is where a declarative renderer goes, which would be
+safer and consistent with the panel without a frame: see ADR 8.
 
 **Not chosen.** A JavaScript bundle per module loaded into the panel's page:
 it would run with the panel's privileges and bind modules to the SPA's
@@ -189,6 +188,53 @@ service" (ADR 3).
 know the caller, such as a short-lived signed prefix per frame. The frame's
 height and navigation are not reported to the shell. Core-to-module events and
 more rights on `/internal` come with the first module that needs them.
+
+### 8. A module may describe its page and let the panel draw it (decided 2026-10-15)
+
+A frame lets a module draw anything, and that costs: the page has a look of its
+own (its stylesheet, not the panel's seed color, no phone layout), its height
+and navigation have to be reported, and it shares the panel's origin. Most
+module pages are a few numbers, a table, a chart and a form. For those the
+module describes the page and the panel draws it.
+
+- **A second mode, not a replacement.** A contribution says `"render": "ui"` or
+  `"render": "frame"`, which stays the default and keeps today's behavior. `ui`
+  is preferred; a frame remains for what the vocabulary cannot say. Adding the
+  field raises `contract` to 2, because a panel of contract 1 would frame the
+  JSON.
+- **The document.** A `GET` on the contribution's path answers
+  `{"blocks": [...]}`; the role, the signed identity and the context are as in
+  ADR 7. The first vocabulary: text, stat, key-value list, table, meter, chart,
+  banner, link, button, form (text, select, switch), and a select that
+  re-requests the page with a query parameter, for the range of a chart. Text
+  is only text: no HTML, styles or scripts. A link points inside the panel or to
+  `https`. Size, block and point counts are limited. A block the panel does not
+  know is shown as unsupported and the rest still draws, the same rule as an
+  unknown slot.
+- **Charts are in the first version.** The panel draws line and area series
+  from the points the module sends; the module keeps the history (ADR 5, feature
+  7). The metrics module is the reason for all of this, and it is the first one
+  rewritten.
+- **Actions.** A button or form `POST`s to the module's `/action/*` with the
+  signed headers and the role of that path. A destructive one asks first, in the
+  panel's dialog.
+- **Updates come from the module, not from polling.** The module tells the core
+  that a page changed (`POST /internal/ui/changed`, with its token, for its own
+  pages only), the core relays it over a stream to open browsers, and each
+  browser refetches the visible page as its own viewer, so a role never gets a
+  page it may not see. It is also fetched on open and on reconnect. An event
+  says "refetch", not what changed: the document stays the one source of truth.
+  This is the opposite direction to the core-to-module events of ADR 7.
+
+**Not chosen.** An expression or data-binding language: the module puts the
+data in the document. Module-supplied HTML, CSS or JavaScript in the panel's
+page (ADR 7). A vocabulary ahead of the modules: a block is added with a real
+module that needs it.
+
+**Open.** The exact block schemas, written with the contract in
+`docs/modules.md`. Row actions and paging in a table. How the stream
+authenticates, and how many open tabs it may hold. Isolating a frame and
+reporting its height concern frame mode only.
 
 ## Feature order (do not change without discussion)
 
@@ -274,7 +320,10 @@ more rights on `/internal` come with the first module that needs them.
 8. **SPA and JSON API** (decided 2026-10-14, ADR 6): the API read before write,
    then the frontend scaffold, then screens until parity, then the cutover and
    removal of the HTML templates
-9. Everything else (a build system, git integration for building images) is out
+9. **Declarative module pages** (decided 2026-10-15, ADR 8): the contract with
+   `render: "ui"`, the blocks, the module-to-panel change events, then the
+   metrics module rewritten as the first one
+10. Everything else (a build system, git integration for building images) is out
    of the current scope — do not implement without an explicit request
 
 ## Deliberate non-goals (anti-scope)
