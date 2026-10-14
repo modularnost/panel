@@ -5,6 +5,9 @@ import { useMe } from "./auth";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
+import { Stack } from "./pages/Stack";
+import { StackNew } from "./pages/StackNew";
+import { Stacks } from "./pages/Stacks";
 import { ServiceLayout } from "./pages/service/Layout";
 import { ServiceDeploys } from "./pages/service/Deploys";
 import { Logs } from "./pages/service/Logs";
@@ -36,6 +39,9 @@ function Shell() {
         <span className="brand">modularnost</span>
         <NavLink to="/" end className="item">
           Services
+        </NavLink>
+        <NavLink to="/stacks" className="item">
+          Stacks
         </NavLink>
         <NavLink to="/resources" className="item">
           Resources
@@ -70,6 +76,9 @@ export function App() {
           <Route path="traefik" element={<Traefik />} />
           <Route path="webhooks" element={<Webhooks />} />
         </Route>
+        <Route path="stacks" element={<Stacks />} />
+        <Route path="stacks/new" element={<StackNew />} />
+        <Route path="stacks/:name" element={<Stack />} />
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
       </Route>
