@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { atLeast, useMe } from "../auth";
-import { Button } from "../components/Button";
-import { DEFAULT_SEED, setSeed, storedSeed } from "../theme";
+import { Swatches } from "../components/Swatches";
+import { setSeed, storedSeed } from "../theme";
 import { Updates } from "./Updates";
 
 export function Settings() {
@@ -18,10 +18,7 @@ export function Settings() {
       <h1>Settings</h1>
       <h2>Appearance</h2>
       <div className="toolbar">
-        <label className="swatch">
-          <input type="color" value={seed} onChange={(e) => choose(e.target.value)} />
-          Accent color
-        </label>
+        <Swatches value={seed} onChange={choose} />
         <Button variant="text" disabled={seed.toLowerCase() === DEFAULT_SEED} onClick={() => choose(DEFAULT_SEED)}>
           Reset
         </Button>
