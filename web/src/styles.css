@@ -29,6 +29,8 @@
   --md-sys-motion-short: 150ms;
 
   --font: system-ui, "Segoe UI", Roboto, sans-serif;
+  --md-ref-typeface-plain: var(--font);
+  --md-ref-typeface-brand: var(--font);
   --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 
   /* M3 has no success role; these are fixed greens tuned to the scheme's tones. */
@@ -311,7 +313,6 @@ label {
 }
 
 input,
-select,
 .compose textarea {
   max-width: 100%;
   padding: 0 16px;
@@ -323,13 +324,11 @@ select,
   font: var(--md-sys-typescale-body-large);
 }
 
-input:hover,
-select:hover {
+input:hover {
   border-color: var(--md-sys-color-on-surface);
 }
 
 input:focus,
-select:focus,
 .compose textarea:focus {
   outline: 2px solid var(--md-sys-color-primary);
   outline-offset: -2px;
@@ -462,4 +461,12 @@ select:focus,
   .module-frame {
     height: 75vh;
   }
+}
+
+md-outlined-select {
+  min-width: 160px;
+  --md-outlined-field-top-space: 12px;
+  --md-outlined-field-bottom-space: 12px;
+  --md-outlined-select-text-field-container-shape: var(--md-sys-shape-extra-small);
+  --md-menu-container-shape: var(--md-sys-shape-extra-small);
 }

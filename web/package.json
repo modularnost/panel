@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",
+    "@material/web": "^2.5.0",
     "@tanstack/react-query": "^5.104.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

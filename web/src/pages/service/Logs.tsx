@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, call } from "../../api/client";
 import { MAX_LINES, capLines, parseLine } from "../../logs";
 import { useService } from "./Layout";
+import { Select } from "../../components/Select";
 
 const TAILS = [100, 200, 500, 1000];
 
@@ -85,24 +86,24 @@ export function Logs() {
       <div className="toolbar">
         <label>
           Replica
-          <select value={task} onChange={(e) => setTask(e.target.value)}>
+          <Select value={task} onChange={(v) => setTask(v)}>
             <option value="">All</option>
             {tasks.data?.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.slot ? `#${t.slot}` : t.id.slice(0, 8)} · {t.state}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label>
           History
-          <select value={tail} onChange={(e) => setTail(Number(e.target.value))}>
+          <Select value={tail} onChange={(v) => setTail(Number(v))}>
             {TAILS.map((n) => (
               <option key={n} value={n}>
                 {n} lines
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <button onClick={() => setPaused((p) => !p)}>{paused ? "Resume" : "Pause"}</button>
         <span className="muted">{connected ? "live" : problem ? "stopped" : "connecting…"}</span>

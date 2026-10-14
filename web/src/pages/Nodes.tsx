@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, call } from "../api/client";
+import { Select } from "../components/Select";
 
 type Role = "worker" | "manager";
 
@@ -63,16 +64,16 @@ export function Nodes() {
                 <span className={`pill ${n.status === "ready" ? "ok" : "bad"}`}>{n.status}</span>
               </td>
               <td>
-                <select
+                <Select
                   value={n.availability}
                   disabled={setAvailability.isPending}
-                  onChange={(e) => change(n.id, n.hostname, e.target.value as "active" | "pause" | "drain")}
+                  onChange={(v) => change(n.id, n.hostname, v as "active" | "pause" | "drain")}
                   aria-label={`Availability of ${n.hostname}`}
                 >
                   <option value="active">active</option>
                   <option value="pause">pause</option>
                   <option value="drain">drain</option>
-                </select>
+                </Select>
               </td>
               <td className="mono">{n.address ?? ""}</td>
               <td className="muted">
@@ -88,10 +89,10 @@ export function Nodes() {
       <div className="toolbar">
         <label>
           Joins as
-          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+          <Select value={role} onChange={(v) => setRole(v as Role)}>
             <option value="worker">worker</option>
             <option value="manager">manager</option>
-          </select>
+          </Select>
         </label>
         <button
           disabled={rotate.isPending}

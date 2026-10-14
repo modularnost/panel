@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { api, call } from "../api/client";
 import type { User } from "../api/generated";
+import { Select } from "../components/Select";
 
 type Role = "admin" | "operator" | "viewer";
 const ROLES: Role[] = ["viewer", "operator", "admin"];
@@ -98,10 +99,10 @@ export function Users() {
             <tr key={u.id}>
               <td>{u.username}</td>
               <td>
-                <select
+                <Select
                   value={u.role}
                   disabled={setRole.isPending}
-                  onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as Role })}
+                  onChange={(v) => setRole.mutate({ id: u.id, role: v as Role })}
                   aria-label={`Role of ${u.username}`}
                 >
                   {ROLES.map((r) => (
@@ -109,7 +110,7 @@ export function Users() {
                       {r}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
               <td>
                 <button className="link" onClick={() => changePassword(u)}>
@@ -159,13 +160,13 @@ export function Users() {
         </label>
         <label>
           Role
-          <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value as Role })}>
+          <Select value={newUser.role} onChange={(v) => setNewUser({ ...newUser, role: v as Role })}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <button disabled={createUser.isPending}>Create</button>
       </form>
@@ -225,9 +226,9 @@ export function Users() {
       <form className="toolbar" onSubmit={submitToken}>
         <label>
           User
-          <select
+          <Select
             value={newToken.user_id}
-            onChange={(e) => setNewToken({ ...newToken, user_id: Number(e.target.value) })}
+            onChange={(v) => setNewToken({ ...newToken, user_id: Number(v) })}
             required
           >
             <option value={0}>Choose…</option>
@@ -236,7 +237,7 @@ export function Users() {
                 {u.username}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label>
           Name
@@ -244,14 +245,14 @@ export function Users() {
         </label>
         <label>
           Role
-          <select value={newToken.role} onChange={(e) => setNewToken({ ...newToken, role: e.target.value as Role | "" })}>
+          <Select value={newToken.role} onChange={(v) => setNewToken({ ...newToken, role: v as Role | "" })}>
             <option value="">same as user</option>
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {r} or less
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label>
           Days

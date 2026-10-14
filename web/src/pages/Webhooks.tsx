@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, call } from "../api/client";
 import { WebhookTable } from "../components/WebhookTable";
+import { Select } from "../components/Select";
 
 export function Webhooks() {
   const queryClient = useQueryClient();
@@ -45,27 +46,27 @@ export function Webhooks() {
       <div className="toolbar">
         <label>
           For
-          <select
+          <Select
             value={kind}
-            onChange={(e) => {
-              setKind(e.target.value as "service" | "stack");
+            onChange={(v) => {
+              setKind(v as "service" | "stack");
               setTarget("");
             }}
           >
             <option value="service">a service</option>
             <option value="stack">a stack</option>
-          </select>
+          </Select>
         </label>
         <label>
           Name
-          <select value={target} onChange={(e) => setTarget(e.target.value)}>
+          <Select value={target} onChange={(v) => setTarget(v)}>
             <option value="">Choose…</option>
             {options.map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <button disabled={!target || create.isPending} onClick={() => create.mutate()}>
           Create

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, call } from "../../api/client";
 import { WebhookTable } from "../../components/WebhookTable";
 import { useService } from "./Layout";
+import { Select } from "../../components/Select";
 
 export function ServiceWebhooks() {
   const s = useService();
@@ -42,10 +43,10 @@ export function ServiceWebhooks() {
       <div className="toolbar">
         <label>
           New webhook
-          <select value={action} onChange={(e) => setAction(e.target.value as typeof action)}>
+          <Select value={action} onChange={(v) => setAction(v as typeof action)}>
             <option value="force_update">Redeploy this service</option>
             {s.stack && <option value="stack_redeploy">Redeploy its stack ({s.stack})</option>}
-          </select>
+          </Select>
         </label>
         <button onClick={() => create.mutate()} disabled={create.isPending}>
           Create
