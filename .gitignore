@@ -6,5 +6,6 @@
 
 # frontend
 /web/node_modules
-/web/dist
+/web/dist/*
+!/web/dist/.gitkeep
 /web/src/api/generated.ts
