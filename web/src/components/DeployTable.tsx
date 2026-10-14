@@ -1,6 +1,7 @@
 import type { Deploy } from "../api/generated";
 import { formatTime, shortDigest } from "../format";
 import { Chip, type Tone } from "./Chip";
+import { Table } from "./Table";
 
 const STATUS_TONE: Record<string, Tone> = { success: "ok", failed: "bad", pending: "" };
 
@@ -8,7 +9,7 @@ export function DeployTable({ deploys }: { deploys: Deploy[] }) {
   if (deploys.length === 0) return <p>No deploys yet.</p>;
 
   return (
-    <table>
+    <Table>
       <thead>
         <tr>
           <th>When</th>
@@ -39,6 +40,6 @@ export function DeployTable({ deploys }: { deploys: Deploy[] }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }

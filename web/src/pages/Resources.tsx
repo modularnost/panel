@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, call } from "../api/client";
 import { formatBytes, memoryUse } from "../format";
+import { Table } from "../components/Table";
 
 export function Resources() {
   // Sampling CPU takes a second on the server, so this is polled slower than the lists.
@@ -19,7 +20,7 @@ export function Resources() {
       {stats.data.length === 0 ? (
         <p>Nothing is running.</p>
       ) : (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Node</th>
@@ -56,7 +57,7 @@ export function Resources() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </>
   );

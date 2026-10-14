@@ -5,6 +5,7 @@ import type { User } from "../api/generated";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
 import { Banner } from "../components/Banner";
+import { Table } from "../components/Table";
 
 type Role = "admin" | "operator" | "viewer";
 const ROLES: Role[] = ["viewer", "operator", "admin"];
@@ -88,7 +89,7 @@ export function Users() {
   return (
     <>
       <h1>Users</h1>
-      <table>
+      <Table>
         <thead>
           <tr>
             <th>User</th>
@@ -132,7 +133,7 @@ export function Users() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </Table>
       {setRole.isError && <p className="error">{setRole.error.message}</p>}
       {setPassword.isError && <p className="error">{setPassword.error.message}</p>}
       {setPassword.isSuccess && <p className="muted">Password changed.</p>}
@@ -189,7 +190,7 @@ export function Users() {
       {tokens.data.length === 0 ? (
         <p className="muted">No tokens.</p>
       ) : (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Name</th>
@@ -220,7 +221,7 @@ export function Users() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
       {removeToken.isError && <p className="error">{removeToken.error.message}</p>}
 

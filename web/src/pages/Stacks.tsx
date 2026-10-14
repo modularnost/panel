@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { Chip } from "../components/Chip";
+import { Table } from "../components/Table";
 
 export function Stacks() {
   const me = useMe();
@@ -26,7 +27,7 @@ export function Stacks() {
       {stacks.data.length === 0 ? (
         <p className="muted">No stacks.</p>
       ) : (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Stack</th>
@@ -51,7 +52,7 @@ export function Stacks() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </>
   );

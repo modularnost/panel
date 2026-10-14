@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, NavLink, Outlet, useOutletContext, useParams } from "react-router";
+import { Link, Outlet, useOutletContext, useParams } from "react-router";
 import { api, call } from "../../api/client";
 import type { Service } from "../../api/generated";
 import { atLeast, useMe } from "../../auth";
 import { useModules, serviceTabs } from "../../modules";
 import { Chip } from "../../components/Chip";
+import { Tab, Tabs } from "../../components/Tabs";
 
 // The tabs of a service share the one service the layout loads.
 export function useService() {
@@ -38,20 +39,20 @@ export function ServiceLayout() {
           {s.running}/{s.desired}
         </Chip>
       </h1>
-      <nav className="tabs">
-        <NavLink to="." end>
+      <Tabs label="Service">
+        <Tab to="." end>
           Overview
-        </NavLink>
-        <NavLink to="logs">Logs</NavLink>
-        <NavLink to="deploys">Deploys</NavLink>
-        {admin && <NavLink to="traefik">Traefik</NavLink>}
-        {admin && <NavLink to="webhooks">Webhooks</NavLink>}
+        </Tab>
+        <Tab to="logs">Logs</Tab>
+        <Tab to="deploys">Deploys</Tab>
+        {admin && <Tab to="traefik">Traefik</Tab>}
+        {admin && <Tab to="webhooks">Webhooks</Tab>}
         {serviceTabs(modules.data, me.data?.role, s).map(({ module, contribution: c }) => (
-          <NavLink key={`${module}${c.path}`} to={`module/${module}${c.path}`}>
+          <Tab key={`${module}${c.path}`} to={`module/${module}${c.path}`}>
             {c.title}
-          </NavLink>
+          </Tab>
         ))}
-      </nav>
+      </Tabs>
       <Outlet context={s} />
     </>
   );

@@ -154,6 +154,10 @@ a {
   color: var(--md-sys-color-error);
 }
 
+.table {
+  overflow-x: auto;
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
@@ -278,7 +282,7 @@ pre.notes {
 
 .btn:focus-visible,
 .item:focus-visible,
-.tabs a:focus-visible {
+.tab-item:focus-visible {
   outline: 3px solid var(--md-sys-color-secondary);
   outline-offset: 2px;
 }
@@ -398,17 +402,17 @@ input:focus,
   align-self: flex-start;
 }
 
+/* Scrollable tabs: on a narrow screen the row scrolls instead of wrapping. */
 .tabs {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   margin-bottom: 24px;
 }
 
-.tabs a {
+.tab-item {
+  flex: none;
   padding: 0 16px;
-  height: 48px;
-  line-height: 48px;
   color: var(--md-sys-color-on-surface-variant);
   font: var(--md-sys-typescale-title-small);
   line-height: 48px;
@@ -416,11 +420,11 @@ input:focus,
   border-bottom: 3px solid transparent;
 }
 
-.tabs a:hover {
+.tab-item:hover {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 
-.tabs a.active {
+.tab-item.active {
   color: var(--md-sys-color-primary);
   border-bottom-color: var(--md-sys-color-primary);
 }
@@ -508,12 +512,6 @@ input:focus,
 
   .main {
     padding: 16px 12px;
-  }
-
-  /* A wide table scrolls by itself; the heading and buttons above it stay. */
-  table {
-    display: block;
-    overflow-x: auto;
   }
 
   .module-frame {
