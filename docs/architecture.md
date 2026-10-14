@@ -26,8 +26,7 @@ Open source is planned. Positioning: **Swarm-native, lightweight, modular**.
   backend (see the ADR below)
 - **Database**: SQLite (see the "Database" section)
 - **Frontend**: a React + TypeScript SPA (Vite, Bun for install and scripts)
-  over the JSON API, embedded in the binary; the HTMX pages stay until the SPA
-  has parity (see ADR 6)
+  over the JSON API, embedded in the binary (see ADR 6)
 - **Docker API access**: only over the Unix socket on a manager node; never
   expose `docker.sock` externally without an authenticating layer in front
 
@@ -121,8 +120,9 @@ is the work ahead, not the current screens: live status, logs and later
 features want client state, and one API serves scripts and CI as well.
 
 - the built bundle is embedded in the binary: still one binary, one image
-- migration is gradual: the API first, then screens one by one; the HTMX pages
-  stay until the SPA has parity and are then removed
+- the SPA is served at `/`; the server renders no HTML of its own. Module
+  pages are framed from `/modules/<name>/`, and the SPA route that frames them
+  is `/module/<name>/`, so the two never share a URL
 - `/api/v1` is the contract for the UI and external clients, authenticated as
   today (session cookie or token); `/internal/*` stays the module API
 - modules are unchanged: the SPA frames their pages

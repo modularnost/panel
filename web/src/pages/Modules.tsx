@@ -27,7 +27,7 @@ export function Modules() {
       <h1>Modules</h1>
       {admin && (
         <p>
-          <Link to="/modules/install">Install a module</Link>
+          <Link to="/install-module">Install a module</Link>
         </p>
       )}
       {uninstall.isError && <p className="error">{uninstall.error.message}</p>}

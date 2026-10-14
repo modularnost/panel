@@ -55,7 +55,7 @@ templates, password hashing and crypto are all stdlib.
 
 | | License |
 | --- | --- |
-| [htmx](https://htmx.org) 2.0.4, bundled at `internal/web/static/htmx.min.js` | Zero-Clause BSD — no attribution required, listed for completeness |
+| React, React DOM, React Router, TanStack Query, bundled into the SPA (`web/`) | MIT |
 
 ## Inside the container image
 

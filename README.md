@@ -1,6 +1,6 @@
 # modularnost
 
-A web panel for Docker Swarm: one binary, SQLite, no frontend build step.
+A web panel for Docker Swarm: one binary with the UI embedded, SQLite.
 
 For people who already build images in CI and want a UI on top of a running
 cluster — check status, redeploy a service, edit Traefik labels, read logs.
@@ -128,8 +128,8 @@ it.
 - **Traefik** — a form instead of hand-editing labels. The panel only writes
   labels; Traefik picks them up on its own.
 - **Webhooks** — `POST /hook/<secret>` from CI.
-- **Create** — run a single service from a form, or deploy a stack from a
-  compose file (stored, so it can be edited and redeployed).
+- **Create** — deploy a stack from a compose file (stored, so it can be edited
+  and redeployed).
 - **Deploy history** — the one thing Swarm itself doesn't keep.
 - **Resources** — current CPU and memory of every replica, cluster-wide and per
   service. Current numbers only: history, graphs and alerts belong in Grafana or
