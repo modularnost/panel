@@ -208,6 +208,55 @@ button:disabled {
   cursor: default;
 }
 
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
+.tabs a {
+  padding: 6px 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.tabs a.active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+select {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.logbox {
+  margin: 0;
+  height: 60vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--side);
+  font: 12.5px/1.45 ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 @media (max-width: 640px) {
   .app {
     grid-template-columns: 1fr;

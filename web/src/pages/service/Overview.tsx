@@ -1,48 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router";
-import { api, call } from "../api/client";
-import { atLeast, useMe } from "../auth";
-import { formatBytes, memoryUse, shortDigest } from "../format";
+import { useNavigate } from "react-router";
+import { api, call } from "../../api/client";
+import { atLeast, useMe } from "../../auth";
+import { formatBytes, memoryUse, shortDigest } from "../../format";
+import { useService } from "./Layout";
 
-export function Service() {
-  const { id = "" } = useParams();
+export function Overview() {
+  const s = useService();
   const me = useMe();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const service = useQuery({
-    queryKey: ["service", id],
-    queryFn: () => call(api.getService(id)),
-    refetchInterval: 3000,
-  });
-  const name = service.data?.name;
   const stats = useQuery({
-    queryKey: ["stats", name],
-    queryFn: () => call(api.listStats({ service: name })),
-    enabled: !!name,
+    queryKey: ["stats", s.name],
+    queryFn: () => call(api.listStats({ service: s.name })),
     refetchInterval: 10_000,
   });
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["service", id] });
-    queryClient.invalidateQueries({ queryKey: ["services"] });
-    queryClient.invalidateQueries({ queryKey: ["deploys"] });
-  };
   const redeploy = useMutation({
-    mutationFn: () => call(api.redeployService(id)),
-    onSuccess: refresh,
+    mutationFn: () => call(api.redeployService(s.id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["service", s.id] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["deploys"] });
+    },
   });
   const remove = useMutation({
-    mutationFn: () => call(api.deleteService(id)),
+    mutationFn: () => call(api.deleteService(s.id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
       navigate("/", { replace: true });
     },
   });
-
-  if (service.isPending) return <p>Loading…</p>;
-  if (service.isError) return <p className="error">{service.error.message}</p>;
-  const s = service.data;
 
   const confirmRemove = () => {
     if (window.confirm(`Remove ${s.name}? Its replicas are stopped and the service is gone.`)) {
@@ -52,16 +41,6 @@ export function Service() {
 
   return (
     <>
-      <p className="muted">
-        <Link to="/">Services</Link>
-      </p>
-      <h1>
-        {s.name}{" "}
-        <span className={`pill ${s.healthy ? "ok" : "bad"}`}>
-          {s.running}/{s.desired}
-        </span>
-      </h1>
-
       <dl className="facts">
         <dt>Stack</dt>
         <dd>{s.stack || "none"}</dd>
@@ -90,7 +69,9 @@ export function Service() {
       {redeploy.isSuccess && (
         <p className="muted">
           Redeployed
-          {redeploy.data.new_digest ? `: ${shortDigest(redeploy.data.old_digest)} → ${shortDigest(redeploy.data.new_digest)}` : ""}
+          {redeploy.data.new_digest
+            ? `: ${shortDigest(redeploy.data.old_digest)} → ${shortDigest(redeploy.data.new_digest)}`
+            : ""}
           {redeploy.data.warnings.map((w) => (
             <span key={w} className="error">
               {" "}
