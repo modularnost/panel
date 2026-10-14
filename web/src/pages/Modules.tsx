@@ -58,7 +58,11 @@ export function Modules() {
                 <td>{m.version}</td>
                 <td className="mono">{m.service}</td>
                 <td>
-                  {m.ok ? <span className="pill ok">ok</span> : <span className="pill bad">{m.error || "unavailable"}</span>}
+                  {m.ok && <span className="pill ok">ok</span>}
+                  {m.state === "starting" && <span className="pill">{m.error}</span>}
+                  {(m.state === "failed" || m.state === "error") && (
+                    <span className="pill bad">{m.error || "unavailable"}</span>
+                  )}
                 </td>
                 <td className="muted">{m.permissions.join(", ")}</td>
                 {admin && (

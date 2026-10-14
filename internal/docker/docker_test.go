@@ -3,6 +3,7 @@ package docker
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/swarm"
@@ -156,6 +157,32 @@ func TestImageRepo(t *testing.T) {
 	} {
 		if got := ImageRepo(in); got != want {
 			t.Errorf("ImageRepo(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestLastFailure(t *testing.T) {
+	at := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	task := func(ago time.Duration, state swarm.TaskState, errText string) swarm.Task {
+		return swarm.Task{
+			Meta:   swarm.Meta{CreatedAt: at.Add(-ago)},
+			Status: swarm.TaskStatus{State: state, Err: errText},
+		}
+	}
+	for name, c := range map[string]struct {
+		tasks []swarm.Task
+		want  string
+	}{
+		"no tasks":            {nil, ""},
+		"a slow first pull":   {[]swarm.Task{task(0, swarm.TaskStatePreparing, "")}, ""},
+		"the newest failed":   {[]swarm.Task{task(0, swarm.TaskStateRejected, "No such image: x:1")}, "No such image: x:1"},
+		"a retry in progress": {[]swarm.Task{task(0, swarm.TaskStatePreparing, ""), task(10*time.Second, swarm.TaskStateRejected, "not found")}, "not found"},
+		"the newest reason":   {[]swarm.Task{task(20*time.Second, swarm.TaskStateRejected, "old"), task(0, swarm.TaskStateFailed, "new")}, "new"},
+		"running wins":        {[]swarm.Task{task(0, swarm.TaskStateRunning, ""), task(10*time.Second, swarm.TaskStateFailed, "earlier")}, ""},
+		"failed, no reason":   {[]swarm.Task{task(0, swarm.TaskStateFailed, "")}, ""},
+	} {
+		if got := lastFailure(c.tasks); got != c.want {
+			t.Errorf("%s: %q, want %q", name, got, c.want)
 		}
 	}
 }
