@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, call } from "../api/client";
 import { envLines } from "../modules";
+import { Button } from "../components/Button";
 
 export function ModuleInstall() {
   const [name, setName] = useState("");
@@ -55,7 +56,7 @@ export function ModuleInstall() {
           <textarea value={env} onChange={(e) => setEnv(e.target.value)} rows={4} placeholder="KEY=value" />
         </label>
         {install.isError && <p className="error">{install.error.message}</p>}
-        <button disabled={install.isPending}>{install.isPending ? "Installing…" : "Install"}</button>
+        <Button disabled={install.isPending}>{install.isPending ? "Installing…" : "Install"}</Button>
       </form>
     </>
   );

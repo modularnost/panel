@@ -4,6 +4,7 @@ import { api, call } from "../../api/client";
 import { WebhookTable } from "../../components/WebhookTable";
 import { useService } from "./Layout";
 import { Select } from "../../components/Select";
+import { Button } from "../../components/Button";
 
 export function ServiceWebhooks() {
   const s = useService();
@@ -48,9 +49,9 @@ export function ServiceWebhooks() {
             {s.stack && <option value="stack_redeploy">Redeploy its stack ({s.stack})</option>}
           </Select>
         </label>
-        <button onClick={() => create.mutate()} disabled={create.isPending}>
+        <Button onClick={() => create.mutate()} disabled={create.isPending}>
           Create
-        </button>
+        </Button>
       </div>
       {create.isError && <p className="error">{create.error.message}</p>}
     </>

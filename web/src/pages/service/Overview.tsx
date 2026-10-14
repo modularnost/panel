@@ -4,6 +4,7 @@ import { api, call } from "../../api/client";
 import { atLeast, useMe } from "../../auth";
 import { formatBytes, memoryUse, shortDigest } from "../../format";
 import { useService } from "./Layout";
+import { Button } from "../../components/Button";
 
 export function Overview() {
   const s = useService();
@@ -54,14 +55,14 @@ export function Overview() {
 
       <div className="actions">
         {atLeast(me.data?.role, "operator") && (
-          <button onClick={() => redeploy.mutate()} disabled={redeploy.isPending}>
+          <Button onClick={() => redeploy.mutate()} disabled={redeploy.isPending}>
             {redeploy.isPending ? "Redeploying…" : "Redeploy"}
-          </button>
+          </Button>
         )}
         {atLeast(me.data?.role, "admin") && (
-          <button className="danger" onClick={confirmRemove} disabled={remove.isPending}>
+          <Button variant="danger" onClick={confirmRemove} disabled={remove.isPending}>
             Remove
-          </button>
+          </Button>
         )}
       </div>
       {redeploy.isError && <p className="error">{redeploy.error.message}</p>}

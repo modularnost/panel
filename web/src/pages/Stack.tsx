@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { ComposeEditor } from "../components/ComposeEditor";
+import { Button } from "../components/Button";
 
 export function Stack() {
   const { name = "" } = useParams();
@@ -55,14 +56,14 @@ export function Stack() {
 
       <div className="actions">
         {atLeast(me.data?.role, "operator") && (
-          <button onClick={() => redeploy.mutate()} disabled={redeploy.isPending}>
+          <Button onClick={() => redeploy.mutate()} disabled={redeploy.isPending}>
             {redeploy.isPending ? "Redeploying…" : "Redeploy"}
-          </button>
+          </Button>
         )}
         {admin && !s.self && (
-          <button className="danger" onClick={confirmRemove} disabled={remove.isPending}>
+          <Button variant="danger" onClick={confirmRemove} disabled={remove.isPending}>
             Remove
-          </button>
+          </Button>
         )}
       </div>
       {redeploy.isError && <p className="error">{redeploy.error.message}</p>}

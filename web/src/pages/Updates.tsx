@@ -3,6 +3,7 @@ import { useState } from "react";
 import { call, api } from "../api/client";
 import { formatTime } from "../format";
 import { installCommand, useUpdates, waitForVersion } from "../updates";
+import { Button } from "../components/Button";
 
 type Progress = "idle" | "waiting" | "late";
 
@@ -43,9 +44,9 @@ export function Updates() {
         Running <span className="mono">{u.current}</span>
         {u.checked_at && <span className="muted"> · checked {formatTime(u.checked_at)}</span>}{" "}
         {u.enabled && u.release_build && (
-          <button onClick={() => check.mutate()} disabled={check.isPending}>
+          <Button onClick={() => check.mutate()} disabled={check.isPending}>
             {check.isPending ? "Checking…" : "Check now"}
-          </button>
+          </Button>
         )}
       </p>
       {check.isError && <p className="error">{check.error.message}</p>}
@@ -59,9 +60,9 @@ export function Updates() {
       {newest && (
         <>
           <p>
-            <button onClick={() => update(newest.tag)} disabled={apply.isPending || progress !== "idle"}>
+            <Button onClick={() => update(newest.tag)} disabled={apply.isPending || progress !== "idle"}>
               Update to {newest.tag}
-            </button>
+            </Button>
           </p>
           {apply.isError && <p className="error">{apply.error.message}</p>}
           {apply.isSuccess && (

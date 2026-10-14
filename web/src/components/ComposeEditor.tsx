@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { api, call } from "../api/client";
+import { Button } from "./Button";
 
 type Props = {
   name: string;
@@ -43,9 +44,9 @@ export function ComposeEditor({ name, initial, placeholder, onDeployed }: Props)
       <p className="muted">Services that are not in the file are removed.</p>
       {deploy.isError && <p className="error">{deploy.error.message}</p>}
       {deploy.isSuccess && deploy.data.output && <pre className="output">{deploy.data.output}</pre>}
-      <button disabled={deploy.isPending || !name || !compose.trim()}>
+      <Button disabled={deploy.isPending || !name || !compose.trim()}>
         {deploy.isPending ? "Deploying…" : "Deploy"}
-      </button>
+      </Button>
     </form>
   );
 }

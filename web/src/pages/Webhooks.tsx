@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, call } from "../api/client";
 import { WebhookTable } from "../components/WebhookTable";
 import { Select } from "../components/Select";
+import { Button } from "../components/Button";
 
 export function Webhooks() {
   const queryClient = useQueryClient();
@@ -68,9 +69,9 @@ export function Webhooks() {
             ))}
           </Select>
         </label>
-        <button disabled={!target || create.isPending} onClick={() => create.mutate()}>
+        <Button disabled={!target || create.isPending} onClick={() => create.mutate()}>
           Create
-        </button>
+        </Button>
       </div>
       {create.isError && <p className="error">{create.error.message}</p>}
     </>
