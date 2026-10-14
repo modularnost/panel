@@ -52,6 +52,8 @@ type Server struct {
 	DB      *store.DB
 	Modules *modules.Registry
 	Updates *updates.Checker // nil: no release check
+	// Addr is the listen address; modules are told its port to reach the core.
+	Addr string
 }
 
 func (s *Server) Routes() http.Handler {

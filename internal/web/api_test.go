@@ -525,6 +525,14 @@ func TestModuleInstallValidation(t *testing.T) {
 	}
 }
 
+func TestCorePort(t *testing.T) {
+	for addr, want := range map[string]string{":9000": "9000", "0.0.0.0:8081": "8081", "": "8080", "9000": "8080"} {
+		if got := corePort(addr); got != want {
+			t.Errorf("corePort(%q) = %q, want %q", addr, got, want)
+		}
+	}
+}
+
 func TestAPIModuleInstallValidatesBeforeDocker(t *testing.T) {
 	c, base := adminSession(t)
 	status, body := send(t, c, "POST", base+"/api/v1/modules", "application/json", `{"name":"a/b","image":"img"}`)
