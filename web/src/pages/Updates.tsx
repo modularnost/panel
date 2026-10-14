@@ -45,7 +45,7 @@ export function Updates() {
 
   return (
     <>
-      <h1>Updates</h1>
+      <h2>Updates</h2>
       <p>
         Running <span className="mono">{u.current}</span>
         {u.checked_at && <span className="muted"> · checked {formatTime(u.checked_at)}</span>}{" "}
@@ -96,13 +96,13 @@ export function Updates() {
           </p>
           {u.releases.map((r) => (
             <section key={r.tag}>
-              <h2>
+              <h3>
                 <a href={r.url} target="_blank" rel="noreferrer">
                   {r.tag}
                 </a>{" "}
                 {r.prerelease && <Chip>pre-release</Chip>}{" "}
                 <span className="muted">{formatTime(r.published_at)}</span>
-              </h2>
+              </h3>
               <pre className="notes">{r.body || "No release notes."}</pre>
             </section>
           ))}

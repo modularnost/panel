@@ -29,7 +29,7 @@ export function Services() {
     <>
       {newest && (
         <Banner>
-          {newest.tag} is available. <Link to="/updates">What changed</Link>
+          {newest.tag} is available. <Link to="/settings">What changed</Link>
         </Banner>
       )}
       <h1>Services</h1>

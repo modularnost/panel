@@ -136,6 +136,11 @@ h2 {
   margin: 32px 0 8px;
 }
 
+h3 {
+  font: var(--md-sys-typescale-title-small);
+  margin: 24px 0 8px;
+}
+
 a {
   color: var(--md-sys-color-primary);
 }
@@ -521,4 +526,22 @@ md-outlined-text-field.mono {
 
 .compose md-outlined-text-field {
   width: 100%;
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font: var(--md-sys-typescale-body-large);
+  cursor: pointer;
+}
+
+.swatch input {
+  width: 56px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-small);
+  background: none;
+  cursor: pointer;
 }
