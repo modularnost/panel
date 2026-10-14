@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
+import { modulePath, slot, useModules } from "../modules";
 import { useUpdates } from "../updates";
 
 export function Services() {
@@ -14,9 +15,11 @@ export function Services() {
     refetchInterval: 3000,
   });
 
+  const modules = useModules();
+  const actions = slot(modules.data, "services.action", me.data?.role);
+
   if (services.isPending) return <p>Loading…</p>;
   if (services.isError) return <p className="error">{services.error.message}</p>;
-  if (services.data.length === 0) return <p>No services.</p>;
 
   return (
     <>
@@ -26,33 +29,45 @@ export function Services() {
         </p>
       )}
       <h1>Services</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>Stack</th>
-            <th>Image</th>
-            <th>Replicas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {services.data.map((s) => (
-            <tr key={s.id}>
-              <td>
-                <Link to={`/services/${s.id}`}>{s.name}</Link>
-              </td>
-              <td>{s.stack ?? ""}</td>
-              <td className="mono">{s.image}</td>
-              <td>
-                <span className={`pill ${s.healthy ? "ok" : "bad"}`}>
-                  {s.running}/{s.desired}
-                </span>{" "}
-                <span className="muted">{s.mode}</span>
-              </td>
-            </tr>
+      {actions.length > 0 && (
+        <p className="actions">
+          {actions.map(({ module, contribution: c }) => (
+            <Link key={`${module}${c.path}`} className="button" to={modulePath(module, c.path)}>
+              {c.title}
+            </Link>
           ))}
-        </tbody>
-      </table>
+        </p>
+      )}
+      {services.data.length === 0 && <p>No services.</p>}
+      {services.data.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Stack</th>
+              <th>Image</th>
+              <th>Replicas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {services.data.map((s) => (
+              <tr key={s.id}>
+                <td>
+                  <Link to={`/services/${s.id}`}>{s.name}</Link>
+                </td>
+                <td>{s.stack ?? ""}</td>
+                <td className="mono">{s.image}</td>
+                <td>
+                  <span className={`pill ${s.healthy ? "ok" : "bad"}`}>
+                    {s.running}/{s.desired}
+                  </span>{" "}
+                  <span className="muted">{s.mode}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </>
   );
 }

@@ -18,6 +18,7 @@ import { Updates } from "./pages/Updates";
 import { Users } from "./pages/Users";
 import { Webhooks } from "./pages/Webhooks";
 import { ServiceLayout } from "./pages/service/Layout";
+import { ModuleTab } from "./pages/service/ModuleTab";
 import { ServiceDeploys } from "./pages/service/Deploys";
 import { Logs } from "./pages/service/Logs";
 import { Overview } from "./pages/service/Overview";
@@ -127,6 +128,7 @@ export function App() {
           <Route path="deploys" element={<ServiceDeploys />} />
           <Route path="traefik" element={<Traefik />} />
           <Route path="webhooks" element={<ServiceWebhooks />} />
+          <Route path="module/:name/*" element={<ModuleTab />} />
         </Route>
         <Route path="stacks" element={<Stacks />} />
         <Route path="stacks/new" element={<StackNew />} />
