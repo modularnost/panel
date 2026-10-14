@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router";
 import { api, call } from "../api/client";
 
 export function Services() {
@@ -27,7 +28,9 @@ export function Services() {
         <tbody>
           {services.data.map((s) => (
             <tr key={s.id}>
-              <td>{s.name}</td>
+              <td>
+                <Link to={`/services/${s.id}`}>{s.name}</Link>
+              </td>
               <td>{s.stack ?? ""}</td>
               <td className="mono">{s.image}</td>
               <td>
