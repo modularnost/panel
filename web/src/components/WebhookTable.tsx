@@ -1,5 +1,6 @@
 import type { Webhook } from "../api/generated";
 import { Button } from "./Button";
+import { useDialogs } from "./Dialogs";
 import { Table } from "./Table";
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export function WebhookTable({ hooks, busy, onDelete }: Props) {
+  const { confirm } = useDialogs();
   if (hooks.length === 0) return <p className="muted">No webhooks.</p>;
 
   return (
@@ -31,8 +33,13 @@ export function WebhookTable({ hooks, busy, onDelete }: Props) {
               <Button
                 variant="text"
                 disabled={busy}
-                onClick={() =>
-                  window.confirm("Delete this webhook? Callers using it will start failing.") && onDelete(h.id)
+                onClick={async () =>
+                  (await confirm({
+                    title: "Delete this webhook?",
+                    message: "Callers using it will start failing.",
+                    action: "Delete",
+                    danger: true,
+                  })) && onDelete(h.id)
                 }
               >
                 Delete

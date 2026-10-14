@@ -4,6 +4,7 @@ import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { ComposeEditor } from "../components/ComposeEditor";
 import { Button } from "../components/Button";
+import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
 
@@ -25,6 +26,7 @@ export function Stack() {
       queryClient.invalidateQueries({ queryKey: [key] });
     }
   };
+  const { confirm } = useDialogs();
   const redeploy = useMutation({ mutationFn: () => call(api.redeployStack(name)), onSuccess: refresh });
   const remove = useMutation({
     mutationFn: () => call(api.deleteStack(name)),
@@ -38,10 +40,14 @@ export function Stack() {
   if (stack.isError) return <p className="error">{stack.error.message}</p>;
   const s = stack.data;
 
-  const confirmRemove = () => {
-    if (window.confirm(`Remove stack ${s.name}? All ${s.service_count} of its services are stopped and removed.`)) {
-      remove.mutate();
-    }
+  const confirmRemove = async () => {
+    const ok = await confirm({
+      title: `Remove stack ${s.name}?`,
+      message: `All ${s.service_count} of its services are stopped and removed.`,
+      action: "Remove",
+      danger: true,
+    });
+    if (ok) remove.mutate();
   };
 
   return (

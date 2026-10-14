@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, call } from "../api/client";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
+import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
 
@@ -22,6 +23,7 @@ export function Nodes() {
     queryFn: () => call(api.getJoin({ role })),
   });
 
+  const { confirm } = useDialogs();
   const setAvailability = useMutation({
     mutationFn: (v: { id: string; availability: "active" | "pause" | "drain" }) =>
       call(api.setNodeAvailability(v.id, { availability: v.availability })),
@@ -32,10 +34,15 @@ export function Nodes() {
     onSuccess: (fresh) => queryClient.setQueryData(["join", role], fresh),
   });
 
-  const change = (id: string, hostname: string, availability: "active" | "pause" | "drain") => {
-    if (availability !== "drain" || window.confirm(`Drain ${hostname}? Its replicas move to other nodes.`)) {
-      setAvailability.mutate({ id, availability });
-    }
+  const change = async (id: string, hostname: string, availability: "active" | "pause" | "drain") => {
+    const ok =
+      availability !== "drain" ||
+      (await confirm({
+        title: `Drain ${hostname}?`,
+        message: "Its replicas move to other nodes.",
+        action: "Drain",
+      }));
+    if (ok) setAvailability.mutate({ id, availability });
   };
 
   if (nodes.isPending) return <p>Loading…</p>;
@@ -100,8 +107,12 @@ export function Nodes() {
         <Button
           variant="tonal"
           disabled={rotate.isPending}
-          onClick={() =>
-            window.confirm("Rotate the token? A command copied earlier stops working for new servers.") && rotate.mutate()
+          onClick={async () =>
+            (await confirm({
+              title: "Rotate the token?",
+              message: "A command copied earlier stops working for new servers.",
+              action: "Rotate",
+            })) && rotate.mutate()
           }
         >
           Rotate token

@@ -5,6 +5,7 @@ import { atLeast, useMe } from "../../auth";
 import { formatBytes, memoryUse, shortDigest } from "../../format";
 import { useService } from "./Layout";
 import { Button } from "../../components/Button";
+import { useDialogs } from "../../components/Dialogs";
 import { Table } from "../../components/Table";
 
 export function Overview() {
@@ -19,6 +20,7 @@ export function Overview() {
     refetchInterval: 10_000,
   });
 
+  const { confirm } = useDialogs();
   const redeploy = useMutation({
     mutationFn: () => call(api.redeployService(s.id)),
     onSuccess: () => {
@@ -35,10 +37,14 @@ export function Overview() {
     },
   });
 
-  const confirmRemove = () => {
-    if (window.confirm(`Remove ${s.name}? Its replicas are stopped and the service is gone.`)) {
-      remove.mutate();
-    }
+  const confirmRemove = async () => {
+    const ok = await confirm({
+      title: `Remove ${s.name}?`,
+      message: "Its replicas are stopped and the service is gone.",
+      action: "Remove",
+      danger: true,
+    });
+    if (ok) remove.mutate();
   };
 
   return (

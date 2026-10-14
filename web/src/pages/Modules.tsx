@@ -5,12 +5,14 @@ import { atLeast, useMe } from "../auth";
 import { modulePath } from "../modules";
 import { Button } from "../components/Button";
 import { Chip } from "../components/Chip";
+import { useDialogs } from "../components/Dialogs";
 import { Table } from "../components/Table";
 
 export function Modules() {
   const me = useMe();
   const queryClient = useQueryClient();
   const admin = atLeast(me.data?.role, "admin");
+  const { confirm } = useDialogs();
 
   const modules = useQuery({
     queryKey: ["modules"],
@@ -77,9 +79,13 @@ export function Modules() {
                     <Button
                       variant="text"
                       disabled={uninstall.isPending}
-                      onClick={() =>
-                        window.confirm(`Remove ${m.name}? Its service is stopped; the image and its data stay.`) &&
-                        uninstall.mutate(m.name)
+                      onClick={async () =>
+                        (await confirm({
+                          title: `Remove ${m.name}?`,
+                          message: "Its service is stopped; the image and its data stay.",
+                          action: "Remove",
+                          danger: true,
+                        })) && uninstall.mutate(m.name)
                       }
                     >
                       Remove

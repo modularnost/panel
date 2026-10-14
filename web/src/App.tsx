@@ -27,6 +27,7 @@ import { Traefik } from "./pages/service/Traefik";
 import { ServiceWebhooks } from "./pages/service/Webhooks";
 import { Services } from "./pages/Services";
 import { Button } from "./components/Button";
+import { DialogsProvider } from "./components/Dialogs";
 import { Chip } from "./components/Chip";
 
 function Shell() {
@@ -139,32 +140,34 @@ function Shell() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route element={<Shell />}>
-        <Route index element={<Services />} />
-        <Route path="services/:id" element={<ServiceLayout />}>
-          <Route index element={<Overview />} />
-          <Route path="logs" element={<Logs />} />
-          <Route path="deploys" element={<ServiceDeploys />} />
-          <Route path="traefik" element={<Traefik />} />
-          <Route path="webhooks" element={<ServiceWebhooks />} />
-          <Route path="module/:name/*" element={<ModuleTab />} />
+    <DialogsProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route element={<Shell />}>
+          <Route index element={<Services />} />
+          <Route path="services/:id" element={<ServiceLayout />}>
+            <Route index element={<Overview />} />
+            <Route path="logs" element={<Logs />} />
+            <Route path="deploys" element={<ServiceDeploys />} />
+            <Route path="traefik" element={<Traefik />} />
+            <Route path="webhooks" element={<ServiceWebhooks />} />
+            <Route path="module/:name/*" element={<ModuleTab />} />
+          </Route>
+          <Route path="stacks" element={<Stacks />} />
+          <Route path="stacks/new" element={<StackNew />} />
+          <Route path="stacks/:name" element={<Stack />} />
+          <Route path="modules" element={<Modules />} />
+          <Route path="install-module" element={<ModuleInstall />} />
+          <Route path="module/:name/*" element={<ModulePage />} />
+          <Route path="nodes" element={<Nodes />} />
+          <Route path="webhooks" element={<Webhooks />} />
+          <Route path="users" element={<Users />} />
+          <Route path="updates" element={<Updates />} />
+          <Route path="resources" element={<Resources />} />
+          <Route path="deploys" element={<Deploys />} />
         </Route>
-        <Route path="stacks" element={<Stacks />} />
-        <Route path="stacks/new" element={<StackNew />} />
-        <Route path="stacks/:name" element={<Stack />} />
-        <Route path="modules" element={<Modules />} />
-        <Route path="install-module" element={<ModuleInstall />} />
-        <Route path="module/:name/*" element={<ModulePage />} />
-        <Route path="nodes" element={<Nodes />} />
-        <Route path="webhooks" element={<Webhooks />} />
-        <Route path="users" element={<Users />} />
-        <Route path="updates" element={<Updates />} />
-        <Route path="resources" element={<Resources />} />
-        <Route path="deploys" element={<Deploys />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </DialogsProvider>
   );
 }
