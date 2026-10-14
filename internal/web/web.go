@@ -4,8 +4,8 @@ package web
 
 import (
 	"cmp"
-	"embed"
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
