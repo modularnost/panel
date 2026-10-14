@@ -53,6 +53,8 @@ type Server struct {
 	DB      *store.DB
 	Modules *modules.Registry
 	Updates *updates.Checker // nil: no release check
+	// Addr is the listen address; modules are told its port to reach the core.
+	Addr string
 
 	// AgentService is the swarm service of the node agents; empty on a single node.
 	AgentService string

@@ -97,7 +97,9 @@ func main() {
 	checker := updates.New(version, os.Getenv("PANEL_UPDATE_CHECK") != "off")
 	go checker.Run(context.Background(), 6*time.Hour)
 
+	addr := env("PANEL_ADDR", ":8080")
 	srv := &web.Server{
+		Addr:         addr,
 		Docker:       dk,
 		DB:           db,
 		Modules:      registry,
@@ -105,7 +107,6 @@ func main() {
 		AgentService: os.Getenv("PANEL_AGENT_SERVICE"),
 		Metrics:      agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
 	}
-	addr := env("PANEL_ADDR", ":8080")
 	log.Printf("modularnost %s listening on %s", version, addr)
 	log.Fatal(http.ListenAndServe(addr, srv.Routes()))
 }

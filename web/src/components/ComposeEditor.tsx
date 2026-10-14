@@ -5,12 +5,13 @@ import { api, call } from "../api/client";
 type Props = {
   name: string;
   initial: string;
+  placeholder?: string;
   onDeployed?: (name: string) => void;
 };
 
 // ComposeEditor deploys a compose file for a stack. Deploying prunes, so what
 // is not in the file leaves the cluster; that is the one thing worth saying.
-export function ComposeEditor({ name, initial, onDeployed }: Props) {
+export function ComposeEditor({ name, initial, placeholder, onDeployed }: Props) {
   const [compose, setCompose] = useState(initial);
   const queryClient = useQueryClient();
 
@@ -35,6 +36,7 @@ export function ComposeEditor({ name, initial, onDeployed }: Props) {
         value={compose}
         onChange={(e) => setCompose(e.target.value)}
         spellCheck={false}
+        placeholder={placeholder}
         rows={18}
         aria-label="Compose file"
       />

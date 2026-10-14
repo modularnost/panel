@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -162,6 +163,12 @@ func (m moduleInstall) validate() error {
 	return nil
 }
 
+// corePort is the port of a listen address such as ":9000"; 8080 when it has none.
+func corePort(addr string) string {
+	_, port, _ := net.SplitHostPort(addr)
+	return cmp.Or(port, "8080")
+}
+
 // deployModule creates the service that makes a module appear in the panel: the
 // labels, the overlay network and the core's address are filled in here.
 func (s *Server) deployModule(ctx context.Context, m moduleInstall) error {
@@ -175,7 +182,7 @@ func (s *Server) deployModule(ctx context.Context, m moduleInstall) error {
 	self, _ := s.Docker.Self(ctx)
 	env := slices.Clone(m.Env)
 	if self.Service != "" {
-		env = append(env, "PANEL_CORE_URL=http://"+self.Service+":8080")
+		env = append(env, "PANEL_CORE_URL=http://"+net.JoinHostPort(self.Service, corePort(s.Addr)))
 	}
 	_, err := s.Docker.CreateService(ctx, docker.NewService{
 		Name:     cmp.Or(m.Service, m.Name+"_module"),
