@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, call } from "../../api/client";
+import { WebhookTable } from "../../components/WebhookTable";
 import { useService } from "./Layout";
 
-export function Webhooks() {
+export function ServiceWebhooks() {
   const s = useService();
   const queryClient = useQueryClient();
   const [action, setAction] = useState<"force_update" | "stack_redeploy">("force_update");
@@ -35,38 +36,7 @@ export function Webhooks() {
 
   return (
     <>
-      {hooks.data.length === 0 ? (
-        <p className="muted">No webhooks.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Runs</th>
-              <th>Call</th>
-              <th>Last used</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {hooks.data.map((h) => (
-              <tr key={h.id}>
-                <td>{h.action === "force_update" ? `Redeploy ${h.service}` : `Redeploy stack ${h.stack}`}</td>
-                <td className="mono">POST {h.path}</td>
-                <td>{h.last_triggered_at ? new Date(h.last_triggered_at).toLocaleString() : "never"}</td>
-                <td>
-                  <button
-                    className="link"
-                    disabled={remove.isPending}
-                    onClick={() => window.confirm("Delete this webhook? Callers using it will start failing.") && remove.mutate(h.id)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <WebhookTable hooks={hooks.data} busy={remove.isPending} onDelete={(id) => remove.mutate(id)} />
       {remove.isError && <p className="error">{remove.error.message}</p>}
 
       <div className="toolbar">

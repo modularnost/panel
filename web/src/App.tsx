@@ -2,22 +2,24 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call } from "./api/client";
 import { moduleURL } from "./modules";
-import { useMe } from "./auth";
+import { atLeast, useMe } from "./auth";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { ModuleInstall } from "./pages/ModuleInstall";
 import { ModulePage } from "./pages/ModulePage";
 import { Modules } from "./pages/Modules";
+import { Nodes } from "./pages/Nodes";
 import { Resources } from "./pages/Resources";
 import { Stack } from "./pages/Stack";
 import { StackNew } from "./pages/StackNew";
 import { Stacks } from "./pages/Stacks";
+import { Webhooks } from "./pages/Webhooks";
 import { ServiceLayout } from "./pages/service/Layout";
 import { ServiceDeploys } from "./pages/service/Deploys";
 import { Logs } from "./pages/service/Logs";
 import { Overview } from "./pages/service/Overview";
 import { Traefik } from "./pages/service/Traefik";
-import { Webhooks } from "./pages/service/Webhooks";
+import { ServiceWebhooks } from "./pages/service/Webhooks";
 import { Services } from "./pages/Services";
 
 function Shell() {
@@ -62,6 +64,16 @@ function Shell() {
         <NavLink to="/modules" end className="item">
           Modules
         </NavLink>
+        {atLeast(me.data?.role, "admin") && (
+          <>
+            <NavLink to="/nodes" className="item">
+              Nodes
+            </NavLink>
+            <NavLink to="/webhooks" className="item">
+              Webhooks
+            </NavLink>
+          </>
+        )}
         {modules.data
           ?.filter((m) => m.ok)
           .flatMap((m) => m.nav_entries.map((e) => ({ key: `${m.name}${e.path}`, title: e.title, to: moduleURL(m.name, e.path) })))
@@ -95,7 +107,7 @@ export function App() {
           <Route path="logs" element={<Logs />} />
           <Route path="deploys" element={<ServiceDeploys />} />
           <Route path="traefik" element={<Traefik />} />
-          <Route path="webhooks" element={<Webhooks />} />
+          <Route path="webhooks" element={<ServiceWebhooks />} />
         </Route>
         <Route path="stacks" element={<Stacks />} />
         <Route path="stacks/new" element={<StackNew />} />
@@ -103,6 +115,8 @@ export function App() {
         <Route path="modules" element={<Modules />} />
         <Route path="modules/install" element={<ModuleInstall />} />
         <Route path="modules/:name/*" element={<ModulePage />} />
+        <Route path="nodes" element={<Nodes />} />
+        <Route path="webhooks" element={<Webhooks />} />
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
       </Route>
