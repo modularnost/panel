@@ -299,6 +299,13 @@ select {
   border: 0;
 }
 
+.secret {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px 8px;
+  margin-bottom: 16px;
+}
+
 @media (max-width: 640px) {
   .app {
     grid-template-columns: 1fr;

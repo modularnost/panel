@@ -13,6 +13,7 @@ import { Resources } from "./pages/Resources";
 import { Stack } from "./pages/Stack";
 import { StackNew } from "./pages/StackNew";
 import { Stacks } from "./pages/Stacks";
+import { Users } from "./pages/Users";
 import { Webhooks } from "./pages/Webhooks";
 import { ServiceLayout } from "./pages/service/Layout";
 import { ServiceDeploys } from "./pages/service/Deploys";
@@ -72,6 +73,9 @@ function Shell() {
             <NavLink to="/webhooks" className="item">
               Webhooks
             </NavLink>
+            <NavLink to="/users" className="item">
+              Users
+            </NavLink>
           </>
         )}
         {modules.data
@@ -117,6 +121,7 @@ export function App() {
         <Route path="modules/:name/*" element={<ModulePage />} />
         <Route path="nodes" element={<Nodes />} />
         <Route path="webhooks" element={<Webhooks />} />
+        <Route path="users" element={<Users />} />
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
       </Route>
