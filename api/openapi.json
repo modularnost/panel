@@ -949,9 +949,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "image_pattern": {
-            "type": "string"
-          },
           "last_triggered_at": {
             "format": "date-time",
             "type": "string"
@@ -982,10 +979,6 @@
               "force_update",
               "stack_redeploy"
             ],
-            "type": "string"
-          },
-          "image_pattern": {
-            "description": "Stored, but not enforced yet",
             "type": "string"
           },
           "service": {

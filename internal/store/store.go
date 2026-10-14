@@ -80,7 +80,6 @@ type Webhook struct {
 	StackName     string
 	SecretToken   string
 	ActionType    string // force_update | stack_redeploy
-	ImagePattern  string
 	CreatedAt     time.Time
 	LastTriggered sql.NullTime
 }
@@ -95,8 +94,8 @@ func (d *DB) CreateWebhook(w Webhook) (Webhook, error) {
 	if w.SecretToken == "" {
 		w.SecretToken = NewToken()
 	}
-	res, err := d.Exec(`INSERT INTO webhooks (service_name, stack_name, secret_token, action_type, image_pattern)
-		VALUES (?,?,?,?,?)`, w.ServiceName, w.StackName, w.SecretToken, w.ActionType, w.ImagePattern)
+	res, err := d.Exec(`INSERT INTO webhooks (service_name, stack_name, secret_token, action_type)
+		VALUES (?,?,?,?)`, w.ServiceName, w.StackName, w.SecretToken, w.ActionType)
 	if err != nil {
 		return w, err
 	}
@@ -110,12 +109,12 @@ func (d *DB) DeleteWebhook(id int64) error {
 	return err
 }
 
-const webhookCols = `id, service_name, stack_name, secret_token, action_type, image_pattern, created_at, last_triggered_at`
+const webhookCols = `id, service_name, stack_name, secret_token, action_type, created_at, last_triggered_at`
 
 func scanWebhook(s interface{ Scan(...any) error }) (Webhook, error) {
 	var w Webhook
 	err := s.Scan(&w.ID, &w.ServiceName, &w.StackName, &w.SecretToken, &w.ActionType,
-		&w.ImagePattern, &w.CreatedAt, &w.LastTriggered)
+		&w.CreatedAt, &w.LastTriggered)
 	return w, err
 }
 

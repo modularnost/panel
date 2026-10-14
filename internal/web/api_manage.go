@@ -10,10 +10,9 @@ import (
 )
 
 type apiWebhookCreate struct {
-	Action       string `json:"action" enum:"force_update,stack_redeploy"`
-	Service      string `json:"service,omitempty" doc:"Required for force_update"`
-	Stack        string `json:"stack,omitempty" doc:"Required for stack_redeploy"`
-	ImagePattern string `json:"image_pattern,omitempty" doc:"Stored, but not enforced yet"`
+	Action  string `json:"action" enum:"force_update,stack_redeploy"`
+	Service string `json:"service,omitempty" doc:"Required for force_update"`
+	Stack   string `json:"stack,omitempty" doc:"Required for stack_redeploy"`
 }
 
 type apiModuleInstall struct {
@@ -49,7 +48,7 @@ func (s *Server) registerManage(api huma.API) {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "stack_redeploy takes a stack and no service")
 		}
 		hook, err := s.DB.CreateWebhook(store.Webhook{
-			ServiceName: b.Service, StackName: b.Stack, ActionType: b.Action, ImagePattern: b.ImagePattern,
+			ServiceName: b.Service, StackName: b.Stack, ActionType: b.Action,
 		})
 		if err != nil {
 			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
