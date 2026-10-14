@@ -125,11 +125,70 @@ features want client state, and one API serves scripts and CI as well.
   is `/module/<name>/`, so the two never share a URL
 - `/api/v1` is the contract for the UI and external clients, authenticated as
   today (session cookie or token); `/internal/*` stays the module API
-- modules are unchanged: the SPA frames their pages
+- the SPA frames module pages and shows what modules contribute to its own
+  screens (see ADR 7)
 - the API is written with Huma: `api/openapi.json` is generated from the
   handlers and committed, and the TypeScript types are generated from it
 - state-changing requests accept only `application/json`, which a plain HTML
   form cannot send: that is the CSRF guard
+
+### 7. A module is a set of contributions (decided 2026-10-14)
+
+A module is more than a page of its own: it needs a tab on a service, an action
+on the services list, a menu entry. The manifest says where, and the panel draws
+it.
+
+**Trust.** A module is code the administrator installed, so it is trusted. It is
+still kept away from the user's session: the proxy never forwards `Cookie` or
+`Authorization`, drops the `Set-Cookie` a module answers with, and discards the
+`X-Panel-*` headers a browser sends. This is defence in depth, not a boundary
+against hostile code: a module's page is served from the panel's origin.
+
+**The manifest is a versioned contract.**
+
+```json
+{"contract": 1, "name": "metrics", "version": "0.2.0",
+ "contributions": [
+   {"slot": "nav",         "title": "Metrics", "path": "/",        "role": "viewer"},
+   {"slot": "service.tab", "title": "Metrics", "path": "/service", "role": "viewer",
+    "match": {"some.label": "value"}}],
+ "permissions": ["stats:read"]}
+```
+
+- A contribution names a **slot**, a title, a path below `/modules/<name>`, a
+  minimum role and, for a tab, labels the service must carry. The slots are
+  `nav`, `service.tab` and `services.action`; the list grows as real modules
+  need more.
+- A slot or a field the core does not know is **ignored**, so a module written
+  for a newer panel loads on an older one. A change that cannot be made that way
+  raises `contract`; a manifest of another contract is shown as failed, with the
+  reason. We break rather than carry two shapes before 1.0.
+- The **role belongs to the contribution** and is enforced by the proxy, by the
+  longest declared path that is a prefix at a `/` boundary; a path nothing
+  covers needs `operator`. The SPA hides what a role cannot use, but only as a
+  courtesy.
+- **Who is looking** is told to the module in signed headers (`X-Panel-User`,
+  `X-Panel-Role`, `X-Panel-Time`, `X-Panel-User-Sig`), an HMAC keyed with the
+  module's own token: the module can verify it and holds no shared secret.
+- **Context** (the service a tab is on) comes from the slot, as query
+  parameters of the framed page. It is a convenience: anybody can write that
+  query, so the role check, not the context, is what protects an action.
+
+**Rendering.** A contribution is a page in a frame, as module pages already
+are. The field `render` is reserved for a declarative renderer later (a form, a
+table, a chart from a small vocabulary), which would be safer and consistent
+with the panel without a frame.
+
+**Not chosen.** A JavaScript bundle per module loaded into the panel's page:
+it would run with the panel's privileges and bind modules to the SPA's
+libraries, which is a different trust model from "any language, a separate
+service" (ADR 3).
+
+**Open.** A frame served from the panel's origin shares it; isolating it
+(a `sandbox` without `allow-same-origin`) needs another way for the proxy to
+know the caller, such as a short-lived signed prefix per frame. The frame's
+height and navigation are not reported to the shell. Core-to-module events and
+more rights on `/internal` come with the first module that needs them.
 
 ## Feature order (do not change without discussion)
 
