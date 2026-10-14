@@ -1,7 +1,8 @@
 import type { Deploy } from "../api/generated";
 import { formatTime, shortDigest } from "../format";
+import { Chip, type Tone } from "./Chip";
 
-const STATUS_CLASS: Record<string, string> = { success: "ok", failed: "bad", pending: "" };
+const STATUS_TONE: Record<string, Tone> = { success: "ok", failed: "bad", pending: "" };
 
 export function DeployTable({ deploys }: { deploys: Deploy[] }) {
   if (deploys.length === 0) return <p>No deploys yet.</p>;
@@ -29,7 +30,7 @@ export function DeployTable({ deploys }: { deploys: Deploy[] }) {
             <td>{d.source}</td>
             <td>{d.triggered_by ?? ""}</td>
             <td>
-              <span className={`pill ${STATUS_CLASS[d.status] ?? ""}`}>{d.status}</span>
+              <Chip tone={STATUS_TONE[d.status] ?? ""}>{d.status}</Chip>
               {d.error ? <div className="error">{d.error}</div> : null}
             </td>
             <td className="mono">

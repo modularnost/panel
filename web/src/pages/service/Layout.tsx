@@ -4,6 +4,7 @@ import { api, call } from "../../api/client";
 import type { Service } from "../../api/generated";
 import { atLeast, useMe } from "../../auth";
 import { useModules, serviceTabs } from "../../modules";
+import { Chip } from "../../components/Chip";
 
 // The tabs of a service share the one service the layout loads.
 export function useService() {
@@ -33,9 +34,9 @@ export function ServiceLayout() {
       </p>
       <h1>
         {s.name}{" "}
-        <span className={`pill ${s.healthy ? "ok" : "bad"}`}>
+        <Chip tone={s.healthy ? "ok" : "bad"}>
           {s.running}/{s.desired}
-        </span>
+        </Chip>
       </h1>
       <nav className="tabs">
         <NavLink to="." end>

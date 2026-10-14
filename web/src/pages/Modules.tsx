@@ -4,6 +4,7 @@ import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { modulePath } from "../modules";
 import { Button } from "../components/Button";
+import { Chip } from "../components/Chip";
 
 export function Modules() {
   const me = useMe();
@@ -63,10 +64,10 @@ export function Modules() {
                 <td>{m.version}</td>
                 <td className="mono">{m.service}</td>
                 <td>
-                  {m.ok && <span className="pill ok">ok</span>}
-                  {m.state === "starting" && <span className="pill">{m.error}</span>}
+                  {m.ok && <Chip tone="ok">ok</Chip>}
+                  {m.state === "starting" && <Chip>{m.error}</Chip>}
                   {(m.state === "failed" || m.state === "error") && (
-                    <span className="pill bad">{m.error || "unavailable"}</span>
+                    <Chip tone="bad">{m.error || "unavailable"}</Chip>
                   )}
                 </td>
                 <td className="muted">{m.permissions.join(", ")}</td>

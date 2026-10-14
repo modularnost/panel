@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, call } from "../api/client";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
+import { Chip } from "../components/Chip";
 
 type Role = "worker" | "manager";
 
@@ -62,7 +63,7 @@ export function Nodes() {
                 {n.leader ? <span className="muted"> · leader</span> : null}
               </td>
               <td>
-                <span className={`pill ${n.status === "ready" ? "ok" : "bad"}`}>{n.status}</span>
+                <Chip tone={n.status === "ready" ? "ok" : "bad"}>{n.status}</Chip>
               </td>
               <td>
                 <Select
