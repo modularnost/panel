@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { LinkButton } from "../components/Button";
+import { Banner } from "../components/Banner";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { modulePath, slot, useModules } from "../modules";
@@ -26,9 +27,9 @@ export function Services() {
   return (
     <>
       {newest && (
-        <p className="banner">
+        <Banner>
           {newest.tag} is available. <Link to="/updates">What changed</Link>
-        </p>
+        </Banner>
       )}
       <h1>Services</h1>
       {actions.length > 0 && (
