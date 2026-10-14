@@ -69,6 +69,12 @@ export function Updates() {
               A copy of the database is at <span className="mono">{apply.data.backup}</span> on the panel's volume.
             </p>
           )}
+          {!u.stack_file && (
+            <p className="muted">
+              The installer's stack file is not mounted into the panel, so it will still name the old image after the
+              update: run the installer once to add the mount.
+            </p>
+          )}
           {progress === "waiting" && <p>Updating… this page reloads when {newest.tag} answers.</p>}
           {progress === "late" && (
             <p className="error">

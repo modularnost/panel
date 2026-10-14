@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -15,6 +16,7 @@ type Self struct {
 	Service string // the panel's own swarm service name, e.g. "panel_panel"
 	Network string // the overlay network it is attached to
 	Stack   string // the stack it was deployed from, empty outside one
+	Image   string // repo:tag it runs, without the digest the daemon pins
 }
 
 // Self inspects the panel's own container. In Docker the hostname of a
@@ -31,6 +33,7 @@ func (c *Client) Self(ctx context.Context) (Self, error) {
 	}
 	s.Service = ct.Config.Labels["com.docker.swarm.service.name"]
 	s.Stack = ct.Config.Labels["com.docker.stack.namespace"]
+	s.Image, _, _ = strings.Cut(ct.Config.Image, "@")
 	var names []string
 	for name := range ct.NetworkSettings.Networks {
 		names = append(names, name)

@@ -58,7 +58,9 @@ type Server struct {
 
 	// AgentService is the swarm service of the node agents; empty on a single node.
 	AgentService string
-	updating     atomic.Bool
+	// StackFile is the compose file the installer wrote, when it is mounted here.
+	StackFile string
+	updating  atomic.Bool
 }
 
 func (s *Server) Routes() http.Handler {

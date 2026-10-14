@@ -37,7 +37,9 @@ curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/inst
 
 Re-running it updates the panel and leaves your users alone: an existing swarm,
 network or stack is reused. The generated compose file and the module secret
-live in `/etc/modularnost`.
+live in `/etc/modularnost`. An installation made before the panel could update
+itself needs this one re-run: it adds the mount the panel uses to keep that file
+in step with an update.
 
 | Variable | Default | |
 | --- | --- | --- |
@@ -114,6 +116,7 @@ it.
 | `PANEL_AGENT_PORT` | `8080` | port the agents listen on |
 | `PANEL_MODE` | unset | `agent` runs this binary as a node agent instead of the panel |
 | `PANEL_UPDATE_CHECK` | on | `off` stops the panel from asking GitHub for new releases |
+| `PANEL_STACK_FILE` | unset | the installer's compose file, mounted into the panel: an update from the panel retags its image lines |
 
 ## What it does
 

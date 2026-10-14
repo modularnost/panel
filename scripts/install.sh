@@ -210,9 +210,12 @@ $ACME_ARGS
       PANEL_ADMIN_PASSWORD: "$ADMIN_PASSWORD"
       PANEL_MODULE_SECRET: "$SECRET"
       PANEL_AGENT_SERVICE: ${STACK}_agent
+      PANEL_STACK_FILE: /config/stack.yml
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - panel-data:/data
+      # So that an update from the panel can keep this file in step.
+      - $CONFIG:/config
     networks: [$NET]
     deploy:
       replicas: 1

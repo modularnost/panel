@@ -154,7 +154,7 @@ func (c *Client) ForceUpdate(ctx context.Context, nameOrID string) (Deploy, erro
 // the panel the old and the new process must not share the SQLite file.
 func (c *Client) UpdateImage(ctx context.Context, nameOrID, tag string) (Deploy, error) {
 	return c.updateSpec(ctx, nameOrID, func(spec *swarm.ServiceSpec, img string) {
-		spec.TaskTemplate.ContainerSpec.Image = imageRepo(img) + ":" + tag
+		spec.TaskTemplate.ContainerSpec.Image = ImageRepo(img) + ":" + tag
 		spec.UpdateConfig = &swarm.UpdateConfig{
 			Parallelism:   1,
 			Order:         swarm.UpdateOrderStopFirst,
@@ -164,8 +164,8 @@ func (c *Client) UpdateImage(ctx context.Context, nameOrID, tag string) (Deploy,
 	})
 }
 
-// imageRepo drops the tag and the digest: ghcr.io/x/panel:edge@sha256:.. -> ghcr.io/x/panel.
-func imageRepo(img string) string {
+// ImageRepo drops the tag and the digest: ghcr.io/x/panel:edge@sha256:.. -> ghcr.io/x/panel.
+func ImageRepo(img string) string {
 	name, _ := splitImage(img)
 	if i := strings.LastIndex(name, ":"); i > strings.LastIndex(name, "/") {
 		name = name[:i]
