@@ -526,3 +526,7 @@ md-outlined-select {
   --md-outlined-select-text-field-container-shape: var(--md-sys-shape-extra-small);
   --md-menu-container-shape: var(--md-sys-shape-extra-small);
 }
+
+md-dialog p {
+  margin: 0 0 16px;
+}

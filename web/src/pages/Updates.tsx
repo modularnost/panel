@@ -4,6 +4,7 @@ import { call, api } from "../api/client";
 import { formatTime } from "../format";
 import { installCommand, useUpdates, waitForVersion } from "../updates";
 import { Button } from "../components/Button";
+import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 
 type Progress = "idle" | "waiting" | "late";
@@ -23,10 +24,14 @@ export function Updates() {
       }
     },
   });
-  const update = (tag: string) => {
-    if (window.confirm(`Update the panel to ${tag}? It is unavailable for a few seconds while it restarts.`)) {
-      apply.mutate(tag);
-    }
+  const { confirm } = useDialogs();
+  const update = async (tag: string) => {
+    const ok = await confirm({
+      title: `Update the panel to ${tag}?`,
+      message: "It is unavailable for a few seconds while it restarts.",
+      action: "Update",
+    });
+    if (ok) apply.mutate(tag);
   };
   const check = useMutation({
     mutationFn: () => call(api.checkUpdates()),

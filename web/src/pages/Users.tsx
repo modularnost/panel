@@ -4,6 +4,7 @@ import { api, call } from "../api/client";
 import type { User } from "../api/generated";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
+import { useDialogs } from "../components/Dialogs";
 import { Banner } from "../components/Banner";
 import { Table } from "../components/Table";
 
@@ -14,6 +15,7 @@ export function Users() {
   const queryClient = useQueryClient();
   const reload = (key: string) => queryClient.invalidateQueries({ queryKey: [key] });
 
+  const { confirm, prompt } = useDialogs();
   const users = useQuery({ queryKey: ["users"], queryFn: () => call(api.listUsers()) });
   const tokens = useQuery({ queryKey: ["tokens"], queryFn: () => call(api.listTokens()) });
 
@@ -68,8 +70,15 @@ export function Users() {
     },
   });
 
-  const changePassword = (u: User) => {
-    const password = window.prompt(`New password for ${u.username} (8 characters or more). Their sessions end.`);
+  const changePassword = async (u: User) => {
+    const password = await prompt({
+      title: `New password for ${u.username}`,
+      message: "Their sessions end.",
+      label: "Password",
+      type: "password",
+      minLength: 8,
+      action: "Change",
+    });
     if (password) setPassword.mutate({ id: u.id, password });
   };
 
@@ -122,9 +131,13 @@ export function Users() {
                 <Button
                   variant="text"
                   disabled={removeUser.isPending}
-                  onClick={() =>
-                    window.confirm(`Delete ${u.username}? Their sessions and tokens go with them.`) &&
-                    removeUser.mutate(u.id)
+                  onClick={async () =>
+                    (await confirm({
+                      title: `Delete ${u.username}?`,
+                      message: "Their sessions and tokens go with them.",
+                      action: "Delete",
+                      danger: true,
+                    })) && removeUser.mutate(u.id)
                   }
                 >
                   Delete
@@ -211,8 +224,13 @@ export function Users() {
                   <Button
                     variant="text"
                     disabled={removeToken.isPending}
-                    onClick={() =>
-                      window.confirm(`Revoke ${t.name}? Whatever uses it stops working.`) && removeToken.mutate(t.id)
+                    onClick={async () =>
+                      (await confirm({
+                        title: `Revoke ${t.name}?`,
+                        message: "Whatever uses it stops working.",
+                        action: "Revoke",
+                        danger: true,
+                      })) && removeToken.mutate(t.id)
                     }
                   >
                     Revoke
