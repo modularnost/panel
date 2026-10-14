@@ -9,7 +9,8 @@
     "@vitejs/plugin-react": "^6.1.2",
     "swagger-typescript-api": "^13.13.0",
     "typescript": "^7.0.2",
-    "vite": "8.3.4"
+    "vite": "8.3.4",
+    "vitest": "^5.0.4"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.2",
@@ -21,6 +22,7 @@
     "gen:api": "swagger-typescript-api generate --path ../api/openapi.json --output src/api --name generated.ts --unwrap-response-data --enum-style union --silent",
     "dev": "bun run gen:api && vite",
     "typecheck": "bun run gen:api && tsc --noEmit",
-    "build": "bun run gen:api && tsc --noEmit && vite build"
+    "build": "bun run gen:api && tsc --noEmit && vite build",
+    "test": "vitest run"
   }
 }
