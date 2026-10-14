@@ -1,11 +1,31 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { call, api } from "../api/client";
 import { formatTime } from "../format";
-import { installCommand, useUpdates } from "../updates";
+import { installCommand, useUpdates, waitForVersion } from "../updates";
+
+type Progress = "idle" | "waiting" | "late";
 
 export function Updates() {
   const queryClient = useQueryClient();
   const updates = useUpdates(true);
+  const [progress, setProgress] = useState<Progress>("idle");
+  const apply = useMutation({
+    mutationFn: (version: string) => call(api.applyUpdate({ version })),
+    onSuccess: async (started) => {
+      setProgress("waiting");
+      if (await waitForVersion(started.version)) {
+        window.location.reload();
+      } else {
+        setProgress("late");
+      }
+    },
+  });
+  const update = (tag: string) => {
+    if (window.confirm(`Update the panel to ${tag}? It is unavailable for a few seconds while it restarts.`)) {
+      apply.mutate(tag);
+    }
+  };
   const check = useMutation({
     mutationFn: () => call(api.checkUpdates()),
     onSuccess: (fresh) => queryClient.setQueryData(["updates"], fresh),
@@ -38,7 +58,25 @@ export function Updates() {
 
       {newest && (
         <>
-          <p>To update to {newest.tag}, run this on the manager:</p>
+          <p>
+            <button onClick={() => update(newest.tag)} disabled={apply.isPending || progress !== "idle"}>
+              Update to {newest.tag}
+            </button>
+          </p>
+          {apply.isError && <p className="error">{apply.error.message}</p>}
+          {apply.isSuccess && (
+            <p className="muted">
+              A copy of the database is at <span className="mono">{apply.data.backup}</span> on the panel's volume.
+            </p>
+          )}
+          {progress === "waiting" && <p>Updating… this page reloads when {newest.tag} answers.</p>}
+          {progress === "late" && (
+            <p className="error">
+              {newest.tag} did not answer within three minutes. Swarm rolls a failing update back on its own; look at{" "}
+              <span className="mono">docker service ps --no-trunc</span> for the panel service.
+            </p>
+          )}
+          <p className="muted">Or on the manager:</p>
           <pre className="mono">{installCommand(newest.tag)}</pre>
           <p className="muted">
             Migrations only go forward: take a copy of the database volume first if you may need to roll back.
