@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -87,8 +88,10 @@ func TestFetchPageSendsTheViewerSigned(t *testing.T) {
 	if got.Get("X-Panel-Token") != token || got.Get("X-Panel-User") != "ann" || got.Get("X-Panel-Role") != "viewer" {
 		t.Errorf("headers: %v", got)
 	}
-	var ts int64
-	fmt.Sscan(got.Get("X-Panel-Time"), &ts)
+	ts, err := strconv.ParseInt(got.Get("X-Panel-Time"), 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Get("X-Panel-User-Sig") != SignUser(token, "m", "ann", "viewer", ts) {
 		t.Errorf("the viewer is not signed the way the module verifies it")
 	}
