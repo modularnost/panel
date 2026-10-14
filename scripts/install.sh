@@ -267,13 +267,31 @@ while [ "$i" -lt 90 ]; do
 	sleep 2
 done
 
+# The stack is deployed and the password is already in its compose file, so a
+# timeout still shows it: the user would otherwise have a panel they cannot sign in to.
+summary() {
+	printf '  Address   %s%s://%s%s\n' "$BLUE" "$SCHEME" "$DOMAIN" "$OFF"
+	if [ "$FIRST_RUN" = yes ]; then
+		printf '  Login     %sadmin%s\n' "$BLUE" "$OFF"
+		printf '  Password  %s%s%s   (shown once; change it on the Users page)\n' "$BLUE" "$ADMIN_PASSWORD" "$OFF"
+	else
+		echo "  Existing installation updated; your users are unchanged."
+	fi
+	echo
+	echo "  Logs      docker service logs ${STACK}_panel"
+	echo "  Remove    curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/uninstall.sh | sh"
+}
+
 if [ "$READY" != yes ]; then
 	echo >&2
 	echo "The panel did not answer. The last lines of Traefik's log:" >&2
 	docker service logs --tail 10 "${STACK}_traefik" 2>&1 | sed 's/^/    /' >&2 || true
 	echo >&2
+	echo "It may still come up, a certificate can take longer. Sign-in details:" >&2
+	echo >&2
+	summary >&2
+	echo >&2
 	echo "More: docker service ps ${STACK}_panel --no-trunc" >&2
-	echo "      docker service logs ${STACK}_panel" >&2
 	echo "      full install log: $LOG" >&2
 	exit 1
 fi
@@ -281,13 +299,4 @@ fi
 echo
 echo "The panel is ready."
 echo
-printf '  Address   %s%s://%s%s\n' "$BLUE" "$SCHEME" "$DOMAIN" "$OFF"
-if [ "$FIRST_RUN" = yes ]; then
-	printf '  Login     %sadmin%s\n' "$BLUE" "$OFF"
-	printf '  Password  %s%s%s   (shown once; change it on the Users page)\n' "$BLUE" "$ADMIN_PASSWORD" "$OFF"
-else
-	echo "  Existing installation updated; your users are unchanged."
-fi
-echo
-echo "  Logs      docker service logs ${STACK}_panel"
-echo "  Remove    curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/uninstall.sh | sh"
+summary
