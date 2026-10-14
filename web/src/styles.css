@@ -530,3 +530,12 @@ md-outlined-select {
 md-dialog p {
   margin: 0 0 16px;
 }
+
+.switch {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  font: var(--md-sys-typescale-body-large);
+  cursor: pointer;
+}
