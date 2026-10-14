@@ -1,8 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, call } from "../api/client";
+import { atLeast, useMe } from "../auth";
+import { useUpdates } from "../updates";
 
 export function Services() {
+  const me = useMe();
+  const updates = useUpdates(atLeast(me.data?.role, "admin"));
+  const newest = updates.data?.releases[0];
   const services = useQuery({
     queryKey: ["services"],
     queryFn: () => call(api.listServices()),
@@ -15,6 +20,11 @@ export function Services() {
 
   return (
     <>
+      {newest && (
+        <p className="banner">
+          {newest.tag} is available. <Link to="/updates">What changed</Link>
+        </p>
+      )}
       <h1>Services</h1>
       <table>
         <thead>
