@@ -108,6 +108,19 @@
         ],
         "type": "object"
       },
+      "LogLine": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "Timestamp, [replica] and the line, as docker prints it",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
       "Login": {
         "additionalProperties": false,
         "properties": {
@@ -503,6 +516,28 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "Task": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slot": {
+            "description": "Replica number; 0 for a global service",
+            "format": "int64",
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slot",
+          "state"
         ],
         "type": "object"
       },
@@ -1533,6 +1568,134 @@
         "summary": "Deploys of one service, including redeploys of its stack"
       }
     },
+    "/api/v1/services/{id}/logs": {
+      "get": {
+        "operationId": "stream-service-logs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A replica id from the tasks list; empty for all replicas",
+            "explode": false,
+            "in": "query",
+            "name": "task",
+            "schema": {
+              "description": "A replica id from the tasks list; empty for all replicas",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lines of history first",
+            "explode": false,
+            "in": "query",
+            "name": "tail",
+            "schema": {
+              "default": 200,
+              "description": "Lines of history first",
+              "format": "int64",
+              "maximum": 5000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "description": "Each oneOf object in the array represents one possible Server Sent Events (SSE) message, serialized as UTF-8 text according to the SSE specification.",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "data": {
+                            "$ref": "#/components/schemas/LogLine"
+                          },
+                          "event": {
+                            "const": "line",
+                            "description": "The event name.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The event ID.",
+                            "type": "integer"
+                          },
+                          "retry": {
+                            "description": "The retry time in milliseconds.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "event"
+                        ],
+                        "title": "Event line",
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "data": {
+                            "$ref": "#/components/schemas/Problem"
+                          },
+                          "event": {
+                            "const": "problem",
+                            "description": "The event name.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The event ID.",
+                            "type": "integer"
+                          },
+                          "retry": {
+                            "description": "The retry time in milliseconds.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "event"
+                        ],
+                        "title": "Event problem",
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "title": "Server Sent Events",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Follow a service's logs, or one replica's"
+      }
+    },
     "/api/v1/services/{id}/redeploy": {
       "post": {
         "operationId": "redeploy-service",
@@ -1577,6 +1740,55 @@
           }
         ],
         "summary": "Pull the image again and replace the replicas"
+      }
+    },
+    "/api/v1/services/{id}/tasks": {
+      "get": {
+        "operationId": "list-service-tasks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The service's live replicas, for filtering its logs"
       }
     },
     "/api/v1/services/{id}/traefik": {

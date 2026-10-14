@@ -738,3 +738,30 @@ func TestAPINodeActionsValidateBeforeDocker(t *testing.T) {
 		}
 	}
 }
+
+func TestAPILogRoutesNeedSignInAndValidateInput(t *testing.T) {
+	c, base := apiClient(t)
+	for _, path := range []string{"/api/v1/services/web/tasks", "/api/v1/services/web/logs"} {
+		if status, body := send(t, c, "GET", base+path, "", ""); status != 401 || errorCode(body) != "unauthorized" {
+			t.Errorf("%s anonymous: %d %v", path, status, body)
+		}
+	}
+
+	signIn(t, c, base)
+	// Rejected before the stream starts, so it is still an ordinary JSON error.
+	for _, q := range []string{"tail=0", "tail=5001", "tail=many"} {
+		if status, body := send(t, c, "GET", base+"/api/v1/services/web/logs?"+q, "", ""); status != 422 {
+			t.Errorf("%s: %d %v", q, status, body)
+		}
+	}
+}
+
+func TestToAPITasks(t *testing.T) {
+	got := toAPITasks([]docker.Task{{ID: "t1", Slot: 2, State: "running"}})
+	if len(got) != 1 || got[0].ID != "t1" || got[0].Slot != 2 || got[0].State != "running" {
+		t.Fatalf("%+v", got)
+	}
+	if empty := toAPITasks(nil); empty == nil {
+		t.Error("no replicas must be an empty list, not null")
+	}
+}
