@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import { api, call } from "../api/client";
 import type { User } from "../api/generated";
 import { Select } from "../components/Select";
+import { Button } from "../components/Button";
 
 type Role = "admin" | "operator" | "viewer";
 const ROLES: Role[] = ["viewer", "operator", "admin"];
@@ -113,11 +114,11 @@ export function Users() {
                 </Select>
               </td>
               <td>
-                <button className="link" onClick={() => changePassword(u)}>
+                <Button variant="text" onClick={() => changePassword(u)}>
                   Change password
-                </button>
-                <button
-                  className="link"
+                </Button>
+                <Button
+                  variant="text"
                   disabled={removeUser.isPending}
                   onClick={() =>
                     window.confirm(`Delete ${u.username}? Their sessions and tokens go with them.`) &&
@@ -125,7 +126,7 @@ export function Users() {
                   }
                 >
                   Delete
-                </button>
+                </Button>
               </td>
             </tr>
           ))}
@@ -168,7 +169,7 @@ export function Users() {
             ))}
           </Select>
         </label>
-        <button disabled={createUser.isPending}>Create</button>
+        <Button disabled={createUser.isPending}>Create</Button>
       </form>
       {createUser.isError && <p className="error">{createUser.error.message}</p>}
 
@@ -179,9 +180,9 @@ export function Users() {
             Token <strong>{created.name}</strong> — copy it now, it is not shown again:
           </p>
           <pre className="output">{created.token}</pre>
-          <button className="link" onClick={() => setCreated(null)}>
+          <Button variant="text" onClick={() => setCreated(null)}>
             Done
-          </button>
+          </Button>
         </div>
       )}
       {tokens.data.length === 0 ? (
@@ -205,15 +206,15 @@ export function Users() {
                 <td>{t.role || <span className="muted">same as user</span>}</td>
                 <td>{t.expires_at ? new Date(t.expires_at).toLocaleDateString() : "never"}</td>
                 <td>
-                  <button
-                    className="link"
+                  <Button
+                    variant="text"
                     disabled={removeToken.isPending}
                     onClick={() =>
                       window.confirm(`Revoke ${t.name}? Whatever uses it stops working.`) && removeToken.mutate(t.id)
                     }
                   >
                     Revoke
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -263,7 +264,7 @@ export function Users() {
             placeholder="never expires"
           />
         </label>
-        <button disabled={createToken.isPending || newToken.user_id === 0}>Create</button>
+        <Button disabled={createToken.isPending || newToken.user_id === 0}>Create</Button>
       </form>
       {createToken.isError && <p className="error">{createToken.error.message}</p>}
     </>

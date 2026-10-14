@@ -4,6 +4,7 @@ import { api, call } from "../../api/client";
 import { MAX_LINES, capLines, parseLine } from "../../logs";
 import { useService } from "./Layout";
 import { Select } from "../../components/Select";
+import { Button } from "../../components/Button";
 
 const TAILS = [100, 200, 500, 1000];
 
@@ -105,7 +106,7 @@ export function Logs() {
             ))}
           </Select>
         </label>
-        <button onClick={() => setPaused((p) => !p)}>{paused ? "Resume" : "Pause"}</button>
+        <Button variant="tonal" onClick={() => setPaused((p) => !p)}>{paused ? "Resume" : "Pause"}</Button>
         <span className="muted">{connected ? "live" : problem ? "stopped" : "connecting…"}</span>
       </div>
       {problem && <p className="error">{problem}</p>}

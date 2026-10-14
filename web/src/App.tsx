@@ -26,6 +26,7 @@ import { Overview } from "./pages/service/Overview";
 import { Traefik } from "./pages/service/Traefik";
 import { ServiceWebhooks } from "./pages/service/Webhooks";
 import { Services } from "./pages/Services";
+import { Button } from "./components/Button";
 
 function Shell() {
   const me = useMe();
@@ -67,11 +68,11 @@ function Shell() {
   return (
     <div className="app">
       <header className="bar">
-        <button className="menu" aria-label="Menu" aria-expanded={drawer} onClick={() => setDrawer(true)}>
+        <Button variant="icon" aria-label="Menu" aria-expanded={drawer} onClick={() => setDrawer(true)}>
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
             <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="currentColor" />
           </svg>
-        </button>
+        </Button>
         <span className="brand">modularnost</span>
       </header>
       <div className={`scrim${drawer ? " open" : ""}`} onClick={() => setDrawer(false)} />
@@ -122,9 +123,9 @@ function Shell() {
           ))}
         <div className="who">
           {me.data.username} · {me.data.role}
-          <button className="link" onClick={logout}>
+          <Button variant="text" onClick={logout}>
             Sign out
-          </button>
+          </Button>
           {version.data && <div className="mono">{version.data}</div>}
         </div>
       </aside>

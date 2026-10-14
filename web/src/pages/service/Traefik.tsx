@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
 import { api, call } from "../../api/client";
 import { useService } from "./Layout";
+import { Button } from "../../components/Button";
 
 export function Traefik() {
   const s = useService();
@@ -75,7 +76,7 @@ export function Traefik() {
       {!host && !port && <p className="muted">With no host and no port the service is taken off Traefik.</p>}
       {save.isError && <p className="error">{save.error.message}</p>}
       {save.isSuccess && <p className="muted">Saved. Traefik picks it up on its own.</p>}
-      <button disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</button>
+      <Button disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
     </form>
   );
 }

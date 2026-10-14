@@ -1,4 +1,5 @@
 import type { Webhook } from "../api/generated";
+import { Button } from "./Button";
 
 type Props = {
   hooks: Webhook[];
@@ -26,15 +27,15 @@ export function WebhookTable({ hooks, busy, onDelete }: Props) {
             <td className="mono">POST {h.path}</td>
             <td>{h.last_triggered_at ? new Date(h.last_triggered_at).toLocaleString() : "never"}</td>
             <td>
-              <button
-                className="link"
+              <Button
+                variant="text"
                 disabled={busy}
                 onClick={() =>
                   window.confirm("Delete this webhook? Callers using it will start failing.") && onDelete(h.id)
                 }
               >
                 Delete
-              </button>
+              </Button>
             </td>
           </tr>
         ))}

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, call } from "../api/client";
 import { Select } from "../components/Select";
+import { Button } from "../components/Button";
 
 type Role = "worker" | "manager";
 
@@ -94,14 +95,15 @@ export function Nodes() {
             <option value="manager">manager</option>
           </Select>
         </label>
-        <button
+        <Button
+          variant="tonal"
           disabled={rotate.isPending}
           onClick={() =>
             window.confirm("Rotate the token? A command copied earlier stops working for new servers.") && rotate.mutate()
           }
         >
           Rotate token
-        </button>
+        </Button>
       </div>
       {join.isError && <p className="error">{join.error.message}</p>}
       {rotate.isError && <p className="error">{rotate.error.message}</p>}

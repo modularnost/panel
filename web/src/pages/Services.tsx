@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
+import { LinkButton } from "../components/Button";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { modulePath, slot, useModules } from "../modules";
@@ -32,9 +33,9 @@ export function Services() {
       {actions.length > 0 && (
         <p className="actions">
           {actions.map(({ module, contribution: c }) => (
-            <Link key={`${module}${c.path}`} className="button" to={modulePath(module, c.path)}>
+            <LinkButton key={`${module}${c.path}`} variant="tonal" to={modulePath(module, c.path)}>
               {c.title}
-            </Link>
+            </LinkButton>
           ))}
         </p>
       )}

@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { modulePath } from "../modules";
+import { Button } from "../components/Button";
 
 export function Modules() {
   const me = useMe();
@@ -71,8 +72,8 @@ export function Modules() {
                 <td className="muted">{m.permissions.join(", ")}</td>
                 {admin && (
                   <td>
-                    <button
-                      className="link"
+                    <Button
+                      variant="text"
                       disabled={uninstall.isPending}
                       onClick={() =>
                         window.confirm(`Remove ${m.name}? Its service is stopped; the image and its data stay.`) &&
@@ -80,7 +81,7 @@ export function Modules() {
                       }
                     >
                       Remove
-                    </button>
+                    </Button>
                   </td>
                 )}
               </tr>

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { api, call } from "../api/client";
+import { Button } from "../components/Button";
 
 export function Login() {
   const [username, setUsername] = useState("");
@@ -46,7 +47,7 @@ export function Login() {
         />
       </label>
       {login.isError && <p className="error">{login.error.message}</p>}
-      <button disabled={login.isPending}>Sign in</button>
+      <Button disabled={login.isPending}>Sign in</Button>
     </form>
   );
 }
