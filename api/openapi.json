@@ -783,6 +783,40 @@
         ],
         "type": "object"
       },
+      "UpdateApply": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "description": "A tag from GET /api/v1/updates; any other value is refused",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "type": "object"
+      },
+      "UpdateStarted": {
+        "additionalProperties": false,
+        "properties": {
+          "backup": {
+            "description": "The database copy taken before the update, on the panel's volume",
+            "type": "string"
+          },
+          "image": {
+            "description": "The image tag the panel service is moved to, shortly after this answer",
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "image"
+        ],
+        "type": "object"
+      },
       "Updates": {
         "additionalProperties": false,
         "properties": {
@@ -2443,6 +2477,52 @@
           }
         ],
         "summary": "Releases newer than the running version, with their notes"
+      }
+    },
+    "/api/v1/updates/apply": {
+      "post": {
+        "operationId": "apply-update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApply"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStarted"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the agents and then the panel to a release the last check listed"
       }
     },
     "/api/v1/updates/check": {

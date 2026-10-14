@@ -144,3 +144,18 @@ func TestRunningTasksExcludesShutDownReplica(t *testing.T) {
 		t.Fatalf("want 1 live task, got %d", got["web"])
 	}
 }
+
+func TestImageRepo(t *testing.T) {
+	for in, want := range map[string]string{
+		"ghcr.io/modularnost/panel:edge":             "ghcr.io/modularnost/panel",
+		"ghcr.io/modularnost/panel:0.2.0@sha256:abc": "ghcr.io/modularnost/panel",
+		"ghcr.io/modularnost/panel":                  "ghcr.io/modularnost/panel",
+		"localhost:5000/panel:dev":                   "localhost:5000/panel",
+		"localhost:5000/panel":                       "localhost:5000/panel",
+		"traefik:v3@sha256:575fa15b1350":             "traefik",
+	} {
+		if got := imageRepo(in); got != want {
+			t.Errorf("imageRepo(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

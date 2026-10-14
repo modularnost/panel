@@ -781,3 +781,26 @@ func TestAPIUpdatesAreAdminOnly(t *testing.T) {
 		t.Fatalf("admin: %d %v", status, body)
 	}
 }
+
+func TestAPIUpdateApplyRefusesWhatTheCheckDidNotList(t *testing.T) {
+	c, base, db := apiServer(t)
+	const j = "application/json"
+	body := `{"version":"v9.9.9"}`
+	if status, _ := send(t, c, "POST", base+"/api/v1/updates/apply", j, body); status != 401 {
+		t.Errorf("anonymous: %d", status)
+	}
+	signIn(t, c, base) // ann, a viewer
+	if status, _ := send(t, c, "POST", base+"/api/v1/updates/apply", j, body); status != 403 {
+		t.Errorf("viewer: %d", status)
+	}
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", j, `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatal("sign in as admin")
+	}
+	// No release check ran, so no version is one the panel may move to.
+	if status, resp := send(t, c, "POST", base+"/api/v1/updates/apply", j, body); status != 422 {
+		t.Errorf("admin, unlisted version: %d %v", status, resp)
+	}
+}
