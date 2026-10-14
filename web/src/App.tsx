@@ -3,7 +3,7 @@ import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-rou
 import { ApiError, api, call } from "./api/client";
 import { modulePath } from "./modules";
 import { atLeast, useMe } from "./auth";
-import { useUpdates } from "./updates";
+import { usePanelVersion, useUpdates } from "./updates";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { ModuleInstall } from "./pages/ModuleInstall";
@@ -39,6 +39,7 @@ function Shell() {
   const isAdmin = atLeast(me.data?.role, "admin");
   const updates = useUpdates(isAdmin);
   const pending = updates.data?.releases.length ?? 0;
+  const version = usePanelVersion();
 
   if (me.isPending) return null;
   if (me.error instanceof ApiError && me.error.status === 401) {
@@ -100,6 +101,7 @@ function Shell() {
           <button className="link" onClick={logout}>
             Sign out
           </button>
+          {version.data && <div className="mono">{version.data}</div>}
         </div>
       </aside>
       <main className="main">
