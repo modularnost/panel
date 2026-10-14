@@ -1,0 +1,115 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { api, call } from "../api/client";
+
+type Role = "worker" | "manager";
+
+export function Nodes() {
+  const queryClient = useQueryClient();
+  const [role, setRole] = useState<Role>("worker");
+
+  const nodes = useQuery({
+    queryKey: ["nodes"],
+    queryFn: () => call(api.listNodes()),
+    refetchInterval: 5000,
+  });
+  const join = useQuery({
+    queryKey: ["join", role],
+    queryFn: () => call(api.getJoin({ role })),
+  });
+
+  const setAvailability = useMutation({
+    mutationFn: (v: { id: string; availability: "active" | "pause" | "drain" }) =>
+      call(api.setNodeAvailability(v.id, { availability: v.availability })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["nodes"] }),
+  });
+  const rotate = useMutation({
+    mutationFn: () => call(api.rotateJoinToken({ role })),
+    onSuccess: (fresh) => queryClient.setQueryData(["join", role], fresh),
+  });
+
+  const change = (id: string, hostname: string, availability: "active" | "pause" | "drain") => {
+    if (availability !== "drain" || window.confirm(`Drain ${hostname}? Its replicas move to other nodes.`)) {
+      setAvailability.mutate({ id, availability });
+    }
+  };
+
+  if (nodes.isPending) return <p>Loading…</p>;
+  if (nodes.isError) return <p className="error">{nodes.error.message}</p>;
+
+  return (
+    <>
+      <h1>Nodes</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>Node</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Availability</th>
+            <th>Address</th>
+            <th>Engine</th>
+          </tr>
+        </thead>
+        <tbody>
+          {nodes.data.map((n) => (
+            <tr key={n.id}>
+              <td>{n.hostname}</td>
+              <td>
+                {n.role}
+                {n.leader ? <span className="muted"> · leader</span> : null}
+              </td>
+              <td>
+                <span className={`pill ${n.status === "ready" ? "ok" : "bad"}`}>{n.status}</span>
+              </td>
+              <td>
+                <select
+                  value={n.availability}
+                  disabled={setAvailability.isPending}
+                  onChange={(e) => change(n.id, n.hostname, e.target.value as "active" | "pause" | "drain")}
+                  aria-label={`Availability of ${n.hostname}`}
+                >
+                  <option value="active">active</option>
+                  <option value="pause">pause</option>
+                  <option value="drain">drain</option>
+                </select>
+              </td>
+              <td className="mono">{n.address ?? ""}</td>
+              <td className="muted">
+                {n.engine} {n.os}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {setAvailability.isError && <p className="error">{setAvailability.error.message}</p>}
+
+      <h2>Add a server</h2>
+      <div className="toolbar">
+        <label>
+          Joins as
+          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+            <option value="worker">worker</option>
+            <option value="manager">manager</option>
+          </select>
+        </label>
+        <button
+          disabled={rotate.isPending}
+          onClick={() =>
+            window.confirm("Rotate the token? A command copied earlier stops working for new servers.") && rotate.mutate()
+          }
+        >
+          Rotate token
+        </button>
+      </div>
+      {join.isError && <p className="error">{join.error.message}</p>}
+      {rotate.isError && <p className="error">{rotate.error.message}</p>}
+      {join.data &&
+        (join.data.command ? (
+          <pre className="output">{join.data.command}</pre>
+        ) : (
+          <p className="muted">No join command is available.</p>
+        ))}
+    </>
+  );
+}
