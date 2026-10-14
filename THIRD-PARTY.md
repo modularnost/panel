@@ -56,6 +56,8 @@ templates, password hashing and crypto are all stdlib.
 | | License |
 | --- | --- |
 | React, React DOM, React Router, TanStack Query, bundled into the SPA (`web/`) | MIT |
+| `@material/web` (the select, dialog, text field and switch) and `@material/material-color-utilities` (the palette from the seed color), bundled into the SPA | Apache-2.0 |
+| The paths of the Material Symbols Outlined icons in `web/src/components/Icon.tsx`, from `@material-symbols/svg-400` 0.48.0 (the package itself is not a dependency) | Apache-2.0 |
 
 ## Inside the container image
 

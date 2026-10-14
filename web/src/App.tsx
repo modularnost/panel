@@ -29,6 +29,7 @@ import { Services } from "./pages/Services";
 import { Button } from "./components/Button";
 import { DialogsProvider } from "./components/Dialogs";
 import { Chip } from "./components/Chip";
+import { Icon } from "./components/Icon";
 
 function Shell() {
   const me = useMe();
@@ -81,34 +82,43 @@ function Shell() {
       <aside className={`side${drawer ? " open" : ""}`}>
         <span className="brand">modularnost</span>
         <NavLink to="/" end className="item">
+          <Icon name="dns" />
           Services
         </NavLink>
         <NavLink to="/stacks" className="item">
+          <Icon name="layers" />
           Stacks
         </NavLink>
         <NavLink to="/resources" className="item">
+          <Icon name="monitoring" />
           Resources
         </NavLink>
         <NavLink to="/deploys" className="item">
+          <Icon name="rocket_launch" />
           Deploys
         </NavLink>
         <NavLink to="/modules" end className="item">
+          <Icon name="extension" />
           Modules
         </NavLink>
         {atLeast(me.data?.role, "admin") && (
           <>
             <NavLink to="/nodes" className="item">
+              <Icon name="hub" />
               Nodes
             </NavLink>
             <NavLink to="/webhooks" className="item">
+              <Icon name="webhook" />
               Webhooks
             </NavLink>
             <NavLink to="/users" className="item">
+              <Icon name="group" />
               Users
             </NavLink>
           </>
         )}
         <NavLink to="/settings" className="item">
+          <Icon name="settings" />
           Settings{pending > 0 && <Chip tone="ok"> {pending}</Chip>}
         </NavLink>
         {modules.data
@@ -120,6 +130,7 @@ function Shell() {
           )
           .map((e) => (
             <NavLink key={e.key} to={e.to} className="item sub">
+              <Icon name="extension" size={20} />
               {e.title}
             </NavLink>
           ))}
