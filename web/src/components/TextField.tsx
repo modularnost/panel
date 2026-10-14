@@ -43,15 +43,24 @@ type Props = {
 };
 
 export function TextField({ onChange, value, autoFocus, error, mono, autoComplete, ...rest }: Props) {
-  const ref = useRef<HTMLElement & { value: string }>(null);
+  const ref = useRef<HTMLElement & { value: string; form: HTMLFormElement | null }>(null);
+  const multiline = rest.type === "textarea";
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const input = () => onChange(el.value);
+    // Material Web does not submit its form on Enter the way an <input> does.
+    const enter = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !multiline && !e.isComposing) el.form?.requestSubmit();
+    };
     el.addEventListener("input", input);
-    return () => el.removeEventListener("input", input);
-  }, [onChange]);
+    el.addEventListener("keydown", enter);
+    return () => {
+      el.removeEventListener("input", input);
+      el.removeEventListener("keydown", enter);
+    };
+  }, [onChange, multiline]);
 
   useEffect(() => {
     if (autoFocus) ref.current?.focus();
