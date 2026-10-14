@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -455,5 +456,100 @@ func TestAPIStackDeployValidatesBeforeDocker(t *testing.T) {
 		if status, body := send(t, c, "PUT", base+tc.path, "application/json", tc.body); status != 422 {
 			t.Errorf("%s: %d %v", name, status, body)
 		}
+	}
+}
+
+func adminSession(t *testing.T) (*http.Client, string) {
+	t.Helper()
+	c, base, db := apiServer(t)
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, body := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatalf("admin sign in: %d %v", status, body)
+	}
+	return c, base
+}
+
+func TestAPIManagementIsAdminOnly(t *testing.T) {
+	c, base := apiClient(t)
+	const j = "application/json"
+	actions := []struct{ method, path, body string }{
+		{"POST", "/api/v1/webhooks", `{"action":"force_update","service":"web"}`},
+		{"DELETE", "/api/v1/webhooks/1", ``},
+		{"POST", "/api/v1/modules", `{"name":"m","image":"img"}`},
+		{"DELETE", "/api/v1/modules/m", ``},
+	}
+	for _, a := range actions {
+		if status, _ := send(t, c, a.method, base+a.path, j, a.body); status != 401 {
+			t.Errorf("%s %s anonymous: %d", a.method, a.path, status)
+		}
+	}
+	signIn(t, c, base)
+	for _, a := range actions {
+		if status, body := send(t, c, a.method, base+a.path, j, a.body); status != 403 || errorCode(body) != "forbidden" {
+			t.Errorf("%s %s as viewer: %d %v", a.method, a.path, status, body)
+		}
+	}
+}
+
+func TestAPIWebhookLifecycle(t *testing.T) {
+	c, base := adminSession(t)
+	const j = "application/json"
+
+	for name, body := range map[string]string{
+		"force_update without a service": `{"action":"force_update"}`,
+		"force_update with a stack":      `{"action":"force_update","service":"web","stack":"shop"}`,
+		"stack_redeploy without a stack": `{"action":"stack_redeploy"}`,
+		"an unknown action":              `{"action":"delete_everything","service":"web"}`,
+	} {
+		if status, resp := send(t, c, "POST", base+"/api/v1/webhooks", j, body); status != 422 {
+			t.Errorf("%s: %d %v", name, status, resp)
+		}
+	}
+
+	status, created := send(t, c, "POST", base+"/api/v1/webhooks", j, `{"action":"force_update","service":"web"}`)
+	path, _ := created["path"].(string)
+	if status != 201 || !strings.HasPrefix(path, "/hook/") || len(path) < 20 {
+		t.Fatalf("create: %d %v", status, created)
+	}
+	id := int64(created["id"].(float64))
+
+	url := base + "/api/v1/webhooks/" + strconv.FormatInt(id, 10)
+	if status, _ := send(t, c, "DELETE", url, j, ""); status != 204 {
+		t.Fatalf("delete: %d", status)
+	}
+	if status, body := send(t, c, "DELETE", url, j, ""); status != 404 || errorCode(body) != "not_found" {
+		t.Fatalf("delete again: %d %v", status, body)
+	}
+}
+
+func TestModuleInstallValidation(t *testing.T) {
+	ok := moduleInstall{Name: "metrics", Image: "ghcr.io/x/m:1", Port: "8080", Env: []string{"A=1", "B_2=x=y"}}
+	if err := ok.validate(); err != nil {
+		t.Fatalf("a valid install is refused: %v", err)
+	}
+	for name, m := range map[string]moduleInstall{
+		"a name with a slash":  {Name: "a/b", Image: "i"},
+		"a name like a flag":   {Name: "-rf", Image: "i"},
+		"no image":             {Name: "m", Image: "  "},
+		"a port out of range":  {Name: "m", Image: "i", Port: "70000"},
+		"a port that is text":  {Name: "m", Image: "i", Port: "http"},
+		"a bad service name":   {Name: "m", Image: "i", Service: "a b"},
+		"a bad network name":   {Name: "m", Image: "i", Network: "x/y"},
+		"an env without a key": {Name: "m", Image: "i", Env: []string{"=1"}},
+		"an env without =":     {Name: "m", Image: "i", Env: []string{"JUSTAKEY"}},
+	} {
+		if err := m.validate(); err == nil {
+			t.Errorf("%s must be refused", name)
+		}
+	}
+}
+
+func TestAPIModuleInstallValidatesBeforeDocker(t *testing.T) {
+	c, base := adminSession(t)
+	status, body := send(t, c, "POST", base+"/api/v1/modules", "application/json", `{"name":"a/b","image":"img"}`)
+	if status != 422 || errorCode(body) != "invalid_input" {
+		t.Fatalf("%d %v", status, body)
 	}
 }
