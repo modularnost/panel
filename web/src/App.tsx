@@ -15,7 +15,7 @@ import { Resources } from "./pages/Resources";
 import { Stack } from "./pages/Stack";
 import { StackNew } from "./pages/StackNew";
 import { Stacks } from "./pages/Stacks";
-import { Updates } from "./pages/Updates";
+import { Settings } from "./pages/Settings";
 import { Users } from "./pages/Users";
 import { Webhooks } from "./pages/Webhooks";
 import { ServiceLayout } from "./pages/service/Layout";
@@ -106,11 +106,11 @@ function Shell() {
             <NavLink to="/users" className="item">
               Users
             </NavLink>
-            <NavLink to="/updates" className="item">
-              Updates{pending > 0 && <Chip tone="ok"> {pending}</Chip>}
-            </NavLink>
           </>
         )}
+        <NavLink to="/settings" className="item">
+          Settings{pending > 0 && <Chip tone="ok"> {pending}</Chip>}
+        </NavLink>
         {modules.data
           ?.filter((m) => m.ok)
           .flatMap((m) =>
@@ -162,7 +162,8 @@ export function App() {
           <Route path="nodes" element={<Nodes />} />
           <Route path="webhooks" element={<Webhooks />} />
           <Route path="users" element={<Users />} />
-          <Route path="updates" element={<Updates />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="updates" element={<Navigate to="/settings" replace />} />
           <Route path="resources" element={<Resources />} />
           <Route path="deploys" element={<Deploys />} />
         </Route>
