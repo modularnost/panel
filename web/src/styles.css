@@ -257,6 +257,17 @@ select {
   word-break: break-all;
 }
 
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.form button {
+  align-self: flex-start;
+}
+
 @media (max-width: 640px) {
   .app {
     grid-template-columns: 1fr;
