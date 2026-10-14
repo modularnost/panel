@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call } from "./api/client";
 import { modulePath } from "./modules";
@@ -41,6 +42,15 @@ function Shell() {
   const updates = useUpdates(isAdmin);
   const pending = updates.data?.releases.length ?? 0;
   const version = usePanelVersion();
+  const [drawer, setDrawer] = useState(false);
+
+  useEffect(() => setDrawer(false), [location.pathname]);
+  useEffect(() => {
+    if (!drawer) return;
+    const close = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [drawer]);
 
   if (me.isPending) return null;
   if (me.error instanceof ApiError && me.error.status === 401) {
@@ -56,7 +66,16 @@ function Shell() {
 
   return (
     <div className="app">
-      <aside className="side">
+      <header className="bar">
+        <button className="menu" aria-label="Menu" aria-expanded={drawer} onClick={() => setDrawer(true)}>
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+            <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="currentColor" />
+          </svg>
+        </button>
+        <span className="brand">modularnost</span>
+      </header>
+      <div className={`scrim${drawer ? " open" : ""}`} onClick={() => setDrawer(false)} />
+      <aside className={`side${drawer ? " open" : ""}`}>
         <span className="brand">modularnost</span>
         <NavLink to="/" end className="item">
           Services

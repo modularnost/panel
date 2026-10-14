@@ -76,6 +76,11 @@ body {
   gap: 2px;
 }
 
+.bar,
+.scrim {
+  display: none;
+}
+
 .brand {
   font: var(--md-sys-typescale-title-large);
   color: var(--md-sys-color-primary);
@@ -424,28 +429,67 @@ input:focus,
     align-content: start;
   }
 
-  .side {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
     align-items: center;
-    padding: 8px 12px;
-  }
-
-  .brand {
-    padding: 0 12px 0 4px;
-  }
-
-  .item,
-  .item.sub {
-    height: 40px;
+    gap: 8px;
+    height: 64px;
     padding: 0 12px;
+    background: var(--md-sys-color-surface-container-low);
   }
 
-  .who {
-    margin: 0 0 0 auto;
+  .bar .brand {
     padding: 0;
+  }
+
+  button.menu {
+    --state: var(--md-sys-color-on-surface-variant);
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    background: none;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 0;
+  }
+
+  /* Closed, the drawer is hidden as well as moved, so Tab does not reach it. */
+  .side {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(280px, 85vw);
+    height: auto;
+    border-radius: 0 var(--md-sys-shape-large) var(--md-sys-shape-large) 0;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 250ms ease,
+      visibility 0s 250ms;
+  }
+
+  .side.open {
+    transform: none;
+    visibility: visible;
+    transition: transform 250ms ease;
+  }
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: block;
+    background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 250ms;
+  }
+
+  .scrim.open {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .main {
