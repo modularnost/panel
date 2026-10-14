@@ -4,6 +4,7 @@ import { call, api } from "../api/client";
 import { formatTime } from "../format";
 import { installCommand, useUpdates, waitForVersion } from "../updates";
 import { Button } from "../components/Button";
+import { Chip } from "../components/Chip";
 
 type Progress = "idle" | "waiting" | "late";
 
@@ -94,7 +95,7 @@ export function Updates() {
                 <a href={r.url} target="_blank" rel="noreferrer">
                   {r.tag}
                 </a>{" "}
-                {r.prerelease && <span className="pill">pre-release</span>}{" "}
+                {r.prerelease && <Chip>pre-release</Chip>}{" "}
                 <span className="muted">{formatTime(r.published_at)}</span>
               </h2>
               <pre className="notes">{r.body || "No release notes."}</pre>

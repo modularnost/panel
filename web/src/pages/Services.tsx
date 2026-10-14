@@ -5,6 +5,7 @@ import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { modulePath, slot, useModules } from "../modules";
 import { useUpdates } from "../updates";
+import { Chip } from "../components/Chip";
 
 export function Services() {
   const me = useMe();
@@ -59,9 +60,9 @@ export function Services() {
                 <td>{s.stack ?? ""}</td>
                 <td className="mono">{s.image}</td>
                 <td>
-                  <span className={`pill ${s.healthy ? "ok" : "bad"}`}>
+                  <Chip tone={s.healthy ? "ok" : "bad"}>
                     {s.running}/{s.desired}
-                  </span>{" "}
+                  </Chip>{" "}
                   <span className="muted">{s.mode}</span>
                 </td>
               </tr>

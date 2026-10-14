@@ -27,6 +27,7 @@ import { Traefik } from "./pages/service/Traefik";
 import { ServiceWebhooks } from "./pages/service/Webhooks";
 import { Services } from "./pages/Services";
 import { Button } from "./components/Button";
+import { Chip } from "./components/Chip";
 
 function Shell() {
   const me = useMe();
@@ -105,7 +106,7 @@ function Shell() {
               Users
             </NavLink>
             <NavLink to="/updates" className="item">
-              Updates{pending > 0 && <span className="pill ok"> {pending}</span>}
+              Updates{pending > 0 && <Chip tone="ok"> {pending}</Chip>}
             </NavLink>
           </>
         )}

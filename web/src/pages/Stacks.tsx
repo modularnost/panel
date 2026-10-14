@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
+import { Chip } from "../components/Chip";
 
 export function Stacks() {
   const me = useMe();
@@ -42,9 +43,9 @@ export function Stacks() {
                 </td>
                 <td>{s.service_count}</td>
                 <td>
-                  <span className={`pill ${s.healthy ? "ok" : "bad"}`}>
+                  <Chip tone={s.healthy ? "ok" : "bad"}>
                     {s.running}/{s.desired}
-                  </span>
+                  </Chip>
                 </td>
                 <td className="muted">{s.managed ? "kept here" : "not kept"}</td>
               </tr>

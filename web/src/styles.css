@@ -175,7 +175,7 @@ tbody tr:hover {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
 }
 
-.pill {
+.chip {
   display: inline-block;
   padding: 0 10px;
   border-radius: var(--md-sys-shape-small);
@@ -185,12 +185,12 @@ tbody tr:hover {
   line-height: 24px;
 }
 
-.pill.ok {
+.chip.ok {
   background: var(--ok-container);
   color: var(--on-ok-container);
 }
 
-.pill.bad {
+.chip.bad {
   background: var(--md-sys-color-error-container);
   color: var(--md-sys-color-on-error-container);
 }

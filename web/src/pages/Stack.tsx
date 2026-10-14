@@ -4,6 +4,7 @@ import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { ComposeEditor } from "../components/ComposeEditor";
 import { Button } from "../components/Button";
+import { Chip } from "../components/Chip";
 
 export function Stack() {
   const { name = "" } = useParams();
@@ -49,9 +50,9 @@ export function Stack() {
       </p>
       <h1>
         {s.name}{" "}
-        <span className={`pill ${s.healthy ? "ok" : "bad"}`}>
+        <Chip tone={s.healthy ? "ok" : "bad"}>
           {s.running}/{s.desired}
-        </span>
+        </Chip>
       </h1>
 
       <div className="actions">
@@ -90,9 +91,9 @@ export function Stack() {
                 </td>
                 <td className="mono">{svc.image}</td>
                 <td>
-                  <span className={`pill ${svc.healthy ? "ok" : "bad"}`}>
+                  <Chip tone={svc.healthy ? "ok" : "bad"}>
                     {svc.running}/{svc.desired}
-                  </span>
+                  </Chip>
                 </td>
               </tr>
             ))}
