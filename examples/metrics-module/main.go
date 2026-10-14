@@ -28,7 +28,7 @@ func or(v, def string) string {
 }
 
 const manifest = `{
-  "contract": 1,
+  "contract": 2,
   "name": "metrics",
   "version": "0.1.0",
   "contributions": [{"slot": "nav", "title": "Metrics", "path": "/", "role": "viewer"}],

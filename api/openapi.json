@@ -32,6 +32,14 @@
             "description": "Below /modules/\u003cname\u003e",
             "type": "string"
           },
+          "render": {
+            "description": "frame: the module draws the page; ui: the module sends a document and the panel draws it",
+            "enum": [
+              "frame",
+              "ui"
+            ],
+            "type": "string"
+          },
           "role": {
             "description": "The lowest role that sees it and may reach the path",
             "enum": [
@@ -58,7 +66,8 @@
           "title",
           "path",
           "role",
-          "match"
+          "match",
+          "render"
         ],
         "type": "object"
       },
@@ -108,6 +117,29 @@
           "source",
           "status",
           "started_at"
+        ],
+        "type": "object"
+      },
+      "Document": {
+        "additionalProperties": false,
+        "properties": {
+          "blocks": {
+            "description": "What the page is made of; each block has a type, and one the panel does not know is shown as unsupported",
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "ui": {
+            "description": "The vocabulary version of the document",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ui",
+          "blocks"
         ],
         "type": "object"
       },
@@ -330,6 +362,18 @@
           "leader",
           "status",
           "availability"
+        ],
+        "type": "object"
+      },
+      "PageChanged": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
         ],
         "type": "object"
       },
@@ -1335,6 +1379,195 @@
           }
         ],
         "summary": "Remove the module's service; its image and data are not touched"
+      }
+    },
+    "/api/v1/modules/{name}/events": {
+      "get": {
+        "operationId": "stream-module-page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The contribution's path",
+            "explode": false,
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "description": "The contribution's path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "description": "Each oneOf object in the array represents one possible Server Sent Events (SSE) message, serialized as UTF-8 text according to the SSE specification.",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "data": {
+                            "$ref": "#/components/schemas/PageChanged"
+                          },
+                          "event": {
+                            "const": "changed",
+                            "description": "The event name.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The event ID.",
+                            "type": "integer"
+                          },
+                          "retry": {
+                            "description": "The retry time in milliseconds.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "event"
+                        ],
+                        "title": "Event changed",
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "data": {
+                            "$ref": "#/components/schemas/Problem"
+                          },
+                          "event": {
+                            "const": "problem",
+                            "description": "The event name.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The event ID.",
+                            "type": "integer"
+                          },
+                          "retry": {
+                            "description": "The retry time in milliseconds.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "event"
+                        ],
+                        "title": "Event problem",
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "title": "Server Sent Events",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tells when a ui page changed, so the browser refetches it"
+      }
+    },
+    "/api/v1/modules/{name}/page": {
+      "get": {
+        "operationId": "get-module-page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The contribution's path",
+            "explode": false,
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "description": "The contribution's path",
+              "type": "string"
+            }
+          },
+          {
+            "description": "What the module is told as its query string: the context of a tab, the range of a chart",
+            "explode": false,
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "description": "What the module is told as its query string: the context of a tab, the range of a chart",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The document of a module's ui page"
       }
     },
     "/api/v1/nodes": {

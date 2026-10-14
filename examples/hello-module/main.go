@@ -35,7 +35,7 @@ const docHead = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 `
 
 const manifest = `{
-  "contract": 1,
+  "contract": 2,
   "name": "hello",
   "version": "0.1.0",
   "contributions": [{"slot": "nav", "title": "Hello", "path": "/", "role": "operator"}],

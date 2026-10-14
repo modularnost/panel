@@ -12,11 +12,12 @@ import (
 )
 
 type apiContribution struct {
-	Slot  string            `json:"slot" enum:"nav,service.tab,services.action"`
-	Title string            `json:"title"`
-	Path  string            `json:"path" doc:"Below /modules/<name>"`
-	Role  string            `json:"role" enum:"viewer,operator,admin" doc:"The lowest role that sees it and may reach the path"`
-	Match map[string]string `json:"match" nullable:"false" doc:"For service.tab: only services carrying all these labels"`
+	Slot   string            `json:"slot" enum:"nav,service.tab,services.action"`
+	Title  string            `json:"title"`
+	Path   string            `json:"path" doc:"Below /modules/<name>"`
+	Role   string            `json:"role" enum:"viewer,operator,admin" doc:"The lowest role that sees it and may reach the path"`
+	Match  map[string]string `json:"match" nullable:"false" doc:"For service.tab: only services carrying all these labels"`
+	Render string            `json:"render" enum:"frame,ui" doc:"frame: the module draws the page; ui: the module sends a document and the panel draws it"`
 }
 
 type apiModule struct {
@@ -49,7 +50,11 @@ func toAPIModules(in []modules.Module) []apiModule {
 			if match == nil {
 				match = map[string]string{}
 			}
-			mod.Contributions = append(mod.Contributions, apiContribution{c.Slot, c.Title, c.Path, c.Role, match})
+			render := c.Render
+			if render == "" { // a manifest built by hand, not read from a module
+				render = modules.RenderFrame
+			}
+			mod.Contributions = append(mod.Contributions, apiContribution{c.Slot, c.Title, c.Path, c.Role, match, render})
 		}
 		mod.Permissions = append(mod.Permissions, m.Manifest.Permissions...)
 		out = append(out, mod)
