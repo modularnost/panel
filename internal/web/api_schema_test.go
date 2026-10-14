@@ -63,7 +63,7 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"Node":            apiNode{},
 		"Join":            apiJoin{},
 		"Module":          apiModule{},
-		"NavEntry":        apiNavEntry{},
+		"Contribution":    apiContribution{},
 		"Webhook":         apiWebhook{},
 		"Token":           apiToken{},
 		"Redeploy":        apiRedeploy{},

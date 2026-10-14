@@ -11,20 +11,23 @@ import (
 	"modularnost/internal/store"
 )
 
-type apiNavEntry struct {
-	Title string `json:"title"`
-	Path  string `json:"path"`
+type apiContribution struct {
+	Slot  string            `json:"slot" enum:"nav,service.tab,services.action"`
+	Title string            `json:"title"`
+	Path  string            `json:"path" doc:"Below /modules/<name>"`
+	Role  string            `json:"role" enum:"viewer,operator,admin" doc:"The lowest role that sees it and may reach the path"`
+	Match map[string]string `json:"match" nullable:"false" doc:"For service.tab: only services carrying all these labels"`
 }
 
 type apiModule struct {
-	Name        string        `json:"name"`
-	Version     string        `json:"version"`
-	Service     string        `json:"service"`
-	OK          bool          `json:"ok"`
-	State       string        `json:"state" enum:"ready,starting,failed,error" doc:"starting: not all replicas run yet; failed: Swarm rejects or fails its tasks, error holds the reason; error: it runs but serves no manifest"`
-	Error       string        `json:"error,omitempty" doc:"Why the module is not ready"`
-	NavEntries  []apiNavEntry `json:"nav_entries" nullable:"false"`
-	Permissions []string      `json:"permissions" nullable:"false"`
+	Name          string            `json:"name"`
+	Version       string            `json:"version"`
+	Service       string            `json:"service"`
+	OK            bool              `json:"ok"`
+	State         string            `json:"state" enum:"ready,starting,failed,error" doc:"starting: not all replicas run yet; failed: Swarm rejects or fails its tasks, error holds the reason; error: it runs but serves no manifest"`
+	Error         string            `json:"error,omitempty" doc:"Why the module is not ready"`
+	Contributions []apiContribution `json:"contributions" nullable:"false"`
+	Permissions   []string          `json:"permissions" nullable:"false"`
 }
 
 func toAPIModules(in []modules.Module) []apiModule {
@@ -39,10 +42,14 @@ func toAPIModules(in []modules.Module) []apiModule {
 		}
 		mod := apiModule{
 			Name: m.Name, Version: m.Version, Service: m.Service, OK: m.OK(), State: state, Error: m.Err,
-			NavEntries: []apiNavEntry{}, Permissions: []string{},
+			Contributions: []apiContribution{}, Permissions: []string{},
 		}
-		for _, e := range m.Manifest.NavEntries {
-			mod.NavEntries = append(mod.NavEntries, apiNavEntry{Title: e.Title, Path: e.Path})
+		for _, c := range m.Manifest.Contributions {
+			match := c.Match
+			if match == nil {
+				match = map[string]string{}
+			}
+			mod.Contributions = append(mod.Contributions, apiContribution{c.Slot, c.Title, c.Path, c.Role, match})
 		}
 		mod.Permissions = append(mod.Permissions, m.Manifest.Permissions...)
 		out = append(out, mod)

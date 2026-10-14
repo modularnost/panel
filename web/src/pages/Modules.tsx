@@ -19,6 +19,10 @@ export function Modules() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["modules"] }),
   });
 
+  // The first menu entry this role may open.
+  const firstNav = (m: { contributions: { slot: string; path: string; role: string }[] }) =>
+    m.contributions.find((c) => c.slot === "nav" && atLeast(me.data?.role, c.role as "viewer" | "operator" | "admin"));
+
   if (modules.isPending) return <p>Loading…</p>;
   if (modules.isError) return <p className="error">{modules.error.message}</p>;
 
@@ -49,8 +53,8 @@ export function Modules() {
             {modules.data.map((m) => (
               <tr key={m.name}>
                 <td>
-                  {m.ok && m.nav_entries.length > 0 ? (
-                    <Link to={modulePath(m.name, m.nav_entries[0].path)}>{m.name}</Link>
+                  {m.ok && firstNav(m) ? (
+                    <Link to={modulePath(m.name, firstNav(m)!.path)}>{m.name}</Link>
                   ) : (
                     m.name
                   )}

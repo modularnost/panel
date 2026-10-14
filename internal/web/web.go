@@ -86,8 +86,9 @@ func (s *Server) Routes() http.Handler {
 	s.registerAPI(mux)
 	mux.HandleFunc("/api/v1/", apiNotFound)
 
-	// A module's whole UI needs operator: the core cannot tell what is inside.
-	mux.HandleFunc("/modules/{name}/", s.require(store.RoleOperator, s.moduleProxy))
+	// Signed in is enough to arrive; the module's manifest says what a role may
+	// reach, and what it does not cover needs operator.
+	mux.HandleFunc("/modules/{name}/", s.require(store.RoleViewer, s.moduleProxy))
 
 	// Every other GET is a client-side route of the SPA.
 	if dist, err := fs.Sub(webui.Dist, "dist"); err == nil {

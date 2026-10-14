@@ -37,7 +37,7 @@ func TestManifestFetchCarriesTheToken(t *testing.T) {
 	var gotName, gotToken string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName, gotToken = r.Header.Get("X-Panel-Module"), r.Header.Get("X-Panel-Token")
-		w.Write([]byte(`{"name":"hello","version":"0.1.0"}`))
+		w.Write([]byte(`{"contract":1,"name":"hello","version":"0.1.0"}`))
 	}))
 	defer srv.Close()
 

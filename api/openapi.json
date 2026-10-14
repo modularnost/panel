@@ -18,6 +18,50 @@
         ],
         "type": "object"
       },
+      "Contribution": {
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "For service.tab: only services carrying all these labels",
+            "type": "object"
+          },
+          "path": {
+            "description": "Below /modules/\u003cname\u003e",
+            "type": "string"
+          },
+          "role": {
+            "description": "The lowest role that sees it and may reach the path",
+            "enum": [
+              "viewer",
+              "operator",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "slot": {
+            "enum": [
+              "nav",
+              "service.tab",
+              "services.action"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot",
+          "title",
+          "path",
+          "role",
+          "match"
+        ],
+        "type": "object"
+      },
       "Deploy": {
         "additionalProperties": false,
         "properties": {
@@ -142,18 +186,18 @@
       "Module": {
         "additionalProperties": false,
         "properties": {
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "type": "array"
+          },
           "error": {
             "description": "Why the module is not ready",
             "type": "string"
           },
           "name": {
             "type": "string"
-          },
-          "nav_entries": {
-            "items": {
-              "$ref": "#/components/schemas/NavEntry"
-            },
-            "type": "array"
           },
           "ok": {
             "type": "boolean"
@@ -187,7 +231,7 @@
           "service",
           "ok",
           "state",
-          "nav_entries",
+          "contributions",
           "permissions"
         ],
         "type": "object"
@@ -241,22 +285,6 @@
         "required": [
           "name",
           "service"
-        ],
-        "type": "object"
-      },
-      "NavEntry": {
-        "additionalProperties": false,
-        "properties": {
-          "path": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "title",
-          "path"
         ],
         "type": "object"
       },

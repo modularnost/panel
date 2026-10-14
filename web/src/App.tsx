@@ -90,7 +90,11 @@ function Shell() {
         )}
         {modules.data
           ?.filter((m) => m.ok)
-          .flatMap((m) => m.nav_entries.map((e) => ({ key: `${m.name}${e.path}`, title: e.title, to: modulePath(m.name, e.path) })))
+          .flatMap((m) =>
+            m.contributions
+              .filter((c) => c.slot === "nav" && atLeast(me.data?.role, c.role))
+              .map((c) => ({ key: `${m.name}${c.path}`, title: c.title, to: modulePath(m.name, c.path) })),
+          )
           .map((e) => (
             <NavLink key={e.key} to={e.to} className="item sub">
               {e.title}

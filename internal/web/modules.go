@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"path"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"modularnost/internal/docker"
 	"modularnost/internal/modules"
@@ -44,14 +46,21 @@ func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newModuleProxy(name, target, s.Modules.Token(name)).ServeHTTP(w, r)
+	rest := path.Clean("/" + strings.TrimPrefix(r.URL.Path, "/modules/"+name))
+	u := userFrom(r)
+	if need := m.RoleFor(rest); !store.AtLeast(u.Role, need) {
+		http.Error(w, "role "+need+" required, you have "+u.Role, http.StatusForbidden)
+		return
+	}
+	r.URL.Path = "/modules/" + name + rest
+	newModuleProxy(name, target, s.Modules.Token(name), u).ServeHTTP(w, r)
 }
 
 // newModuleProxy forwards to a module. The module's page is served from the
 // panel's own origin, so what crosses in either direction is limited: the
 // session cookie would let the module act as the signed-in user, and a cookie
 // the module sets would land in the panel's jar (it could replace the session).
-func newModuleProxy(name string, target *url.URL, token string) *httputil.ReverseProxy {
+func newModuleProxy(name string, target *url.URL, token string, user store.User) *httputil.ReverseProxy {
 	prefix := "/modules/" + name
 	return &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
@@ -59,9 +68,20 @@ func newModuleProxy(name string, target *url.URL, token string) *httputil.Revers
 			pr.Out.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(pr.In.URL.Path, prefix), "/")
 			pr.Out.Header.Del("Authorization")
 			pr.Out.Header.Del("Cookie")
+			// Whatever the browser put in X-Panel-* is the browser's.
+			for k := range pr.Out.Header {
+				if strings.HasPrefix(http.CanonicalHeaderKey(k), "X-Panel-") {
+					pr.Out.Header.Del(k)
+				}
+			}
 			// How the module calls the core back: its name plus an HMAC of it.
 			pr.Out.Header.Set("X-Panel-Module", name)
 			pr.Out.Header.Set("X-Panel-Token", token)
+			now := time.Now().Unix()
+			pr.Out.Header.Set("X-Panel-User", user.Username)
+			pr.Out.Header.Set("X-Panel-Role", user.Role)
+			pr.Out.Header.Set("X-Panel-Time", strconv.FormatInt(now, 10))
+			pr.Out.Header.Set("X-Panel-User-Sig", modules.SignUser(token, name, user.Username, user.Role, now))
 		},
 		ModifyResponse: func(resp *http.Response) error {
 			resp.Header.Del("Set-Cookie")
