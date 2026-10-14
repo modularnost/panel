@@ -18,6 +18,11 @@ const (
 
 type ctxKey struct{}
 
+func userFrom(r *http.Request) store.User {
+	u, _ := r.Context().Value(ctxKey{}).(store.User)
+	return u
+}
+
 // identify resolves the user from a session cookie, a Bearer token or basic
 // auth. Basic and Bearer are there for CI and curl, which have no cookie jar.
 func (s *Server) identify(r *http.Request) (store.User, bool) {

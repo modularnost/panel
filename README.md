@@ -213,7 +213,7 @@ A module answers `GET /manifest`:
 
 ```json
 {"name":"hello","version":"0.1.0",
- "nav_entries":[{"title":"Hello","path":"/"}],
+ "contract":1,"contributions":[{"slot":"nav","title":"Hello","path":"/"}],
  "permissions":["service:read","service:update"]}
 ```
 

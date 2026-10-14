@@ -66,7 +66,7 @@ discovery mechanism the panel's own functionality uses) and talks to a module
 over HTTP inside the overlay network:
 
 ```text
-GET  /manifest   -> {name, version, nav_entries[], permissions[]}
+GET  /manifest   -> {contract, name, version, contributions[], permissions[]}
 GET  /health
 POST /action/*   -> the module's own actions
 ```

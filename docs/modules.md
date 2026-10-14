@@ -5,8 +5,9 @@ renders as one of its own pages. It is not a plugin inside the binary: it
 crashes and upgrades separately, and can be written in any language as long as
 it answers over HTTP.
 
-The panel gives a module two things: a place in the menu, and the right to ask
-the core to do something to Swarm. Modules never get direct access to
+The panel gives a module two things: places in its own screens (a menu entry,
+a tab on a service, an action on the services list), and the right to ask the
+core to do something to Swarm. Modules never get direct access to
 `docker.sock` — that boundary is what limits the damage a third-party module
 can do.
 
@@ -60,21 +61,54 @@ with a new secret. Keep the latest one and use it to call back.
 
 ```json
 {
+  "contract": 1,
   "name": "hello",
   "version": "0.1.0",
-  "nav_entries": [{"title": "Hello", "path": "/"}],
+  "contributions": [
+    {"slot": "nav", "title": "Hello", "path": "/", "role": "viewer"}
+  ],
   "permissions": ["service:read", "service:update"]
 }
 ```
 
 | Field | |
 | --- | --- |
-| `nav_entries` | menu items; `path` is appended to `/modules/<name>` |
+| `contract` | required, `1`. A manifest without it, or with another number, makes the module show as failed |
+| `contributions` | what the module adds to the panel, see below |
 | `permissions` | what the module may ask the core for, see below |
 | `name`, `version` | informational; routing uses the label values |
 
-If `/manifest` is missing or returns anything but 200, the module is listed as
-broken with the error text and stays out of the menu.
+If `/manifest` is missing, returns anything but 200, or does not pass the
+checks above, the module is listed as broken with the error text and stays out
+of the menu.
+
+### Contributions
+
+A contribution is one thing the module puts into the panel. Every one has a
+`slot` (where), a `title` (what the user reads), a `path` (the page of yours
+it opens, below `/modules/<name>`), and optionally a `role`.
+
+| Slot | Where it appears |
+| --- | --- |
+| `nav` | an entry in the side menu |
+| `service.tab` | a tab on a service's page; `match` (labels the service must all carry) narrows it to the services that are yours |
+| `services.action` | an action on the services list |
+
+The panel frames the page: `nav` and `services.action` open it as a screen,
+`service.tab` shows it inside the service's page and passes the service as
+`?service=<name>&stack=<stack>&id=<id>`. A slot the panel does not know is
+ignored, so a manifest written for a newer panel still loads on an older one.
+`service.tab` and `services.action` are accepted and listed on the Modules
+page today; the screens that show them are the next step ([#66][contrib]).
+
+`role` is the lowest role that sees the contribution **and may reach its path**;
+it defaults to `operator`. The panel checks it on every request to the module,
+by the longest declared `path` that is a prefix of the request path (at a
+`/` boundary). So `{"path": "/", "role": "viewer"}` opens the whole module to
+viewers, and `{"path": "/settings", "role": "admin"}` keeps `/settings` for
+admins. A path no contribution covers needs `operator`.
+
+[contrib]: https://github.com/modularnost/panel/issues/66
 
 ### `GET /health`
 
@@ -85,7 +119,7 @@ Dockerfile.
 ## What a user request looks like
 
 ```text
-browser → GET /modules/hello/page   (panel checks for the operator role)
+browser → GET /modules/hello/page   (panel checks the role the manifest asks for)
         → panel proxies: GET /page to http://hello_module:8080
 ```
 
@@ -93,7 +127,35 @@ Along the way the core:
 
 - strips the `/modules/hello` prefix, so the module lives at its own `/`;
 - adds the `X-Panel-Module` and `X-Panel-Token` headers;
-- drops `Authorization` — the user's panel password never reaches the module.
+- adds who is looking, signed (below);
+- drops `Authorization` and `Cookie` — neither the user's panel password nor the
+  session ever reaches the module — and drops any `Set-Cookie` the module
+  answers with, because its page is served from the panel's origin and a cookie
+  it set would land in the panel's jar;
+- discards any `X-Panel-*` header the browser sent: those are the core's to set.
+
+### Who is looking
+
+```http
+X-Panel-User: ann
+X-Panel-Role: viewer
+X-Panel-Time: 1792000000
+X-Panel-User-Sig: 3f9c…
+```
+
+The signature is an HMAC-SHA256, keyed with the module's own token (the one it
+already holds), over `v1\n<user>\n<role>\n<time>\n<module name>`, hex-encoded.
+A module that makes decisions by user or role verifies it and, if it cares
+about replay, the time:
+
+```go
+mac := hmac.New(sha256.New, []byte(token))
+fmt.Fprintf(mac, "v1\n%s\n%s\n%s\n%s", user, role, ts, moduleName)
+ok := hmac.Equal([]byte(hex.EncodeToString(mac.Sum(nil))), []byte(sig))
+```
+
+The core already refused a request below the contribution's `role`; the headers
+are for a module that wants finer lines than that.
 
 The module renders the whole page itself, and the panel shows it in a frame
 inside its own layout: sidebar on the left, your page on the right. The core
@@ -181,9 +243,11 @@ without authentication and your page is same-origin, so one `<link>` gives your
 module the panel's look and its dark theme. It is not a stable API yet — class
 names may change before the first release.
 
-**A module handles its own authorization.** The core lets any `operator` into a
-module's UI, so if your module exposes dangerous actions, it has to draw that
-line itself — the core won't do it for you.
+**The core enforces the role of the contribution, not what your page does.**
+It lets a user in when their role is at least the one of the longest matching
+`path`, and everything else needs `operator`. If one page exposes both a view
+and a dangerous action, give the action its own path with a higher `role`, or
+check `X-Panel-Role` yourself.
 
 ## Checklist before publishing
 
@@ -191,7 +255,9 @@ Modules live in their own repositories, with their own CI and their own image �
 that is the point of them being separate services. When yours works, add a row
 to [catalog.md](catalog.md) so people can find it.
 
-- [ ] `/manifest` returns valid JSON and a 200
+- [ ] `/manifest` returns valid JSON and a 200, with `"contract": 1`
+- [ ] every contribution has the lowest `role` that is safe, and dangerous
+      paths are covered by a higher one
 - [ ] `permissions` lists only what is actually used
 - [ ] the port is not published outside the cluster
 - [ ] the service is on the panel's overlay network

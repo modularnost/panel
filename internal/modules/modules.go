@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"modularnost/internal/docker"
+	"modularnost/internal/store"
 )
 
 const (
@@ -35,17 +37,105 @@ const (
 	LabelPort    = "panel.module.port"
 )
 
+// ContractVersion is the manifest format this core understands.
+const ContractVersion = 1
+
+// The places a module may put something in. A slot the core does not know is
+// ignored, so a newer module does not break an older core.
+const (
+	SlotNav            = "nav"
+	SlotServiceTab     = "service.tab"
+	SlotServicesAction = "services.action"
+)
+
 type Manifest struct {
-	Name       string     `json:"name"`
-	Version    string     `json:"version"`
-	NavEntries []NavEntry `json:"nav_entries"`
+	Contract      int            `json:"contract"`
+	Name          string         `json:"name"`
+	Version       string         `json:"version"`
+	Contributions []Contribution `json:"contributions"`
 	// Permissions is what the module may ask the core for, e.g. "service:read".
 	Permissions []string `json:"permissions"`
 }
 
-type NavEntry struct {
+// Contribution is one thing a module adds to the panel.
+type Contribution struct {
+	Slot  string `json:"slot"`
 	Title string `json:"title"`
-	Path  string `json:"path"`
+	Path  string `json:"path"` // below /modules/<name>
+	// Role is the lowest role that may see this and reach its path.
+	Role string `json:"role,omitempty"`
+	// Match narrows a service.tab to services that carry all these labels.
+	Match map[string]string `json:"match,omitempty"`
+}
+
+// validate checks the manifest and drops what this core does not know. A
+// contribution is refused rather than guessed at: its role is a security
+// decision.
+func (m *Manifest) validate() error {
+	switch {
+	case m.Contract == 0:
+		return fmt.Errorf(`the manifest has no "contract": %d, see docs/modules.md`, ContractVersion)
+	case m.Contract != ContractVersion:
+		return fmt.Errorf("the manifest is contract %d, this panel understands %d", m.Contract, ContractVersion)
+	}
+	known := m.Contributions[:0]
+	for i, c := range m.Contributions {
+		switch c.Slot {
+		case SlotNav, SlotServiceTab, SlotServicesAction:
+		default:
+			continue
+		}
+		if strings.TrimSpace(c.Title) == "" {
+			return fmt.Errorf("contribution %d (%s): no title", i, c.Slot)
+		}
+		if !strings.HasPrefix(c.Path, "/") || slices.Contains(strings.Split(c.Path, "/"), "..") {
+			return fmt.Errorf("contribution %d (%s): path %q must start with / and not climb", i, c.Slot, c.Path)
+		}
+		if !slices.Contains([]string{"", store.RoleViewer, store.RoleOperator, store.RoleAdmin}, c.Role) {
+			return fmt.Errorf("contribution %d (%s): unknown role %q", i, c.Slot, c.Role)
+		}
+		if c.Role == "" {
+			c.Role = store.RoleOperator
+		}
+		known = append(known, c)
+	}
+	m.Contributions = known
+	return nil
+}
+
+// Contributions of one slot, in the order the module declared them.
+func (m Module) In(slot string) []Contribution {
+	var out []Contribution
+	for _, c := range m.Manifest.Contributions {
+		if c.Slot == slot {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// RoleFor is the lowest role that may reach path below the module's root: the
+// longest declared path that is a prefix at a segment boundary wins, and what
+// no contribution covers needs operator, as every module did before.
+func (m Module) RoleFor(p string) string {
+	p = path.Clean("/" + p)
+	role, best := store.RoleOperator, -1
+	for _, c := range m.Manifest.Contributions {
+		root := strings.TrimSuffix(path.Clean(c.Path), "/")
+		if (root == "" || p == root || strings.HasPrefix(p, root+"/")) && len(root) > best {
+			role, best = c.Role, len(root)
+		}
+	}
+	return role
+}
+
+// SignUser is how a module learns who is looking at its page without trusting
+// a header anybody could add: an HMAC, keyed with the module's own token, over
+// the user, the role, the time and the module's name.
+func SignUser(token, module, user, role string, unix int64) string {
+	mac := hmac.New(sha256.New, []byte(token))
+	fmt.Fprintf(mac, "v1\n%s\n%s\n%d\n%s", user, role, unix, module)
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 // What a module that does not answer is doing: a service that has not come up
@@ -186,7 +276,10 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("/manifest returned %s", resp.Status)
 	}
-	return json.NewDecoder(resp.Body).Decode(&m.Manifest)
+	if err := json.NewDecoder(resp.Body).Decode(&m.Manifest); err != nil {
+		return err
+	}
+	return m.Manifest.validate()
 }
 
 // Refresh keeps discovery running with nobody watching, so scheduled modules

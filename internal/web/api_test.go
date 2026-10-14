@@ -296,15 +296,15 @@ func TestAPIWebhooksAreAdminOnly(t *testing.T) {
 func TestToAPIModules(t *testing.T) {
 	got := toAPIModules([]modules.Module{
 		{Name: "metrics", Version: "0.1.0", Service: "metrics_module", Manifest: modules.Manifest{
-			NavEntries:  []modules.NavEntry{{Title: "Metrics", Path: "/"}},
-			Permissions: []string{"stats:read"},
+			Contributions: []modules.Contribution{{Slot: modules.SlotNav, Title: "Metrics", Path: "/", Role: "viewer"}},
+			Permissions:   []string{"stats:read"},
 		}},
 		{Name: "broken", Err: "connection refused"},
 	})
-	if len(got) != 2 || !got[0].OK || got[0].NavEntries[0].Title != "Metrics" || got[0].Permissions[0] != "stats:read" {
+	if len(got) != 2 || !got[0].OK || got[0].Contributions[0].Title != "Metrics" || got[0].Permissions[0] != "stats:read" {
 		t.Fatalf("working module: %+v", got)
 	}
-	if got[1].OK || got[1].Error != "connection refused" || got[1].NavEntries == nil || got[1].Permissions == nil {
+	if got[1].OK || got[1].Error != "connection refused" || got[1].Contributions == nil || got[1].Permissions == nil {
 		t.Fatalf("broken module must keep its error and still list empty arrays, not null: %+v", got[1])
 	}
 }
