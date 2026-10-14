@@ -24,6 +24,7 @@ export function Nodes() {
   });
 
   const { confirm } = useDialogs();
+  const [declined, setDeclined] = useState(0);
   const setAvailability = useMutation({
     mutationFn: (v: { id: string; availability: "active" | "pause" | "drain" }) =>
       call(api.setNodeAvailability(v.id, { availability: v.availability })),
@@ -43,6 +44,8 @@ export function Nodes() {
         action: "Drain",
       }));
     if (ok) setAvailability.mutate({ id, availability });
+    // The select already shows the refused choice and its value prop did not change.
+    else setDeclined((n) => n + 1);
   };
 
   if (nodes.isPending) return <p>Loading…</p>;
@@ -75,6 +78,7 @@ export function Nodes() {
               </td>
               <td>
                 <Select
+                  key={declined}
                   value={n.availability}
                   disabled={setAvailability.isPending}
                   onChange={(v) => change(n.id, n.hostname, v as "active" | "pause" | "drain")}
