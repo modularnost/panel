@@ -156,6 +156,7 @@ label {
 }
 
 input {
+  max-width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -202,10 +203,17 @@ a {
 
 .facts dd {
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -221,6 +229,7 @@ button:disabled {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 16px;
@@ -319,21 +328,42 @@ select {
 
 @media (max-width: 640px) {
   .app {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
   }
 
   .side {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    padding: 8px 12px;
   }
 
   .brand {
     margin: 0 12px 0 0;
   }
 
+  .item.sub {
+    padding-left: 10px;
+  }
+
   .who {
     margin: 0 0 0 auto;
+  }
+
+  .main {
+    padding: 16px 12px;
+  }
+
+  /* A wide table scrolls by itself; the heading and buttons above it stay. */
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .module-frame {
+    height: 75vh;
   }
 }
