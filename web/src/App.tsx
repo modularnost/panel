@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call } from "./api/client";
+import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
+import { Resources } from "./pages/Resources";
 import { Services } from "./pages/Services";
 
 function useMe() {
@@ -35,6 +37,12 @@ function Shell() {
         <NavLink to="/" end className="item">
           Services
         </NavLink>
+        <NavLink to="/resources" className="item">
+          Resources
+        </NavLink>
+        <NavLink to="/deploys" className="item">
+          Deploys
+        </NavLink>
         <div className="who">
           {me.data.username} · {me.data.role}
           <button className="link" onClick={logout}>
@@ -55,6 +63,8 @@ export function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<Shell />}>
         <Route index element={<Services />} />
+        <Route path="resources" element={<Resources />} />
+        <Route path="deploys" element={<Deploys />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
