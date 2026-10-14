@@ -85,7 +85,9 @@ type logoutOutput struct {
 }
 
 type meOutput struct{ Body apiUser }
-type serviceListOutput struct{ Body []apiService }
+type serviceListOutput struct {
+	Body []apiService `nullable:"false"`
+}
 type serviceOutput struct{ Body apiService }
 
 func (s *Server) registerAPI(mux *http.ServeMux) huma.API {

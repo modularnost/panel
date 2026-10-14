@@ -22,7 +22,7 @@ type apiModuleInstall struct {
 	Port    string   `json:"port,omitempty" doc:"The module's HTTP port; 8080 when empty"`
 	Service string   `json:"service,omitempty" doc:"Swarm service name; <name>_module when empty"`
 	Network string   `json:"network,omitempty" doc:"Overlay network; the panel's own when empty"`
-	Env     []string `json:"env,omitempty" doc:"KEY=value entries"`
+	Env     []string `json:"env,omitempty" doc:"KEY=value entries" nullable:"false"`
 }
 
 type apiModuleInstalled struct {

@@ -140,10 +140,7 @@
             "items": {
               "$ref": "#/components/schemas/NavEntry"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "ok": {
             "type": "boolean"
@@ -152,10 +149,7 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "service": {
             "type": "string"
@@ -182,10 +176,7 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "image": {
             "type": "string"
@@ -334,10 +325,7 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           }
         },
         "required": [
@@ -481,10 +469,7 @@
             "items": {
               "$ref": "#/components/schemas/Service"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "updated_at": {
             "format": "date-time",
@@ -987,10 +972,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Deploy"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -1065,10 +1047,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Module"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -1190,10 +1169,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Node"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -1385,10 +1361,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Service"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -1532,10 +1505,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Deploy"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -1730,10 +1700,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Webhook"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -1772,10 +1739,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Stack"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -2009,10 +1973,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TaskStats"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -2051,10 +2012,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Token"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -2177,10 +2135,7 @@
                   "items": {
                     "$ref": "#/components/schemas/User"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -2358,10 +2313,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Webhook"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },

@@ -22,8 +22,8 @@ type apiModule struct {
 	Service     string        `json:"service"`
 	OK          bool          `json:"ok"`
 	Error       string        `json:"error,omitempty" doc:"Why the manifest could not be fetched"`
-	NavEntries  []apiNavEntry `json:"nav_entries"`
-	Permissions []string      `json:"permissions"`
+	NavEntries  []apiNavEntry `json:"nav_entries" nullable:"false"`
+	Permissions []string      `json:"permissions" nullable:"false"`
 }
 
 func toAPIModules(in []modules.Module) []apiModule {
@@ -70,8 +70,12 @@ func toAPIWebhooks(in []store.Webhook) []apiWebhook {
 	return out
 }
 
-type moduleListOutput struct{ Body []apiModule }
-type webhookListOutput struct{ Body []apiWebhook }
+type moduleListOutput struct {
+	Body []apiModule `nullable:"false"`
+}
+type webhookListOutput struct {
+	Body []apiWebhook `nullable:"false"`
+}
 
 func (s *Server) registerModules(api huma.API, viewer huma.Middlewares) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}

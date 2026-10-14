@@ -66,8 +66,12 @@ type apiJoin struct {
 	Command string `json:"command" doc:"Run this on the machine that should join; it contains the join token"`
 }
 
-type statsOutput struct{ Body []apiTaskStats }
-type nodeListOutput struct{ Body []apiNode }
+type statsOutput struct {
+	Body []apiTaskStats `nullable:"false"`
+}
+type nodeListOutput struct {
+	Body []apiNode `nullable:"false"`
+}
 type joinOutput struct{ Body apiJoin }
 
 func (s *Server) registerCluster(api huma.API, viewer huma.Middlewares) {

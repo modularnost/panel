@@ -1,0 +1,26 @@
+{
+  "name": "modularnost-web",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.3",
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "swagger-typescript-api": "^13.13.0",
+    "typescript": "^7.0.2",
+    "vite": "8.3.4"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.104.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^8.4.0"
+  },
+  "scripts": {
+    "gen:api": "swagger-typescript-api generate --path ../api/openapi.json --output src/api --name generated.ts --unwrap-response-data --enum-style union --silent",
+    "dev": "bun run gen:api && vite",
+    "typecheck": "bun run gen:api && tsc --noEmit",
+    "build": "bun run gen:api && tsc --noEmit && vite build"
+  }
+}
