@@ -319,6 +319,20 @@ select {
   border: 0;
 }
 
+/* A tab sits below the service's heading and tabs. */
+.module-frame.tab {
+  height: 70vh;
+}
+
+a.button {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--bg);
+  text-decoration: none;
+}
+
 .secret {
   border: 1px solid var(--accent);
   border-radius: 6px;

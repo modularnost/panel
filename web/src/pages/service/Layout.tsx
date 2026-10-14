@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useOutletContext, useParams } from "react-router
 import { api, call } from "../../api/client";
 import type { Service } from "../../api/generated";
 import { atLeast, useMe } from "../../auth";
+import { useModules, serviceTabs } from "../../modules";
 
 // The tabs of a service share the one service the layout loads.
 export function useService() {
@@ -18,6 +19,8 @@ export function ServiceLayout() {
     queryFn: () => call(api.getService(id)),
     refetchInterval: 3000,
   });
+
+  const modules = useModules();
 
   if (service.isPending) return <p>Loading…</p>;
   if (service.isError) return <p className="error">{service.error.message}</p>;
@@ -42,6 +45,11 @@ export function ServiceLayout() {
         <NavLink to="deploys">Deploys</NavLink>
         {admin && <NavLink to="traefik">Traefik</NavLink>}
         {admin && <NavLink to="webhooks">Webhooks</NavLink>}
+        {serviceTabs(modules.data, me.data?.role, s).map(({ module, contribution: c }) => (
+          <NavLink key={`${module}${c.path}`} to={`module/${module}${c.path}`}>
+            {c.title}
+          </NavLink>
+        ))}
       </nav>
       <Outlet context={s} />
     </>

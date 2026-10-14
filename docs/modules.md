@@ -98,8 +98,9 @@ The panel frames the page: `nav` and `services.action` open it as a screen,
 `service.tab` shows it inside the service's page and passes the service as
 `?service=<name>&stack=<stack>&id=<id>`. A slot the panel does not know is
 ignored, so a manifest written for a newer panel still loads on an older one.
-`service.tab` and `services.action` are accepted and listed on the Modules
-page today; the screens that show them are the next step ([#66][contrib]).
+The context is a convenience, not proof: anybody can write that query, so a
+module that acts on it checks the caller's role (the headers below) like on any
+other request.
 
 `role` is the lowest role that sees the contribution **and may reach its path**;
 it defaults to `operator`. The panel checks it on every request to the module,
@@ -107,8 +108,6 @@ by the longest declared `path` that is a prefix of the request path (at a
 `/` boundary). So `{"path": "/", "role": "viewer"}` opens the whole module to
 viewers, and `{"path": "/settings", "role": "admin"}` keeps `/settings` for
 admins. A path no contribution covers needs `operator`.
-
-[contrib]: https://github.com/modularnost/panel/issues/66
 
 ### `GET /health`
 
