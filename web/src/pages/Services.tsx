@@ -6,6 +6,7 @@ import { atLeast, useMe } from "../auth";
 import { modulePath, slot, useModules } from "../modules";
 import { useUpdates } from "../updates";
 import { Chip } from "../components/Chip";
+import { Table } from "../components/Table";
 
 export function Services() {
   const me = useMe();
@@ -42,7 +43,7 @@ export function Services() {
       )}
       {services.data.length === 0 && <p>No services.</p>}
       {services.data.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Service</th>
@@ -68,7 +69,7 @@ export function Services() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </>
   );

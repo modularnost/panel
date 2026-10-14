@@ -5,6 +5,7 @@ import { atLeast, useMe } from "../../auth";
 import { formatBytes, memoryUse, shortDigest } from "../../format";
 import { useService } from "./Layout";
 import { Button } from "../../components/Button";
+import { Table } from "../../components/Table";
 
 export function Overview() {
   const s = useService();
@@ -86,7 +87,7 @@ export function Overview() {
       {stats.isError && <p className="error">{stats.error.message}</p>}
       {stats.data && stats.data.length === 0 && <p className="muted">No running replicas.</p>}
       {stats.data && stats.data.length > 0 && (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Node</th>
@@ -117,7 +118,7 @@ export function Overview() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </>
   );

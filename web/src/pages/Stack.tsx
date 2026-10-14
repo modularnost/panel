@@ -5,6 +5,7 @@ import { atLeast, useMe } from "../auth";
 import { ComposeEditor } from "../components/ComposeEditor";
 import { Button } from "../components/Button";
 import { Chip } from "../components/Chip";
+import { Table } from "../components/Table";
 
 export function Stack() {
   const { name = "" } = useParams();
@@ -75,7 +76,7 @@ export function Stack() {
       {s.services.length === 0 ? (
         <p className="muted">No services are running.</p>
       ) : (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Service</th>
@@ -98,7 +99,7 @@ export function Stack() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       {admin && s.self && (
