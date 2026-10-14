@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
-import { moduleURL } from "../modules";
+import { modulePath } from "../modules";
 
 export function Modules() {
   const me = useMe();
@@ -50,7 +50,7 @@ export function Modules() {
               <tr key={m.name}>
                 <td>
                   {m.ok && m.nav_entries.length > 0 ? (
-                    <Link to={moduleURL(m.name, m.nav_entries[0].path)}>{m.name}</Link>
+                    <Link to={modulePath(m.name, m.nav_entries[0].path)}>{m.name}</Link>
                   ) : (
                     m.name
                   )}
