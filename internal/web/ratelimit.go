@@ -123,6 +123,13 @@ func (s *Server) loginSucceeded(r *http.Request, username string) {
 	s.logins.reset(user)
 }
 
+func plural(n int, unit string) string {
+	if n == 1 {
+		return "1 " + unit
+	}
+	return fmt.Sprintf("%d %ss", n, unit)
+}
+
 func retryAfterSeconds(d time.Duration) int {
 	return int((d + time.Second - 1) / time.Second)
 }
