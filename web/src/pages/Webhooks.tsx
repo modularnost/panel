@@ -45,9 +45,7 @@ export function Webhooks() {
 
       <h2>New webhook</h2>
       <div className="toolbar">
-        <label>
-          For
-          <Select
+        <Select label="For"
             value={kind}
             onChange={(v) => {
               setKind(v as "service" | "stack");
@@ -57,10 +55,7 @@ export function Webhooks() {
             <option value="service">a service</option>
             <option value="stack">a stack</option>
           </Select>
-        </label>
-        <label>
-          Name
-          <Select value={target} onChange={(v) => setTarget(v)}>
+        <Select label="Name" value={target} onChange={(v) => setTarget(v)}>
             <option value="">Choose…</option>
             {options.map((n) => (
               <option key={n} value={n}>
@@ -68,7 +63,6 @@ export function Webhooks() {
               </option>
             ))}
           </Select>
-        </label>
         <Button disabled={!target || create.isPending} onClick={() => create.mutate()}>
           Create
         </Button>

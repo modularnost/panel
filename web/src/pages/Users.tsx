@@ -171,16 +171,13 @@ export function Users() {
           minLength={8}
           required
         />
-        <label>
-          Role
-          <Select value={newUser.role} onChange={(v) => setNewUser({ ...newUser, role: v as Role })}>
+        <Select label="Role" value={newUser.role} onChange={(v) => setNewUser({ ...newUser, role: v as Role })}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
             ))}
           </Select>
-        </label>
         <Button disabled={createUser.isPending}>Create</Button>
       </form>
       {createUser.isError && <p className="error">{createUser.error.message}</p>}
@@ -242,9 +239,7 @@ export function Users() {
 
       <h2>New token</h2>
       <form className="toolbar" onSubmit={submitToken}>
-        <label>
-          User
-          <Select
+        <Select label="User"
             value={newToken.user_id}
             onChange={(v) => setNewToken({ ...newToken, user_id: Number(v) })}
             required
@@ -256,11 +251,8 @@ export function Users() {
               </option>
             ))}
           </Select>
-        </label>
         <TextField label="Name" value={newToken.name} onChange={(name) => setNewToken({ ...newToken, name })} required />
-        <label>
-          Role
-          <Select value={newToken.role} onChange={(v) => setNewToken({ ...newToken, role: v as Role | "" })}>
+        <Select label="Role" value={newToken.role} onChange={(v) => setNewToken({ ...newToken, role: v as Role | "" })}>
             <option value="">same as user</option>
             {ROLES.map((r) => (
               <option key={r} value={r}>
@@ -268,7 +260,6 @@ export function Users() {
               </option>
             ))}
           </Select>
-        </label>
         <TextField
           label="Days"
           value={newToken.days}

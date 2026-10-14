@@ -336,14 +336,6 @@ pre.notes {
   background: none;
 }
 
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font: var(--md-sys-typescale-body-small);
-  color: var(--md-sys-color-on-surface-variant);
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -364,6 +356,7 @@ label {
   flex-direction: column;
   gap: 16px;
   max-width: 420px;
+  margin-bottom: 16px;
 }
 
 .form button {

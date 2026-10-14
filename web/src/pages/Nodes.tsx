@@ -101,13 +101,10 @@ export function Nodes() {
 
       <h2>Add a server</h2>
       <div className="toolbar">
-        <label>
-          Joins as
-          <Select value={role} onChange={(v) => setRole(v as Role)}>
+        <Select label="Joins as" value={role} onChange={(v) => setRole(v as Role)}>
             <option value="worker">worker</option>
             <option value="manager">manager</option>
           </Select>
-        </label>
         <Button
           variant="tonal"
           disabled={rotate.isPending}

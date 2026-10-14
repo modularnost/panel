@@ -42,13 +42,10 @@ export function ServiceWebhooks() {
       {remove.isError && <p className="error">{remove.error.message}</p>}
 
       <div className="toolbar">
-        <label>
-          New webhook
-          <Select value={action} onChange={(v) => setAction(v as typeof action)}>
+        <Select label="New webhook" value={action} onChange={(v) => setAction(v as typeof action)}>
             <option value="force_update">Redeploy this service</option>
             {s.stack && <option value="stack_redeploy">Redeploy its stack ({s.stack})</option>}
           </Select>
-        </label>
         <Button onClick={() => create.mutate()} disabled={create.isPending}>
           Create
         </Button>
