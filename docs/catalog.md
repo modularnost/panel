@@ -22,7 +22,7 @@ module contract changes.
 
 | Module | Repository | Image | Requires | Permissions | Status |
 | --- | --- | --- | --- | --- | --- |
-| metrics v0.1.0 | [modularnost/metrics_module](https://github.com/modularnost/metrics_module) | `ghcr.io/modularnost/metrics-module:v0.1.0` | panel >= v0.0.1 | `stats:read` | verified |
+| metrics v0.1.0 | [modularnost/metrics_module](https://github.com/modularnost/metrics_module) | `ghcr.io/modularnost/metrics-module:0.1.0` | panel >= v0.0.1 | `stats:read` | verified |
 
 ## Adding your module
 
