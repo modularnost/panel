@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { api, call } from "../api/client";
 import { Button } from "./Button";
+import { TextField } from "./TextField";
 
 type Props = {
   name: string;
@@ -33,13 +34,15 @@ export function ComposeEditor({ name, initial, placeholder, onDeployed }: Props)
 
   return (
     <form onSubmit={submit} className="compose">
-      <textarea
+      <TextField
+        label="Compose file"
+        type="textarea"
         value={compose}
-        onChange={(e) => setCompose(e.target.value)}
+        onChange={setCompose}
         spellCheck={false}
         placeholder={placeholder}
         rows={18}
-        aria-label="Compose file"
+        mono
       />
       <p className="muted">Services that are not in the file are removed.</p>
       {deploy.isError && <p className="error">{deploy.error.message}</p>}

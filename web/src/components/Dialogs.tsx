@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "./Button";
 import { Dialog } from "./Dialog";
+import { TextField } from "./TextField";
 
 type Confirm = { title: string; message: string; action: string; danger?: boolean };
 type Prompt = Confirm & { label: string; type?: "text" | "password"; minLength?: number };
@@ -69,18 +70,16 @@ export function DialogsProvider({ children }: { children: ReactNode }) {
           <form id="dialog-form" onSubmit={submit}>
             <p>{request.message}</p>
             {"label" in request && (
-              <label>
-                {request.label}
-                <input
-                  type={request.type ?? "text"}
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  minLength={request.minLength}
-                  autoComplete="new-password"
-                  autoFocus
-                  required
-                />
-              </label>
+              <TextField
+                label={request.label}
+                type={request.type}
+                value={value}
+                onChange={setValue}
+                minLength={request.minLength}
+                autoComplete="new-password"
+                autoFocus
+                required
+              />
             )}
           </form>
         </Dialog>

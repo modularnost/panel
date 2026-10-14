@@ -8,6 +8,7 @@ declare module "react" {
       "md-outlined-select": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
         value?: string;
         disabled?: boolean;
+        label?: string;
         required?: boolean;
         "menu-positioning"?: string;
       };
@@ -36,6 +37,7 @@ type Props = {
   value: string | number;
   onChange: (value: string) => void;
   disabled?: boolean;
+  label?: string;
   required?: boolean;
   "aria-label"?: string;
   children: ReactNode;
