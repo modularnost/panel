@@ -1,4 +1,5 @@
-// A demo panel module: its own HTTP server, a manifest, and one action that
+// A demo panel module that draws its own page, a frame (the other example,
+// metrics-module, sends blocks and lets the panel draw them): its own HTTP server, a manifest, and one action that
 // asks the core (PANEL_CORE_URL) to redeploy a service. It has no docker.sock;
 // it identifies itself with the X-Panel-Module / X-Panel-Token headers.
 package main
@@ -38,7 +39,7 @@ const manifest = `{
   "contract": 2,
   "name": "hello",
   "version": "0.1.0",
-  "contributions": [{"slot": "nav", "title": "Hello", "path": "/", "role": "operator"}],
+  "contributions": [{"slot": "nav", "title": "Hello", "path": "/", "role": "operator", "render": "frame"}],
   "permissions": ["service:read", "service:update"]
 }`
 

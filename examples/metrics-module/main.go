@@ -1,18 +1,23 @@
 // An example module, not a feature: the panel already shows these numbers. It
-// demonstrates the contract (a manifest, the stats:read permission, a call to
-// GET /internal/stats) and is meant to be copied as a skeleton.
+// demonstrates a ui page (a document of blocks the panel draws), the stats:read
+// permission, a call to GET /internal/stats and telling the panel a page changed.
+// It keeps ten minutes of history in memory, which is all a chart needs here;
+// a module that keeps more owns its own storage (docs/modules.md).
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
+	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var (
@@ -30,10 +35,18 @@ func or(v, def string) string {
 const manifest = `{
   "contract": 2,
   "name": "metrics",
-  "version": "0.1.0",
-  "contributions": [{"slot": "nav", "title": "Metrics", "path": "/", "role": "viewer"}],
+  "version": "0.2.0",
+  "contributions": [
+    {"slot": "nav", "title": "Metrics", "path": "/", "role": "viewer", "render": "ui"},
+    {"slot": "service.tab", "title": "Metrics", "path": "/service", "role": "viewer", "render": "ui"}
+  ],
   "permissions": ["stats:read"]
 }`
+
+const (
+	interval = 5 * time.Second
+	keep     = 120 // samples: ten minutes at 5 s
+)
 
 type stat struct {
 	Node     string  `json:"node"`
@@ -46,74 +59,149 @@ type stat struct {
 	Err      string  `json:"err"`
 }
 
-// CPUBar is the bar width in percent, clamped to 100.
-func (s stat) CPUBar() int { return clamp(s.CPU) }
-
-func (s stat) MemBar() int {
-	if s.MemLimit == 0 {
-		return 0
-	}
-	return clamp(float64(s.Mem) / float64(s.MemLimit) * 100)
+// sample is one service at one moment, summed over its replicas.
+type sample struct {
+	T        int64
+	CPU      float64
+	Mem      uint64
+	MemLimit uint64
+	Replicas int
 }
 
-func clamp(v float64) int {
-	switch {
-	case v < 0:
-		return 0
-	case v > 100:
-		return 100
-	default:
-		return int(v)
+var (
+	mu      sync.Mutex
+	latest  []stat
+	history = map[string][]sample{}
+)
+
+// record keeps the snapshot and appends one sample per service to its history.
+func record(stats []stat, now time.Time) {
+	mu.Lock()
+	defer mu.Unlock()
+	latest = stats
+	sums := map[string]*sample{}
+	for _, s := range stats {
+		if s.Err != "" {
+			continue
+		}
+		a := sums[s.Service]
+		if a == nil {
+			a = &sample{T: now.Unix()}
+			sums[s.Service] = a
+		}
+		a.CPU += s.CPU
+		a.Mem += s.Mem
+		a.MemLimit += s.MemLimit
+		a.Replicas++
+	}
+	for name, a := range sums {
+		h := append(history[name], *a)
+		if len(h) > keep {
+			h = h[len(h)-keep:]
+		}
+		history[name] = h
 	}
 }
 
-func human(b uint64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := uint64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+type block map[string]any
+
+type document struct {
+	UI     int     `json:"ui"`
+	Blocks []block `json:"blocks"`
 }
 
-var page = template.Must(template.New("page").Funcs(template.FuncMap{"human": human}).Parse(`
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Metrics</title>
-<!-- The panel's stylesheet: same origin, so the module matches the surrounding
-     UI and its theme. Only the bars below are the module's own. -->
-<link rel="stylesheet" href="/static/panel.css">
-<style>
-body { margin: 1rem; }
-.bar { height: .7rem; background: #8882; border-radius: 3px; overflow: hidden; min-width: 6rem; }
-.bar > i { display: block; height: 100%; background: var(--accent, #4a90d9); }
-.hot > i { background: var(--bad, #d33); }
-.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-</style></head><body>
-<h1>Metrics</h1>
-<p><small>Live snapshot, refreshed every 5 s. No history &mdash; that is Grafana's job.</small></p>
-<table>
-<tr><th>Node</th><th>Service</th><th>Replica</th><th class=num>CPU</th><th></th><th class=num>Memory</th><th></th></tr>
-{{range .}}
-<tr>
-  <td class=muted>{{.Node}}</td>
-  <td>{{.Service}}</td>
-  <td>{{.Slot}}</td>
-  {{if .Err}}<td colspan=4 class=bad>{{.Err}}</td>{{else}}
-  <td class=num>{{printf "%.1f" .CPU}} %</td>
-  <td><div class="bar {{if gt .CPUBar 80}}hot{{end}}"><i style="width:{{.CPUBar}}%"></i></div></td>
-  <td class=num>{{human .Mem}}{{if .MemLimit}} / {{human .MemLimit}}{{end}}</td>
-  <td>{{if .MemLimit}}<div class="bar {{if gt .MemBar 80}}hot{{end}}"><i style="width:{{.MemBar}}%"></i></div>{{end}}</td>
-  {{end}}
-</tr>
-{{else}}
-<tr><td colspan=7>No running replicas in sight.</td></tr>
-{{end}}
-</table>
-<script>setTimeout(() => location.reload(), 5000);</script>
-`))
+func overview(stats []stat) document {
+	var cpu float64
+	var mem uint64
+	running := 0
+	rows := []block{}
+	for _, s := range stats {
+		row := block{
+			"node":    s.Node,
+			"service": block{"text": s.Service, "href": block{"path": "/service?service=" + url.QueryEscape(s.Service)}},
+			"slot":    s.Slot,
+		}
+		if s.Err != "" {
+			// A node that cannot be reached is shown, not dropped: it would look idle.
+			row["cpu"] = block{"text": s.Err, "tone": "bad"}
+		} else {
+			cpu, mem, running = cpu+s.CPU, mem+s.Mem, running+1
+			row["cpu"], row["mem"] = s.CPU, s.Mem
+		}
+		rows = append(rows, row)
+	}
+	return document{UI: 1, Blocks: []block{
+		{"type": "text", "tone": "muted", "text": "A live snapshot; a service's page keeps ten minutes of history."},
+		{"type": "stat", "label": "Replicas", "value": running},
+		{"type": "stat", "label": "CPU", "value": cpu, "unit": "percent"},
+		{"type": "stat", "label": "Memory", "value": mem, "unit": "bytes"},
+		{"type": "table", "empty": "Nothing sampled yet.", "rows": rows, "columns": []block{
+			{"key": "node", "title": "Node"},
+			{"key": "service", "title": "Service"},
+			{"key": "slot", "title": "Replica", "type": "number"},
+			{"key": "cpu", "title": "CPU", "type": "percent"},
+			{"key": "mem", "title": "Memory", "type": "bytes"},
+		}},
+	}}
+}
+
+var ranges = []struct {
+	Value string
+	D     time.Duration
+}{{"1m", time.Minute}, {"5m", 5 * time.Minute}, {"10m", 10 * time.Minute}}
+
+func rangeOf(s string) (string, time.Duration) {
+	for _, r := range ranges {
+		if r.Value == s {
+			return r.Value, r.D
+		}
+	}
+	return "5m", 5 * time.Minute
+}
+
+func serviceDoc(service, rng string, h []sample, now time.Time) document {
+	if service == "" {
+		return document{UI: 1, Blocks: []block{{"type": "banner", "tone": "warning", "text": "Open a service to see its metrics."}}}
+	}
+	label, d := rangeOf(rng)
+	from := now.Add(-d).Unix()
+	options := make([]block, len(ranges))
+	for i, r := range ranges {
+		options[i] = block{"value": r.Value, "label": r.Value}
+	}
+	var cpu, mem [][2]float64
+	var last *sample
+	for i, s := range h {
+		if s.T >= from {
+			cpu = append(cpu, [2]float64{float64(s.T), s.CPU})
+			mem = append(mem, [2]float64{float64(s.T), float64(s.Mem)})
+			last = &h[i]
+		}
+	}
+	chart := func(title, unit string, points [][2]float64) block {
+		return block{"type": "chart", "title": title, "unit": unit, "sync": "time", "from": from, "to": now.Unix(),
+			"empty": "No samples in this range.", "series": []block{{"name": title, "points": points}}}
+	}
+	blocks := []block{
+		{"type": "choice", "param": "range", "value": label, "options": options},
+		{"type": "heading", "text": service},
+	}
+	if last != nil {
+		blocks = append(blocks, block{"type": "meter", "label": "CPU", "value": last.CPU, "max": max(100, last.CPU), "unit": "percent"})
+		if last.MemLimit > 0 {
+			blocks = append(blocks, block{"type": "meter", "label": "Memory", "value": last.Mem, "max": last.MemLimit, "unit": "bytes",
+				"tone": tone(float64(last.Mem) > 0.8*float64(last.MemLimit))})
+		}
+	}
+	return document{UI: 1, Blocks: append(blocks, chart("CPU", "percent", cpu), chart("Memory", "bytes", mem))}
+}
+
+func tone(bad bool) string {
+	if bad {
+		return "bad"
+	}
+	return "ok"
+}
 
 func main() {
 	http.HandleFunc("/manifest", func(w http.ResponseWriter, r *http.Request) {
@@ -124,20 +212,49 @@ func main() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "ok")
 	})
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
 		remember(r)
-		stats, err := fetchStats()
-		if err != nil {
-			http.Error(w, "the core did not return metrics: "+err.Error(), http.StatusBadGateway)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		page.Execute(w, stats)
+		mu.Lock()
+		doc := overview(latest)
+		mu.Unlock()
+		write(w, doc)
+	})
+	http.HandleFunc("/service", func(w http.ResponseWriter, r *http.Request) {
+		remember(r)
+		name := r.URL.Query().Get("service")
+		mu.Lock()
+		doc := serviceDoc(name, r.URL.Query().Get("range"), history[name], time.Now())
+		mu.Unlock()
+		write(w, doc)
 	})
 
+	go poll()
 	addr := or(os.Getenv("ADDR"), ":8080")
 	log.Printf("metrics-module listening on %s, core: %s", addr, core)
 	log.Fatal(http.ListenAndServe(addr, nil))
+}
+
+func write(w http.ResponseWriter, d document) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(d)
+}
+
+// poll samples the core on a timer, nobody needs to be watching, and tells the
+// panel that the pages changed so the browsers that have them open ask again.
+func poll() {
+	for range time.Tick(interval) {
+		stats, err := fetchStats()
+		if err != nil {
+			log.Printf("sampling: %v", err)
+			continue
+		}
+		record(stats, time.Now())
+		for _, page := range []string{"/", "/service"} {
+			if err := changed(page); err != nil {
+				log.Printf("telling the panel about %s: %v", page, err)
+			}
+		}
+	}
 }
 
 // remember stores the credentials the core arrived with; we answer with them.
@@ -147,18 +264,35 @@ func remember(r *http.Request) {
 	}
 }
 
-func fetchStats() ([]stat, error) {
+func coreRequest(method, path string, body io.Reader) (*http.Response, error) {
 	c := creds.Load()
 	if c == nil {
 		return nil, fmt.Errorf("the core has not called yet, so there is no token")
 	}
-	req, err := http.NewRequest(http.MethodGet, core+"/internal/stats", nil)
+	req, err := http.NewRequest(method, core+path, body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("X-Panel-Module", c[0])
 	req.Header.Set("X-Panel-Token", c[1])
-	resp, err := http.DefaultClient.Do(req)
+	req.Header.Set("Content-Type", "application/json")
+	return http.DefaultClient.Do(req)
+}
+
+func changed(page string) error {
+	resp, err := coreRequest(http.MethodPost, "/internal/ui/changed", bytes.NewBufferString(fmt.Sprintf(`{"path":%q}`, page)))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("%s", resp.Status)
+	}
+	return nil
+}
+
+func fetchStats() ([]stat, error) {
+	resp, err := coreRequest(http.MethodGet, "/internal/stats", nil)
 	if err != nil {
 		return nil, err
 	}

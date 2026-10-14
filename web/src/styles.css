@@ -577,3 +577,209 @@ md-outlined-text-field.mono {
   outline: 3px solid var(--md-sys-color-secondary);
   outline-offset: 3px;
 }
+
+.ui-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ui-page > * {
+  margin: 0;
+}
+
+.banner.warning {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+.banner.error {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-medium);
+  background: var(--md-sys-color-surface-container);
+}
+
+.stat-label {
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-medium);
+}
+
+.stat-value {
+  font: var(--md-sys-typescale-headline-small);
+}
+
+.fact {
+  display: contents;
+}
+
+.meter-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 200px) 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-full);
+  background: var(--md-sys-color-secondary-container);
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--md-sys-color-primary);
+}
+
+.meter.bad span {
+  background: var(--md-sys-color-error);
+}
+
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  overflow: hidden;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-full);
+}
+
+.segmented label {
+  position: relative;
+  height: 40px;
+  padding: 0 16px;
+  font: var(--md-sys-typescale-label-large);
+  line-height: 40px;
+  cursor: pointer;
+}
+
+.segmented label + label {
+  border-left: 1px solid var(--md-sys-color-outline);
+}
+
+.segmented label:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+
+.segmented label.selected {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.segmented input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: -3px;
+}
+
+.chart-box {
+  margin: 0;
+}
+
+.chart-box figcaption {
+  margin-bottom: 4px;
+  font: var(--md-sys-typescale-title-small);
+}
+
+.chart-wrap {
+  position: relative;
+}
+
+.chart {
+  display: block;
+  touch-action: pan-y;
+}
+
+.chart .grid {
+  stroke: var(--md-sys-color-outline-variant);
+}
+
+.chart .tick {
+  fill: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+}
+
+.chart .line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.chart .area {
+  fill: currentColor;
+  opacity: 0.12;
+}
+
+.chart .cursor line {
+  stroke: var(--md-sys-color-on-surface-variant);
+}
+
+.chart-tip {
+  position: absolute;
+  top: 8px;
+  z-index: 2;
+  padding: 4px 8px;
+  border-radius: var(--md-sys-shape-extra-small);
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  font: var(--md-sys-typescale-body-small);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(10px);
+}
+
+.chart-tip.flip {
+  transform: translateX(calc(-100% - 10px));
+}
+
+.chart-tip small {
+  display: block;
+  opacity: 0.7;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 4px 0 0;
+  padding: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-body-small);
+  list-style: none;
+}
+
+.swatch-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

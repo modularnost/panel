@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Module, Service } from "./api/generated";
-import { envLines, matchesLabels, modulePath, moduleURL, serviceContext, serviceTabs, slot } from "./modules";
+import { envLines, matchesLabels, modulePath, moduleURL, serviceContext, serviceTabs, slot, uiContribution } from "./modules";
 
 const mod = (name: string, ok: boolean, contributions: Module["contributions"]): Module => ({
   name,
@@ -17,6 +17,7 @@ const tab = (title: string, role: "viewer" | "operator" | "admin", match: Record
   path: "/service",
   role,
   match,
+  render: "frame" as const,
 });
 const svc = (labels?: Record<string, string>, stack?: string): Service =>
   ({ id: "abc", name: "shop_web", stack, labels, image: "", mode: "replicated", running: 1, desired: 1, healthy: true }) as Service;
@@ -80,5 +81,24 @@ describe("envLines", () => {
 
   it("is empty for empty input", () => {
     expect(envLines("")).toEqual([]);
+  });
+});
+
+describe("uiContribution", () => {
+  const page = (path: string, render: "frame" | "ui") => ({ ...tab("T", "viewer"), path, render });
+  const modules = [mod("metrics", true, [page("/", "ui"), page("/service/", "ui"), page("/old", "frame")])];
+
+  it("finds the page the module declared as a document, ignoring slashes at the ends", () => {
+    expect(uiContribution(modules, "metrics", "")?.path).toBe("/");
+    expect(uiContribution(modules, "metrics", "/")?.path).toBe("/");
+    expect(uiContribution(modules, "metrics", "service")?.path).toBe("/service/");
+    expect(uiContribution(modules, "metrics", "/service/")?.path).toBe("/service/");
+  });
+
+  it("leaves a frame, a path nobody declared and another module to the frame", () => {
+    expect(uiContribution(modules, "metrics", "old")).toBeUndefined();
+    expect(uiContribution(modules, "metrics", "service/deep")).toBeUndefined();
+    expect(uiContribution(modules, "other", "")).toBeUndefined();
+    expect(uiContribution(undefined, "metrics", "")).toBeUndefined();
   });
 });

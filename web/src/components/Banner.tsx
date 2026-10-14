@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
-export function Banner({ children }: { children: ReactNode }) {
+export function Banner({ tone = "info", children }: { tone?: "info" | "warning" | "error"; children: ReactNode }) {
   return (
-    <div className="banner" role="status">
+    <div className={`banner ${tone}`} role="status">
       {children}
     </div>
   );

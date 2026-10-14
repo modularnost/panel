@@ -13,11 +13,15 @@ can do.
 
 ## Quick start
 
-Copy [examples/hello-module](../examples/hello-module) — everything you need is
-there in ~120 lines. [examples/metrics-module](../examples/metrics-module) is
-the other skeleton: it asks for a permission (`stats:read`) and calls the core
-for data. Note that the panel already shows those numbers on its own Resources
-page — that module is a demonstration, not a feature to install. Then:
+Start from [examples/metrics-module](../examples/metrics-module): a `ui` page,
+which is what most modules should be. It sends blocks (numbers, a table,
+charts with a range to pick), asks for a permission (`stats:read`), samples the
+core on a timer and tells the panel when its pages changed. Note that the panel
+already shows those numbers on its own Resources page — that module is a
+demonstration, not a feature to install.
+[examples/hello-module](../examples/hello-module) is the other way, a frame: it
+draws its own HTML page and has a button that asks the core to redeploy a
+service, which the blocks cannot do yet. Then:
 
 ```sh
 docker build -t my-module:latest .
