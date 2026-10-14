@@ -5,7 +5,9 @@ import { useMe } from "./auth";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
-import { Service } from "./pages/Service";
+import { ServiceLayout } from "./pages/service/Layout";
+import { Logs } from "./pages/service/Logs";
+import { Overview } from "./pages/service/Overview";
 import { Services } from "./pages/Services";
 
 function Shell() {
@@ -58,7 +60,10 @@ export function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<Shell />}>
         <Route index element={<Services />} />
-        <Route path="services/:id" element={<Service />} />
+        <Route path="services/:id" element={<ServiceLayout />}>
+          <Route index element={<Overview />} />
+          <Route path="logs" element={<Logs />} />
+        </Route>
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
       </Route>
