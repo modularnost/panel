@@ -77,7 +77,8 @@ Before a tag:
 2. A clean install with `scripts/install.sh` works and prints the admin password.
 3. Upgrading an existing database from the previous release keeps its data.
 4. Sign-in, the service list, one module and one webhook work.
-5. A migration or a breaking change is called out in the release.
+5. A migration or a breaking change is called out in the release, using
+   [docs/release-template.md](docs/release-template.md).
 
 `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z` publishes `X.Y.Z`,
 `X.Y` and `latest` and creates the GitHub release, which is the changelog. A tag
