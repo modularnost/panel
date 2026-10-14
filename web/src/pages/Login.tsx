@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { api, call } from "../api/client";
 
 export function Login() {
@@ -9,11 +9,17 @@ export function Login() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const from = (useLocation().state as { from?: string } | null)?.from ?? "/";
+  // The server sends a browser here with next=, from a module page it guards.
+  const next = useSearchParams()[0].get("next");
 
   const login = useMutation({
     mutationFn: () => call(api.login({ username, password })),
     onSuccess: (me) => {
       queryClient.setQueryData(["me"], me);
+      if (next && /^\/(?![/\\])/.test(next)) {
+        window.location.assign(next);
+        return;
+      }
       navigate(from, { replace: true });
     },
   });

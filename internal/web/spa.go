@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-// spaHandler serves the built frontend under /app/: the file when there is one,
+// spaHandler serves the built frontend: the file when there is one,
 // index.html for every other path, so a client-side route survives a reload.
 func spaHandler(fsys fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(path.Clean("/"+strings.TrimPrefix(r.URL.Path, "/app/")), "/")
+		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 		if st, err := fs.Stat(fsys, name); err == nil && !st.IsDir() {
 			if strings.HasPrefix(name, "assets/") {
 				// File names carry a content hash.

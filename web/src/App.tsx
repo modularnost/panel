@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call } from "./api/client";
-import { moduleURL } from "./modules";
+import { modulePath } from "./modules";
 import { atLeast, useMe } from "./auth";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
@@ -43,7 +43,7 @@ function Shell() {
   const logout = async () => {
     await call(api.logout());
     queryClient.clear();
-    window.location.assign("/app/login");
+    window.location.assign("/login");
   };
 
   return (
@@ -80,7 +80,7 @@ function Shell() {
         )}
         {modules.data
           ?.filter((m) => m.ok)
-          .flatMap((m) => m.nav_entries.map((e) => ({ key: `${m.name}${e.path}`, title: e.title, to: moduleURL(m.name, e.path) })))
+          .flatMap((m) => m.nav_entries.map((e) => ({ key: `${m.name}${e.path}`, title: e.title, to: modulePath(m.name, e.path) })))
           .map((e) => (
             <NavLink key={e.key} to={e.to} className="item sub">
               {e.title}
@@ -117,8 +117,8 @@ export function App() {
         <Route path="stacks/new" element={<StackNew />} />
         <Route path="stacks/:name" element={<Stack />} />
         <Route path="modules" element={<Modules />} />
-        <Route path="modules/install" element={<ModuleInstall />} />
-        <Route path="modules/:name/*" element={<ModulePage />} />
+        <Route path="install-module" element={<ModuleInstall />} />
+        <Route path="module/:name/*" element={<ModulePage />} />
         <Route path="nodes" element={<Nodes />} />
         <Route path="webhooks" element={<Webhooks />} />
         <Route path="users" element={<Users />} />

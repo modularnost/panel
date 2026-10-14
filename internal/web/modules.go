@@ -19,27 +19,6 @@ import (
 	"modularnost/internal/store"
 )
 
-func (s *Server) modulesPage(w http.ResponseWriter, r *http.Request) {
-	mods, err := s.Modules.List(r.Context())
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	s.render(w, "modules.html", struct {
-		Me      store.User
-		Modules []modules.Module
-	}{userFrom(r), mods})
-}
-
-// nav is the menu fragment, fetched separately so handlers need not pass it.
-func (s *Server) nav(w http.ResponseWriter, r *http.Request) {
-	mods, _ := s.Modules.List(r.Context())
-	s.render(w, "nav", struct {
-		Me      store.User
-		Modules []modules.Module
-	}{userFrom(r), mods})
-}
-
 // moduleProxy forwards the request as is: the module renders its own page.
 func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
@@ -60,10 +39,7 @@ func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
 	// A top-level navigation gets the shell with the module in a frame; the
 	// frame's own requests, and browsers without Sec-Fetch-Dest, get the bare page.
 	if r.Header.Get("Sec-Fetch-Dest") == "document" {
-		s.render(w, "module.html", struct {
-			Module modules.Module
-			Src    string
-		}{m, r.URL.RequestURI()})
+		http.Redirect(w, r, "/module/"+strings.TrimPrefix(r.URL.RequestURI(), "/modules/"), http.StatusFound)
 		return
 	}
 
@@ -151,43 +127,6 @@ func (s *Server) apiUpdateService(w http.ResponseWriter, r *http.Request, m modu
 	writeJSON(w, d)
 }
 
-type installPage struct {
-	Networks []string
-	Self     docker.Self
-	Error    string
-}
-
-func (s *Server) installForm(w http.ResponseWriter, r *http.Request) {
-	s.render(w, "install.html", s.installPage(r, ""))
-}
-
-func (s *Server) installPage(r *http.Request, errMsg string) installPage {
-	p := installPage{Error: errMsg}
-	p.Self, _ = s.Docker.Self(r.Context())
-	p.Networks, _ = s.Docker.OverlayNetworks(r.Context())
-	return p
-}
-
-// installModule deploys a module image; the panel fills in the labels, the
-// network and the callback address.
-func (s *Server) installModule(w http.ResponseWriter, r *http.Request) {
-	err := s.deployModule(r.Context(), moduleInstall{
-		Name:    r.FormValue("name"),
-		Image:   r.FormValue("image"),
-		Port:    r.FormValue("port"),
-		Service: r.FormValue("service"),
-		Network: r.FormValue("network"),
-		Env:     lines(r.FormValue("env")),
-	})
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		s.render(w, "install.html", s.installPage(r, err.Error()))
-		return
-	}
-	w.Header().Set("HX-Redirect", "/modules")
-	w.WriteHeader(http.StatusNoContent)
-}
-
 type moduleInstall struct {
 	Name, Image, Port, Service, Network string
 	Env                                 []string
@@ -256,20 +195,4 @@ func (s *Server) deployModule(ctx context.Context, m moduleInstall) error {
 	// The module is not up yet, but the list must stop showing the old state.
 	s.Modules.Forget()
 	return nil
-}
-
-// uninstallModule removes the module's service only, not its image or data.
-func (s *Server) uninstallModule(w http.ResponseWriter, r *http.Request) {
-	m, ok := s.Modules.Get(r.Context(), r.PathValue("name"))
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	if err := s.Docker.RemoveService(r.Context(), m.Service); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	s.Modules.Forget()
-	w.Header().Set("HX-Redirect", "/modules")
-	w.WriteHeader(http.StatusNoContent)
 }
