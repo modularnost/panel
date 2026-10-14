@@ -99,18 +99,13 @@ func main() {
 
 	addr := env("PANEL_ADDR", ":8080")
 	srv := &web.Server{
+		Addr:         addr,
 		Docker:       dk,
 		DB:           db,
 		Modules:      registry,
 		Updates:      checker,
 		AgentService: os.Getenv("PANEL_AGENT_SERVICE"),
 		Metrics:      agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
-		Addr:    addr,
-		Docker:  dk,
-		DB:      db,
-		Modules: registry,
-		Updates: checker,
-		Metrics: agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
 	}
 	log.Printf("modularnost %s listening on %s", version, addr)
 	log.Fatal(http.ListenAndServe(addr, srv.Routes()))
