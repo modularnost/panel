@@ -5,11 +5,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"modularnost/internal/agent"
 	"modularnost/internal/docker"
 	"modularnost/internal/modules"
 	"modularnost/internal/store"
+	"modularnost/internal/updates"
 	"modularnost/internal/web"
 )
 
@@ -92,10 +94,14 @@ func main() {
 	// Gives modules their token without waiting for someone to open a page.
 	go registry.Refresh(context.Background())
 
+	checker := updates.New(version, os.Getenv("PANEL_UPDATE_CHECK") != "off")
+	go checker.Run(context.Background(), 6*time.Hour)
+
 	srv := &web.Server{
 		Docker:  dk,
 		DB:      db,
 		Modules: registry,
+		Updates: checker,
 		Metrics: agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
 	}
 	addr := env("PANEL_ADDR", ":8080")

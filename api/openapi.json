@@ -347,6 +347,36 @@
         ],
         "type": "object"
       },
+      "Release": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "The release notes as written on GitHub: Markdown source, to be shown as text",
+            "type": "string"
+          },
+          "prerelease": {
+            "type": "boolean"
+          },
+          "published_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "body",
+          "prerelease",
+          "published_at",
+          "url"
+        ],
+        "type": "object"
+      },
       "Service": {
         "additionalProperties": false,
         "properties": {
@@ -746,6 +776,45 @@
           "port",
           "entrypoint",
           "cert_resolver"
+        ],
+        "type": "object"
+      },
+      "Updates": {
+        "additionalProperties": false,
+        "properties": {
+          "checked_at": {
+            "description": "The last successful check; absent before the first one",
+            "format": "date-time",
+            "type": "string"
+          },
+          "current": {
+            "type": "string"
+          },
+          "enabled": {
+            "description": "False when PANEL_UPDATE_CHECK=off",
+            "type": "boolean"
+          },
+          "error": {
+            "description": "Why the last check failed; releases are from the check before it",
+            "type": "string"
+          },
+          "release_build": {
+            "description": "False for edge and dev builds, which never list releases",
+            "type": "boolean"
+          },
+          "releases": {
+            "description": "Releases newer than the running version, newest first",
+            "items": {
+              "$ref": "#/components/schemas/Release"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "current",
+          "release_build",
+          "enabled",
+          "releases"
         ],
         "type": "object"
       },
@@ -2334,6 +2403,78 @@
           }
         ],
         "summary": "Revoke an API token"
+      }
+    },
+    "/api/v1/updates": {
+      "get": {
+        "operationId": "get-updates",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updates"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Releases newer than the running version, with their notes"
+      }
+    },
+    "/api/v1/updates/check": {
+      "post": {
+        "operationId": "check-updates",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updates"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask GitHub for releases now"
       }
     },
     "/api/v1/users": {
