@@ -1,9 +1,13 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call } from "./api/client";
+import { moduleURL } from "./modules";
 import { useMe } from "./auth";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
+import { ModuleInstall } from "./pages/ModuleInstall";
+import { ModulePage } from "./pages/ModulePage";
+import { Modules } from "./pages/Modules";
 import { Resources } from "./pages/Resources";
 import { Stack } from "./pages/Stack";
 import { StackNew } from "./pages/StackNew";
@@ -20,6 +24,12 @@ function Shell() {
   const me = useMe();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const modules = useQuery({
+    queryKey: ["modules"],
+    queryFn: () => call(api.listModules()),
+    refetchInterval: 10_000,
+    enabled: me.isSuccess,
+  });
 
   if (me.isPending) return null;
   if (me.error instanceof ApiError && me.error.status === 401) {
@@ -49,6 +59,17 @@ function Shell() {
         <NavLink to="/deploys" className="item">
           Deploys
         </NavLink>
+        <NavLink to="/modules" end className="item">
+          Modules
+        </NavLink>
+        {modules.data
+          ?.filter((m) => m.ok)
+          .flatMap((m) => m.nav_entries.map((e) => ({ key: `${m.name}${e.path}`, title: e.title, to: moduleURL(m.name, e.path) })))
+          .map((e) => (
+            <NavLink key={e.key} to={e.to} className="item sub">
+              {e.title}
+            </NavLink>
+          ))}
         <div className="who">
           {me.data.username} · {me.data.role}
           <button className="link" onClick={logout}>
@@ -79,6 +100,9 @@ export function App() {
         <Route path="stacks" element={<Stacks />} />
         <Route path="stacks/new" element={<StackNew />} />
         <Route path="stacks/:name" element={<Stack />} />
+        <Route path="modules" element={<Modules />} />
+        <Route path="modules/install" element={<ModuleInstall />} />
+        <Route path="modules/:name/*" element={<ModulePage />} />
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
       </Route>

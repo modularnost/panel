@@ -288,6 +288,17 @@ select {
   white-space: pre-wrap;
 }
 
+.item.sub {
+  padding-left: 22px;
+  font-size: 14px;
+}
+
+.module-frame {
+  width: 100%;
+  height: calc(100vh - 48px);
+  border: 0;
+}
+
 @media (max-width: 640px) {
   .app {
     grid-template-columns: 1fr;
