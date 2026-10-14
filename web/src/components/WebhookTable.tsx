@@ -1,5 +1,6 @@
 import type { Webhook } from "../api/generated";
 import { Button } from "./Button";
+import { Table } from "./Table";
 
 type Props = {
   hooks: Webhook[];
@@ -11,7 +12,7 @@ export function WebhookTable({ hooks, busy, onDelete }: Props) {
   if (hooks.length === 0) return <p className="muted">No webhooks.</p>;
 
   return (
-    <table>
+    <Table>
       <thead>
         <tr>
           <th>Redeploys</th>
@@ -40,6 +41,6 @@ export function WebhookTable({ hooks, busy, onDelete }: Props) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }

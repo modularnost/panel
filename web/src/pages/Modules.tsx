@@ -5,6 +5,7 @@ import { atLeast, useMe } from "../auth";
 import { modulePath } from "../modules";
 import { Button } from "../components/Button";
 import { Chip } from "../components/Chip";
+import { Table } from "../components/Table";
 
 export function Modules() {
   const me = useMe();
@@ -40,7 +41,7 @@ export function Modules() {
       {modules.data.length === 0 ? (
         <p className="muted">No modules.</p>
       ) : (
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Module</th>
@@ -88,7 +89,7 @@ export function Modules() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </>
   );

@@ -4,6 +4,7 @@ import { api, call } from "../api/client";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
 import { Chip } from "../components/Chip";
+import { Table } from "../components/Table";
 
 type Role = "worker" | "manager";
 
@@ -43,7 +44,7 @@ export function Nodes() {
   return (
     <>
       <h1>Nodes</h1>
-      <table>
+      <Table>
         <thead>
           <tr>
             <th>Node</th>
@@ -84,7 +85,7 @@ export function Nodes() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </Table>
       {setAvailability.isError && <p className="error">{setAvailability.error.message}</p>}
 
       <h2>Add a server</h2>
