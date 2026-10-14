@@ -266,6 +266,7 @@ pre.notes {
   color: var(--md-sys-color-on-primary);
   font: var(--md-sys-typescale-label-large);
   line-height: 40px;
+  white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
   transition: box-shadow var(--md-sys-motion-short);
