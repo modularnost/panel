@@ -3,3 +3,8 @@
 *.db-wal
 /modularnost
 /modularnost.exe
+
+# frontend
+/web/node_modules
+/web/dist
+/web/src/api/generated.ts

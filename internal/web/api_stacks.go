@@ -31,7 +31,7 @@ type apiStackDetail struct {
 	Desired      uint64       `json:"desired"`
 	Healthy      bool         `json:"healthy"`
 	Managed      bool         `json:"managed"`
-	Services     []apiService `json:"services"`
+	Services     []apiService `json:"services" nullable:"false"`
 	// Compose is for admins only: a compose file is access to the whole cluster.
 	Compose   string     `json:"compose,omitempty"`
 	UpdatedBy string     `json:"updated_by,omitempty"`
@@ -98,9 +98,13 @@ func summarizeStacks(svcs []docker.Service) []apiStack {
 	return out
 }
 
-type stackListOutput struct{ Body []apiStack }
+type stackListOutput struct {
+	Body []apiStack `nullable:"false"`
+}
 type stackOutput struct{ Body apiStackDetail }
-type deployListOutput struct{ Body []apiDeploy }
+type deployListOutput struct {
+	Body []apiDeploy `nullable:"false"`
+}
 
 type limitInput struct {
 	Limit int `query:"limit" default:"100" minimum:"1" maximum:"500"`

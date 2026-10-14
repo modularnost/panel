@@ -44,6 +44,9 @@ CI rejects a PR whose title does not match.
 - JSON field and parameter names are `snake_case` everywhere; a test enforces it.
 - A change to `/api/v1` regenerates the spec: `UPDATE_OPENAPI=1 go test
   ./internal/web`. CI fails when `api/openapi.json` is stale.
+- The frontend is in `web/` (Bun, Vite, React, TypeScript). `bun install` and
+  `bun run dev` there, with the panel running on :8080; the API types are
+  generated from `api/openapi.json` on every build and are not committed.
 - Docker only through `internal/docker`, the database only through
   `internal/store`. A migration is a new file; an applied one is never edited.
 - Interface text rules are in [docs/architecture.md](docs/architecture.md).

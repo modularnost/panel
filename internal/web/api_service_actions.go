@@ -15,7 +15,7 @@ type apiRedeploy struct {
 	Service   string   `json:"service"`
 	OldDigest string   `json:"old_digest,omitempty"`
 	NewDigest string   `json:"new_digest,omitempty"`
-	Warnings  []string `json:"warnings"`
+	Warnings  []string `json:"warnings" nullable:"false"`
 }
 
 type apiTraefik struct {

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -161,5 +162,15 @@ func TestSpecNamesAreSnakeCase(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// Handlers always send [] for an empty list, so the spec must not promise null:
+// the generated client types would force every caller to guard against it.
+func TestSpecHasNoNullableTypes(t *testing.T) {
+	rec := httptest.NewRecorder()
+	(&Server{}).Routes().ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/openapi.json", nil))
+	if strings.Contains(rec.Body.String(), `"null"`) {
+		t.Error(`the spec has a "null" type: add nullable:"false" to the slice field`)
 	}
 }

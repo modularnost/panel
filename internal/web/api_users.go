@@ -33,8 +33,12 @@ func toAPITokens(in []store.Token) []apiToken {
 	return out
 }
 
-type userListOutput struct{ Body []apiUser }
-type tokenListOutput struct{ Body []apiToken }
+type userListOutput struct {
+	Body []apiUser `nullable:"false"`
+}
+type tokenListOutput struct {
+	Body []apiToken `nullable:"false"`
+}
 
 func (s *Server) registerUsers(api huma.API) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
