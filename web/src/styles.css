@@ -127,6 +127,17 @@ th {
   color: var(--bad);
 }
 
+.banner {
+  padding: 8px 12px;
+  border: 1px solid var(--ok);
+  border-radius: 6px;
+}
+
+pre.notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .login {
   max-width: 320px;
   margin: 15vh auto 0;

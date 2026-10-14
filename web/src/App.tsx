@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-rou
 import { ApiError, api, call } from "./api/client";
 import { modulePath } from "./modules";
 import { atLeast, useMe } from "./auth";
+import { useUpdates } from "./updates";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { ModuleInstall } from "./pages/ModuleInstall";
@@ -13,6 +14,7 @@ import { Resources } from "./pages/Resources";
 import { Stack } from "./pages/Stack";
 import { StackNew } from "./pages/StackNew";
 import { Stacks } from "./pages/Stacks";
+import { Updates } from "./pages/Updates";
 import { Users } from "./pages/Users";
 import { Webhooks } from "./pages/Webhooks";
 import { ServiceLayout } from "./pages/service/Layout";
@@ -33,6 +35,10 @@ function Shell() {
     refetchInterval: 10_000,
     enabled: me.isSuccess,
   });
+
+  const isAdmin = atLeast(me.data?.role, "admin");
+  const updates = useUpdates(isAdmin);
+  const pending = updates.data?.releases.length ?? 0;
 
   if (me.isPending) return null;
   if (me.error instanceof ApiError && me.error.status === 401) {
@@ -75,6 +81,9 @@ function Shell() {
             </NavLink>
             <NavLink to="/users" className="item">
               Users
+            </NavLink>
+            <NavLink to="/updates" className="item">
+              Updates{pending > 0 && <span className="pill ok"> {pending}</span>}
             </NavLink>
           </>
         )}
@@ -122,6 +131,7 @@ export function App() {
         <Route path="nodes" element={<Nodes />} />
         <Route path="webhooks" element={<Webhooks />} />
         <Route path="users" element={<Users />} />
+        <Route path="updates" element={<Updates />} />
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
       </Route>
