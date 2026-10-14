@@ -196,6 +196,7 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 		return nil, problem(http.StatusNotFound, "not_found", "no such service")
 	})
 	s.registerStacks(api, viewer)
+	s.registerLogs(api, viewer)
 	s.registerCluster(api, viewer)
 	s.registerModules(api, viewer)
 	s.registerUsers(api)
