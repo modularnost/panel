@@ -236,6 +236,13 @@ func (d *DB) UserByToken(token string) (User, error) {
 	return u, nil
 }
 
+// RevokeSessions ends the user's browser sessions. Named API tokens stay: they
+// belong to CI, and an admin revokes them one by one.
+func (d *DB) RevokeSessions(userID int64) error {
+	_, err := d.Exec(`DELETE FROM api_tokens WHERE user_id=? AND name=''`, userID)
+	return err
+}
+
 func (d *DB) DeleteToken(id int64) error {
 	_, err := d.Exec(`DELETE FROM api_tokens WHERE id=?`, id)
 	return err

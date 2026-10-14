@@ -128,3 +128,27 @@ func TestRolesAndTokens(t *testing.T) {
 		t.Fatal("revoked token accepted")
 	}
 }
+
+func TestRevokeSessionsKeepsNamedTokens(t *testing.T) {
+	db, err := Open(t.TempDir() + "/t.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	u, err := db.CreateUser("ann", "long-enough-1", RoleViewer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, _ := db.CreateToken(u.ID, "", "", time.Hour)
+	named, _ := db.CreateToken(u.ID, "ci", "", 0)
+
+	if err := db.RevokeSessions(u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.UserByToken(session); err == nil {
+		t.Error("the session must be gone")
+	}
+	if _, err := db.UserByToken(named); err != nil {
+		t.Errorf("the named token must stay: %v", err)
+	}
+}

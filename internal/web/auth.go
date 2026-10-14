@@ -214,11 +214,20 @@ func (s *Server) setUserRole(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) setUserPassword(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err := s.DB.SetPassword(id, r.FormValue("password")); err != nil {
+	if err := s.changePassword(id, r.FormValue("password")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	s.renderFragment(w, r, "")
+}
+
+// changePassword also ends the user's sessions: a password that was stolen
+// should not keep working through a session opened with it.
+func (s *Server) changePassword(id int64, password string) error {
+	if err := s.DB.SetPassword(id, password); err != nil {
+		return err
+	}
+	return s.DB.RevokeSessions(id)
 }
 
 func (s *Server) guardLastAdmin(id int64) error {

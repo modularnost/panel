@@ -553,3 +553,156 @@ func TestAPIModuleInstallValidatesBeforeDocker(t *testing.T) {
 		t.Fatalf("%d %v", status, body)
 	}
 }
+
+func TestAPIUserLifecycle(t *testing.T) {
+	c, base := adminSession(t)
+	const j = "application/json"
+
+	status, created := send(t, c, "POST", base+"/api/v1/users", j, `{"username":"bob","password":"bob-password","role":"operator"}`)
+	if status != 201 || created["username"] != "bob" || created["role"] != "operator" {
+		t.Fatalf("create: %d %v", status, created)
+	}
+	id := strconv.FormatInt(int64(created["id"].(float64)), 10)
+
+	if status, body := send(t, c, "POST", base+"/api/v1/users", j, `{"username":"bob","password":"another-pass","role":"viewer"}`); status != 409 || errorCode(body) != "username_taken" {
+		t.Errorf("duplicate: %d %v", status, body)
+	}
+	for name, body := range map[string]string{
+		"a short password": `{"username":"x","password":"short","role":"viewer"}`,
+		"an unknown role":  `{"username":"x","password":"long-enough-1","role":"root"}`,
+		"an empty name":    `{"username":"","password":"long-enough-1","role":"viewer"}`,
+	} {
+		if status, resp := send(t, c, "POST", base+"/api/v1/users", j, body); status != 422 {
+			t.Errorf("%s: %d %v", name, status, resp)
+		}
+	}
+
+	if status, body := send(t, c, "PATCH", base+"/api/v1/users/"+id, j, `{}`); status != 422 {
+		t.Errorf("an empty patch: %d %v", status, body)
+	}
+	status, patched := send(t, c, "PATCH", base+"/api/v1/users/"+id, j, `{"role":"viewer"}`)
+	if status != 200 || patched["role"] != "viewer" {
+		t.Fatalf("patch: %d %v", status, patched)
+	}
+	if status, _ := send(t, c, "PATCH", base+"/api/v1/users/99999", j, `{"role":"viewer"}`); status != 404 {
+		t.Errorf("unknown user: %d", status)
+	}
+	if status, _ := send(t, c, "DELETE", base+"/api/v1/users/"+id, j, ""); status != 204 {
+		t.Errorf("delete: %d", status)
+	}
+}
+
+func TestAPIKeepsTheLastAdmin(t *testing.T) {
+	c, base := adminSession(t)
+	const j = "application/json"
+	_, me := send(t, c, "GET", base+"/api/v1/me", "", "")
+	id := strconv.FormatInt(int64(me["id"].(float64)), 10)
+
+	if status, body := send(t, c, "DELETE", base+"/api/v1/users/"+id, j, ""); status != 409 || errorCode(body) != "last_admin" {
+		t.Errorf("deleting the last admin: %d %v", status, body)
+	}
+	if status, body := send(t, c, "PATCH", base+"/api/v1/users/"+id, j, `{"role":"viewer"}`); status != 409 || errorCode(body) != "last_admin" {
+		t.Errorf("demoting the last admin: %d %v", status, body)
+	}
+}
+
+func TestPasswordChangeEndsSessionsButKeepsTokens(t *testing.T) {
+	c, base, db := apiServer(t)
+	const j = "application/json"
+	root, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ci, err := db.CreateToken(root.ID, "ci", "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", j, `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatal("sign in")
+	}
+	if status, _ := send(t, c, "GET", base+"/api/v1/me", "", ""); status != 200 {
+		t.Fatal("session should work before the change")
+	}
+
+	id := strconv.FormatInt(root.ID, 10)
+	if status, body := send(t, c, "PATCH", base+"/api/v1/users/"+id, j, `{"password":"new-password-1"}`); status != 200 {
+		t.Fatalf("change: %d %v", status, body)
+	}
+	if status, _ := send(t, c, "GET", base+"/api/v1/me", "", ""); status != 401 {
+		t.Errorf("the old session must be gone: %d", status)
+	}
+
+	req, _ := http.NewRequest("GET", base+"/api/v1/me", nil)
+	req.Header.Set("Authorization", "Bearer "+ci)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Errorf("a named token belongs to CI and must survive: %d", resp.StatusCode)
+	}
+}
+
+func TestAPITokenValueIsShownOnce(t *testing.T) {
+	c, base, db := apiServer(t)
+	const j = "application/json"
+	root, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", j, `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatal("sign in")
+	}
+
+	body := `{"user_id":` + strconv.FormatInt(root.ID, 10) + `,"name":"deploy","role":"operator","days":30}`
+	status, created := send(t, c, "POST", base+"/api/v1/tokens", j, body)
+	value, _ := created["token"].(string)
+	if status != 201 || len(value) < 20 || created["expires_at"] == nil || created["id"] == nil {
+		t.Fatalf("create: %d %v", status, created)
+	}
+
+	resp, err := c.Get(base + "/api/v1/tokens")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if strings.Contains(string(listed), value) {
+		t.Error("the value must not appear in the list")
+	}
+
+	url := base + "/api/v1/tokens/" + strconv.FormatInt(int64(created["id"].(float64)), 10)
+	if status, _ := send(t, c, "DELETE", url, j, ""); status != 204 {
+		t.Errorf("revoke: %d", status)
+	}
+	if status, _ := send(t, c, "DELETE", url, j, ""); status != 404 {
+		t.Errorf("revoke again: %d", status)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/tokens", j, `{"user_id":9999,"name":"x"}`); status != 422 {
+		t.Errorf("a token for nobody: %d", status)
+	}
+}
+
+func TestAPIUserWritesAreAdminOnly(t *testing.T) {
+	c, base := apiClient(t)
+	const j = "application/json"
+	actions := []struct{ method, path, body string }{
+		{"POST", "/api/v1/users", `{"username":"x","password":"long-enough-1","role":"viewer"}`},
+		{"PATCH", "/api/v1/users/1", `{"role":"viewer"}`},
+		{"DELETE", "/api/v1/users/1", ``},
+		{"POST", "/api/v1/tokens", `{"user_id":1,"name":"x"}`},
+		{"DELETE", "/api/v1/tokens/1", ``},
+	}
+	for _, a := range actions {
+		if status, _ := send(t, c, a.method, base+a.path, j, a.body); status != 401 {
+			t.Errorf("%s %s anonymous: %d", a.method, a.path, status)
+		}
+	}
+	signIn(t, c, base)
+	for _, a := range actions {
+		if status, body := send(t, c, a.method, base+a.path, j, a.body); status != 403 || errorCode(body) != "forbidden" {
+			t.Errorf("%s %s as viewer: %d %v", a.method, a.path, status, body)
+		}
+	}
+}
