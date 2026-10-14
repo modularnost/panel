@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { ComposeEditor } from "../components/ComposeEditor";
-import { SAMPLE_COMPOSE } from "../stacks";
 
 export function Stack() {
   const { name = "" } = useParams();
@@ -60,7 +59,7 @@ export function Stack() {
             {redeploy.isPending ? "Redeploying…" : "Redeploy"}
           </button>
         )}
-        {admin && (
+        {admin && !s.self && (
           <button className="danger" onClick={confirmRemove} disabled={remove.isPending}>
             Remove
           </button>
@@ -100,16 +99,25 @@ export function Stack() {
         </table>
       )}
 
-      {admin && (
+      {admin && s.self && (
+        <p className="muted">This is the panel's own stack. It is managed by the installer (install.sh).</p>
+      )}
+      {admin && !s.self && (
         <>
           <h2>Compose file</h2>
-          {!s.managed && (
-            <p className="muted">
-              This stack was not deployed from the panel, so there is no file to show. Paste one to manage it here.
-            </p>
+          {s.managed ? (
+            /* key: a new file arriving from outside must not keep the old text */
+            <ComposeEditor key={s.updated_at ?? "none"} name={s.name} initial={s.compose ?? ""} />
+          ) : (
+            <details>
+              <summary>Manage with a compose file…</summary>
+              <p className="muted">
+                This stack was not deployed from the panel, so there is no file to show. Deploying one removes every
+                service of the stack that is not in it.
+              </p>
+              <ComposeEditor name={s.name} initial="" placeholder="Paste the compose file for this stack" />
+            </details>
           )}
-          {/* key: a new file arriving from outside must not keep the old text */}
-          <ComposeEditor key={s.updated_at ?? "none"} name={s.name} initial={s.compose ?? SAMPLE_COMPOSE} />
         </>
       )}
     </>
