@@ -85,9 +85,7 @@ export function Logs() {
   return (
     <>
       <div className="toolbar">
-        <label>
-          Replica
-          <Select value={task} onChange={(v) => setTask(v)}>
+        <Select label="Replica" value={task} onChange={(v) => setTask(v)}>
             <option value="">All</option>
             {tasks.data?.map((t) => (
               <option key={t.id} value={t.id}>
@@ -95,17 +93,13 @@ export function Logs() {
               </option>
             ))}
           </Select>
-        </label>
-        <label>
-          History
-          <Select value={tail} onChange={(v) => setTail(Number(v))}>
+        <Select label="History" value={tail} onChange={(v) => setTail(Number(v))}>
             {TAILS.map((n) => (
               <option key={n} value={n}>
                 {n} lines
               </option>
             ))}
           </Select>
-        </label>
         <Button variant="tonal" onClick={() => setPaused((p) => !p)}>{paused ? "Resume" : "Pause"}</Button>
         <span className="muted">{connected ? "live" : problem ? "stopped" : "connecting…"}</span>
       </div>

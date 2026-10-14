@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { api, call } from "../api/client";
 import { Button } from "../components/Button";
+import { TextField } from "../components/TextField";
 
 export function Login() {
   const [username, setUsername] = useState("");
@@ -33,19 +34,8 @@ export function Login() {
   return (
     <form className="login" onSubmit={submit}>
       <h1>modularnost</h1>
-      <label>
-        Username
-        <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus autoComplete="username" />
-      </label>
-      <label>
-        Password
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-        />
-      </label>
+      <TextField label="Username" value={username} onChange={setUsername} autoFocus autoComplete="username" />
+      <TextField label="Password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
       {login.isError && <p className="error">{login.error.message}</p>}
       <Button disabled={login.isPending}>Sign in</Button>
     </form>

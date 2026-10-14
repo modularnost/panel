@@ -7,6 +7,7 @@ import { Button } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
 import { Banner } from "../components/Banner";
 import { Table } from "../components/Table";
+import { TextField } from "../components/TextField";
 
 type Role = "admin" | "operator" | "viewer";
 const ROLES: Role[] = ["viewer", "operator", "admin"];
@@ -154,36 +155,29 @@ export function Users() {
 
       <h2>New user</h2>
       <form className="toolbar" onSubmit={submitUser}>
-        <label>
-          Username
-          <input
-            value={newUser.username}
-            onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-            autoComplete="off"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={newUser.password}
-            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-            autoComplete="new-password"
-            minLength={8}
-            required
-          />
-        </label>
-        <label>
-          Role
-          <Select value={newUser.role} onChange={(v) => setNewUser({ ...newUser, role: v as Role })}>
+        <TextField
+          label="Username"
+          value={newUser.username}
+          onChange={(username) => setNewUser({ ...newUser, username })}
+          autoComplete="off"
+          required
+        />
+        <TextField
+          label="Password"
+          type="password"
+          value={newUser.password}
+          onChange={(password) => setNewUser({ ...newUser, password })}
+          autoComplete="new-password"
+          minLength={8}
+          required
+        />
+        <Select label="Role" value={newUser.role} onChange={(v) => setNewUser({ ...newUser, role: v as Role })}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
             ))}
           </Select>
-        </label>
         <Button disabled={createUser.isPending}>Create</Button>
       </form>
       {createUser.isError && <p className="error">{createUser.error.message}</p>}
@@ -245,9 +239,7 @@ export function Users() {
 
       <h2>New token</h2>
       <form className="toolbar" onSubmit={submitToken}>
-        <label>
-          User
-          <Select
+        <Select label="User"
             value={newToken.user_id}
             onChange={(v) => setNewToken({ ...newToken, user_id: Number(v) })}
             required
@@ -259,14 +251,8 @@ export function Users() {
               </option>
             ))}
           </Select>
-        </label>
-        <label>
-          Name
-          <input value={newToken.name} onChange={(e) => setNewToken({ ...newToken, name: e.target.value })} required />
-        </label>
-        <label>
-          Role
-          <Select value={newToken.role} onChange={(v) => setNewToken({ ...newToken, role: v as Role | "" })}>
+        <TextField label="Name" value={newToken.name} onChange={(name) => setNewToken({ ...newToken, name })} required />
+        <Select label="Role" value={newToken.role} onChange={(v) => setNewToken({ ...newToken, role: v as Role | "" })}>
             <option value="">same as user</option>
             {ROLES.map((r) => (
               <option key={r} value={r}>
@@ -274,16 +260,13 @@ export function Users() {
               </option>
             ))}
           </Select>
-        </label>
-        <label>
-          Days
-          <input
-            value={newToken.days}
-            onChange={(e) => setNewToken({ ...newToken, days: e.target.value })}
-            inputMode="numeric"
-            placeholder="never expires"
-          />
-        </label>
+        <TextField
+          label="Days"
+          value={newToken.days}
+          onChange={(days) => setNewToken({ ...newToken, days })}
+          inputMode="numeric"
+          placeholder="never expires"
+        />
         <Button disabled={createToken.isPending || newToken.user_id === 0}>Create</Button>
       </form>
       {createToken.isError && <p className="error">{createToken.error.message}</p>}

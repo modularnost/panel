@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ComposeEditor } from "../components/ComposeEditor";
 import { SAMPLE_COMPOSE, validStackName } from "../stacks";
+import { TextField } from "../components/TextField";
 
 export function StackNew() {
   const [name, setName] = useState("");
@@ -15,11 +16,14 @@ export function StackNew() {
       </p>
       <h1>New stack</h1>
       <div className="form">
-        <label>
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="shop" autoFocus />
-        </label>
-        {bad && <p className="error">Letters, digits, dot, dash and underscore; up to 63 characters.</p>}
+        <TextField
+          label="Name"
+          value={name}
+          onChange={setName}
+          placeholder="shop"
+          autoFocus
+          error={bad ? "Letters, digits, dot, dash and underscore; up to 63 characters." : undefined}
+        />
       </div>
       <ComposeEditor
         name={validStackName(name) ? name : ""}
