@@ -176,3 +176,11 @@ func TestBasicAuthGuessingIsThrottledToo(t *testing.T) {
 		t.Fatalf("the right password while paused must be refused: %d", resp.StatusCode)
 	}
 }
+
+func TestPlural(t *testing.T) {
+	for n, want := range map[int]string{1: "1 second", 2: "2 seconds", 60: "60 seconds"} {
+		if got := plural(n, "second"); got != want {
+			t.Errorf("plural(%d) = %q, want %q", n, got, want)
+		}
+	}
+}

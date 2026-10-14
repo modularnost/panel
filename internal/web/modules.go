@@ -44,22 +44,34 @@ func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	newModuleProxy(name, target, s.Modules.Token(name)).ServeHTTP(w, r)
+}
+
+// newModuleProxy forwards to a module. The module's page is served from the
+// panel's own origin, so what crosses in either direction is limited: the
+// session cookie would let the module act as the signed-in user, and a cookie
+// the module sets would land in the panel's jar (it could replace the session).
+func newModuleProxy(name string, target *url.URL, token string) *httputil.ReverseProxy {
 	prefix := "/modules/" + name
-	proxy := &httputil.ReverseProxy{
+	return &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(target)
 			pr.Out.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(pr.In.URL.Path, prefix), "/")
+			pr.Out.Header.Del("Authorization")
+			pr.Out.Header.Del("Cookie")
 			// How the module calls the core back: its name plus an HMAC of it.
 			pr.Out.Header.Set("X-Panel-Module", name)
-			pr.Out.Header.Set("X-Panel-Token", s.Modules.Token(name))
-			pr.Out.Header.Del("Authorization") // the module has no business with the panel password
+			pr.Out.Header.Set("X-Panel-Token", token)
+		},
+		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Del("Set-Cookie")
+			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			log.Printf("module %s: %v", name, err)
 			http.Error(w, "module not responding", http.StatusBadGateway)
 		},
 	}
-	proxy.ServeHTTP(w, r)
 }
 
 // moduleAuth admits only a module with a valid token and the required permission.

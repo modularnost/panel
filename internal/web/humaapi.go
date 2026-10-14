@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"errors"
-	"fmt"
 	"mime"
 	"net/http"
 	"reflect"
@@ -136,7 +135,7 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 			secs := retryAfterSeconds(wait)
 			return nil, huma.ErrorWithHeaders(
 				problem(http.StatusTooManyRequests, "too_many_attempts",
-					fmt.Sprintf("too many attempts, try again in %d seconds", secs)),
+					"too many attempts, try again in "+plural(secs, "second")),
 				http.Header{"Retry-After": {strconv.Itoa(secs)}})
 		}
 		u, err := s.DB.Authenticate(in.Body.Username, in.Body.Password)
