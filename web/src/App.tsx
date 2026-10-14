@@ -1,17 +1,12 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call } from "./api/client";
+import { useMe } from "./auth";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
+import { Service } from "./pages/Service";
 import { Services } from "./pages/Services";
-
-function useMe() {
-  return useQuery({
-    queryKey: ["me"],
-    queryFn: () => call(api.getMe()),
-  });
-}
 
 function Shell() {
   const me = useMe();
@@ -63,6 +58,7 @@ export function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<Shell />}>
         <Route index element={<Services />} />
+        <Route path="services/:id" element={<Service />} />
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
       </Route>
