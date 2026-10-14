@@ -53,6 +53,7 @@ type Server struct {
 	Metrics *agent.Collector
 	DB      *store.DB
 	Modules *modules.Registry
+	Pages   PageHub
 	Updates *updates.Checker // nil: no release check
 	// Addr is the listen address; modules are told its port to reach the core.
 	Addr string
@@ -76,6 +77,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /internal/services", s.moduleAuth("service:read", s.apiServices))
 	mux.HandleFunc("GET /internal/stats", s.moduleAuth("stats:read", s.apiStats))
 	mux.HandleFunc("POST /internal/services/{name}/update", s.moduleAuth("service:update", s.apiUpdateService))
+	// A module needs no permission to tell that its own page changed.
+	mux.HandleFunc("POST /internal/ui/changed", s.moduleAuth("", s.uiChanged))
 
 	mux.Handle("GET /static/", staticHandler())
 	// Unauthenticated: load balancers and HEALTHCHECK call it.

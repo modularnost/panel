@@ -53,6 +53,17 @@ export function modulePath(name: string, path: string): string {
   return `/module/${name}/${path.replace(/^\/+/, "")}`;
 }
 
+const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
+
+// uiContribution is the contribution a route shows as a document, when the
+// module declared that path with render "ui"; anything else is a frame.
+export function uiContribution(modules: Module[] | undefined, name: string, path: string): Contribution | undefined {
+  const want = trimSlash("/" + path.replace(/^\/+/, ""));
+  return modules
+    ?.find((m) => m.name === name)
+    ?.contributions.find((c) => c.render === "ui" && trimSlash(c.path) === want);
+}
+
 // envLines turns the textarea into KEY=value entries, ignoring blank lines.
 export function envLines(text: string): string[] {
   return text

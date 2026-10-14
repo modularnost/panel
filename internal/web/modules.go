@@ -107,7 +107,7 @@ func (s *Server) moduleAuth(perm string, next func(http.ResponseWriter, *http.Re
 			http.Error(w, "module not found in the cluster", http.StatusUnauthorized)
 			return
 		}
-		if !m.Allowed(perm) {
+		if perm != "" && !m.Allowed(perm) {
 			// Valid token, but the manifest never declared this permission.
 			http.Error(w, "permission "+perm+" not granted", http.StatusForbidden)
 			return

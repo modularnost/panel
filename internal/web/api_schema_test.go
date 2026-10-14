@@ -86,6 +86,8 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"UpdateApply":     apiUpdateApply{},
 		"UpdateStarted":   apiUpdateStarted{},
 		"Login":           apiLogin{},
+		"Document":        apiDocument{},
+		"PageChanged":     apiPageChanged{},
 		"Problem":         apiProblem{},
 		"ProblemBody":     problemBody{},
 	}
