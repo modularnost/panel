@@ -17,12 +17,7 @@ export function Settings() {
     <>
       <h1>Settings</h1>
       <h2>Appearance</h2>
-      <div className="toolbar">
-        <Swatches value={seed} onChange={choose} />
-        <Button variant="text" disabled={seed.toLowerCase() === DEFAULT_SEED} onClick={() => choose(DEFAULT_SEED)}>
-          Reset
-        </Button>
-      </div>
+      <Swatches value={seed} onChange={choose} />
       <p className="muted">Kept in this browser.</p>
       {atLeast(me.data?.role, "admin") && <Updates />}
     </>
