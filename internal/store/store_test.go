@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -150,5 +151,35 @@ func TestRevokeSessionsKeepsNamedTokens(t *testing.T) {
 	}
 	if _, err := db.UserByToken(named); err != nil {
 		t.Errorf("the named token must stay: %v", err)
+	}
+}
+
+func TestBackupIsAReadableCopy(t *testing.T) {
+	dir := t.TempDir()
+	db, err := Open(dir + "/panel.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.CreateUser("ann", "s3cret-pass", RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if path, err := db.Path(); err != nil || !strings.HasSuffix(path, "panel.db") {
+		t.Fatalf("path %q: %v", path, err)
+	}
+	copyPath := dir + "/copy.db"
+	if err := db.Backup(copyPath); err != nil {
+		t.Fatal(err)
+	}
+	cp, err := Open(copyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cp.Close()
+	if n, err := cp.CountUsers(); err != nil || n != 1 {
+		t.Fatalf("copy has %d users: %v", n, err)
+	}
+	if err := db.Backup(copyPath); err == nil {
+		t.Fatal("an existing file must not be overwritten")
 	}
 }

@@ -206,5 +206,6 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	s.registerUserActions(api)
 	s.registerNodeActions(api)
 	s.registerUpdates(api)
+	s.registerUpdateApply(api)
 	return api
 }

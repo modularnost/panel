@@ -31,6 +31,20 @@ func Open(path string) (*DB, error) {
 	return &DB{db}, nil
 }
 
+// Backup writes a consistent copy of the database to dest, which must not
+// exist yet. Migrations only go forward, so this is the way back.
+func (d *DB) Backup(dest string) error {
+	_, err := d.Exec("VACUUM INTO ?", dest)
+	return err
+}
+
+// Path is the database file; empty for an in-memory database.
+func (d *DB) Path() (string, error) {
+	var p string
+	err := d.QueryRow("SELECT file FROM pragma_database_list WHERE name = 'main'").Scan(&p)
+	return p, err
+}
+
 func migrate(db *sql.DB) error {
 	files, err := migrations.ReadDir("migrations")
 	if err != nil {

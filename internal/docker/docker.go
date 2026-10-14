@@ -142,6 +142,40 @@ type Deploy struct {
 
 // ForceUpdate redeploys a service, re-pulling its image from the registry.
 func (c *Client) ForceUpdate(ctx context.Context, nameOrID string) (Deploy, error) {
+	return c.updateSpec(ctx, nameOrID, func(spec *swarm.ServiceSpec, img string) {
+		// Drop the digest pin, or the daemon won't go to the registry for a new image.
+		spec.TaskTemplate.ContainerSpec.Image = img
+		spec.TaskTemplate.ForceUpdate++
+	})
+}
+
+// UpdateImage moves a service to another tag of the same repository. The
+// rollout stops the old task first and rolls back when the new one fails: for
+// the panel the old and the new process must not share the SQLite file.
+func (c *Client) UpdateImage(ctx context.Context, nameOrID, tag string) (Deploy, error) {
+	return c.updateSpec(ctx, nameOrID, func(spec *swarm.ServiceSpec, img string) {
+		spec.TaskTemplate.ContainerSpec.Image = imageRepo(img) + ":" + tag
+		spec.UpdateConfig = &swarm.UpdateConfig{
+			Parallelism:   1,
+			Order:         swarm.UpdateOrderStopFirst,
+			FailureAction: swarm.UpdateFailureActionRollback,
+			Monitor:       30 * time.Second,
+		}
+	})
+}
+
+// imageRepo drops the tag and the digest: ghcr.io/x/panel:edge@sha256:.. -> ghcr.io/x/panel.
+func imageRepo(img string) string {
+	name, _ := splitImage(img)
+	if i := strings.LastIndex(name, ":"); i > strings.LastIndex(name, "/") {
+		name = name[:i]
+	}
+	return name
+}
+
+// updateSpec applies change to the service's spec; img is the image without
+// its digest pin.
+func (c *Client) updateSpec(ctx context.Context, nameOrID string, change func(spec *swarm.ServiceSpec, img string)) (Deploy, error) {
 	var d Deploy
 	// Swarm bumps the service version itself while tasks converge, and then
 	// ServiceUpdate fails with "update out of sequence". Re-inspect and retry.
@@ -154,9 +188,7 @@ func (c *Client) ForceUpdate(ctx context.Context, nameOrID string) (Deploy, erro
 		d.Service, d.OldDigest = s.Spec.Name, oldDigest
 
 		spec := s.Spec
-		// Drop the digest pin, or the daemon won't go to the registry for a new image.
-		spec.TaskTemplate.ContainerSpec.Image = img
-		spec.TaskTemplate.ForceUpdate++
+		change(&spec, img)
 
 		resp, err := c.api.ServiceUpdate(ctx, s.ID, s.Version, spec, swarm.ServiceUpdateOptions{QueryRegistry: true})
 		if err != nil {
