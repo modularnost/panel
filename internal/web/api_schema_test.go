@@ -81,6 +81,8 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"TokenCreated":    apiTokenCreated{},
 		"Availability":    apiAvailability{},
 		"JoinRotate":      apiJoinRotate{},
+		"Release":         apiRelease{},
+		"Updates":         apiUpdates{},
 		"Login":           apiLogin{},
 		"Problem":         apiProblem{},
 		"ProblemBody":     problemBody{},

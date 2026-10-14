@@ -744,3 +744,32 @@ func TestToAPITasks(t *testing.T) {
 		t.Error("no replicas must be an empty list, not null")
 	}
 }
+
+func TestAPIUpdatesAreAdminOnly(t *testing.T) {
+	c, base, db := apiServer(t)
+	const j = "application/json"
+	if status, _ := send(t, c, "GET", base+"/api/v1/updates", "", ""); status != 401 {
+		t.Errorf("anonymous: %d", status)
+	}
+	signIn(t, c, base) // ann, a viewer
+	for _, m := range []string{"GET", "POST"} {
+		path := "/api/v1/updates"
+		if m == "POST" {
+			path += "/check"
+		}
+		if status, _ := send(t, c, m, base+path, j, ""); status != 403 {
+			t.Errorf("%s %s as a viewer: %d", m, path, status)
+		}
+	}
+
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", j, `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatal("sign in as admin")
+	}
+	status, body := send(t, c, "GET", base+"/api/v1/updates", "", "")
+	if rel, ok := body["releases"].([]any); status != 200 || !ok || len(rel) != 0 {
+		t.Fatalf("admin: %d %v", status, body)
+	}
+}

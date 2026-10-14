@@ -113,6 +113,7 @@ it.
 | `PANEL_AGENT_SERVICE` | unset | agent service name, e.g. `panel_agent`; unset means single-node |
 | `PANEL_AGENT_PORT` | `8080` | port the agents listen on |
 | `PANEL_MODE` | unset | `agent` runs this binary as a node agent instead of the panel |
+| `PANEL_UPDATE_CHECK` | on | `off` stops the panel from asking GitHub for new releases |
 
 ## What it does
 

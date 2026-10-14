@@ -19,6 +19,7 @@ import (
 	"modularnost/internal/docker"
 	"modularnost/internal/modules"
 	"modularnost/internal/store"
+	"modularnost/internal/updates"
 	webui "modularnost/web"
 )
 
@@ -50,6 +51,7 @@ type Server struct {
 	Metrics *agent.Collector
 	DB      *store.DB
 	Modules *modules.Registry
+	Updates *updates.Checker // nil: no release check
 }
 
 func (s *Server) Routes() http.Handler {
