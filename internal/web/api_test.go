@@ -417,3 +417,43 @@ func TestHTMLTraefikFormRefusesBadHost(t *testing.T) {
 		t.Fatalf("the HTML form must refuse it too: %d", resp.StatusCode)
 	}
 }
+
+func TestAPIStackActionsAreGated(t *testing.T) {
+	c, base := apiClient(t)
+	const j = "application/json"
+	actions := []struct{ method, path, body string }{
+		{"PUT", "/api/v1/stacks/shop", `{"compose":"services: {}"}`},
+		{"POST", "/api/v1/stacks/shop/redeploy", `{}`},
+		{"DELETE", "/api/v1/stacks/shop", ``},
+	}
+	for _, a := range actions {
+		if status, _ := send(t, c, a.method, base+a.path, j, a.body); status != 401 {
+			t.Errorf("%s %s anonymous: %d", a.method, a.path, status)
+		}
+	}
+	signIn(t, c, base) // ann, a viewer: not even a redeploy
+	for _, a := range actions {
+		if status, body := send(t, c, a.method, base+a.path, j, a.body); status != 403 || errorCode(body) != "forbidden" {
+			t.Errorf("%s %s as viewer: %d %v", a.method, a.path, status, body)
+		}
+	}
+}
+
+func TestAPIStackDeployValidatesBeforeDocker(t *testing.T) {
+	c, base, db := apiServer(t)
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatal("sign in")
+	}
+	for name, tc := range map[string]struct{ path, body string }{
+		"a name that is a flag": {"/api/v1/stacks/-rf", `{"compose":"services: {}"}`},
+		"a name with a slash":   {"/api/v1/stacks/a%2Fb", `{"compose":"services: {}"}`},
+		"an empty compose file": {"/api/v1/stacks/shop", `{"compose":"   "}`},
+	} {
+		if status, body := send(t, c, "PUT", base+tc.path, "application/json", tc.body); status != 422 {
+			t.Errorf("%s: %d %v", name, status, body)
+		}
+	}
+}

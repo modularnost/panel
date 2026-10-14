@@ -347,6 +347,19 @@
         ],
         "type": "object"
       },
+      "StackCompose": {
+        "additionalProperties": false,
+        "properties": {
+          "compose": {
+            "description": "The compose file; services missing from it are removed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "compose"
+        ],
+        "type": "object"
+      },
       "StackDetail": {
         "additionalProperties": false,
         "properties": {
@@ -401,6 +414,22 @@
           "healthy",
           "managed",
           "services"
+        ],
+        "type": "object"
+      },
+      "StackResult": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "output": {
+            "description": "What docker stack deploy printed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
         ],
         "type": "object"
       },
@@ -1356,6 +1385,43 @@
       }
     },
     "/api/v1/stacks/{name}": {
+      "delete": {
+        "operationId": "delete-stack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove every service of the stack and forget its compose file"
+      },
       "get": {
         "operationId": "get-stack",
         "parameters": [
@@ -1399,6 +1465,106 @@
           }
         ],
         "summary": "One stack with its services"
+      },
+      "put": {
+        "operationId": "deploy-stack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StackCompose"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StackResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a stack or update it from a compose file, and keep the file"
+      }
+    },
+    "/api/v1/stacks/{name}/redeploy": {
+      "post": {
+        "operationId": "redeploy-stack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StackResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deploy the stored compose file again, or force-update the services of an adopted stack"
       }
     },
     "/api/v1/stats": {
