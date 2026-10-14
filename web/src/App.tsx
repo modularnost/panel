@@ -6,8 +6,11 @@ import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
 import { ServiceLayout } from "./pages/service/Layout";
+import { ServiceDeploys } from "./pages/service/Deploys";
 import { Logs } from "./pages/service/Logs";
 import { Overview } from "./pages/service/Overview";
+import { Traefik } from "./pages/service/Traefik";
+import { Webhooks } from "./pages/service/Webhooks";
 import { Services } from "./pages/Services";
 
 function Shell() {
@@ -63,6 +66,9 @@ export function App() {
         <Route path="services/:id" element={<ServiceLayout />}>
           <Route index element={<Overview />} />
           <Route path="logs" element={<Logs />} />
+          <Route path="deploys" element={<ServiceDeploys />} />
+          <Route path="traefik" element={<Traefik />} />
+          <Route path="webhooks" element={<Webhooks />} />
         </Route>
         <Route path="resources" element={<Resources />} />
         <Route path="deploys" element={<Deploys />} />
