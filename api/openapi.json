@@ -504,6 +504,9 @@
             "minimum": 0,
             "type": "integer"
           },
+          "self": {
+            "type": "boolean"
+          },
           "service_count": {
             "format": "int64",
             "type": "integer"
@@ -529,6 +532,7 @@
           "desired",
           "healthy",
           "managed",
+          "self",
           "services"
         ],
         "type": "object"
