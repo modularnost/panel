@@ -57,6 +57,8 @@ type Server struct {
 	// AgentService is the swarm service of the node agents; empty on a single node.
 	AgentService string
 	updating     atomic.Bool
+	// Addr is the listen address; modules are told its port to reach the core.
+	Addr string
 }
 
 func (s *Server) Routes() http.Handler {

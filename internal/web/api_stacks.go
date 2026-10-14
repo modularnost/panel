@@ -25,13 +25,16 @@ type apiStack struct {
 }
 
 type apiStackDetail struct {
-	Name         string       `json:"name"`
-	ServiceCount int          `json:"service_count"`
-	Running      uint64       `json:"running"`
-	Desired      uint64       `json:"desired"`
-	Healthy      bool         `json:"healthy"`
-	Managed      bool         `json:"managed"`
-	Services     []apiService `json:"services" nullable:"false"`
+	Name         string `json:"name"`
+	ServiceCount int    `json:"service_count"`
+	Running      uint64 `json:"running"`
+	Desired      uint64 `json:"desired"`
+	Healthy      bool   `json:"healthy"`
+	Managed      bool   `json:"managed"`
+	// Self is the stack the panel itself runs in: the installer owns it, so the
+	// UI offers no editor and no removal.
+	Self     bool         `json:"self"`
+	Services []apiService `json:"services" nullable:"false"`
 	// Compose is for admins only: a compose file is access to the whole cluster.
 	Compose   string     `json:"compose,omitempty"`
 	UpdatedBy string     `json:"updated_by,omitempty"`
@@ -154,6 +157,8 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 			}
 		}
 		detail.Name, detail.Managed = in.Name, managed
+		self, _ := s.Docker.Self(ctx)
+		detail.Self = self.Stack == in.Name
 		if managed {
 			u, _ := ctx.Value(ctxKey{}).(store.User)
 			if store.AtLeast(u.Role, store.RoleAdmin) {
