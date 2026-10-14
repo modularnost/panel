@@ -1,6 +1,23 @@
 {
   "components": {
     "schemas": {
+      "Availability": {
+        "additionalProperties": false,
+        "properties": {
+          "availability": {
+            "enum": [
+              "active",
+              "pause",
+              "drain"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "availability"
+        ],
+        "type": "object"
+      },
       "Deploy": {
         "additionalProperties": false,
         "properties": {
@@ -72,6 +89,22 @@
           "role",
           "address",
           "command"
+        ],
+        "type": "object"
+      },
+      "JoinRotate": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "worker",
+              "manager"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
         ],
         "type": "object"
       },
@@ -1237,6 +1270,108 @@
           }
         ],
         "summary": "The command that adds a server to the cluster"
+      }
+    },
+    "/api/v1/nodes/join/rotate": {
+      "post": {
+        "operationId": "rotate-join-token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinRotate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Join"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the join token: commands issued before stop working for new servers"
+      }
+    },
+    "/api/v1/nodes/{id}/availability": {
+      "put": {
+        "operationId": "set-node-availability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Availability"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Make a node active, paused or drained"
       }
     },
     "/api/v1/services": {

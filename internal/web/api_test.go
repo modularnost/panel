@@ -706,3 +706,35 @@ func TestAPIUserWritesAreAdminOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestAPINodeActionsAreGated(t *testing.T) {
+	c, base := apiClient(t)
+	const j = "application/json"
+	actions := []struct{ method, path, body string }{
+		{"PUT", "/api/v1/nodes/n1/availability", `{"availability":"drain"}`},
+		{"POST", "/api/v1/nodes/join/rotate", `{"role":"worker"}`},
+	}
+	for _, a := range actions {
+		if status, _ := send(t, c, a.method, base+a.path, j, a.body); status != 401 {
+			t.Errorf("%s %s anonymous: %d", a.method, a.path, status)
+		}
+	}
+	signIn(t, c, base)
+	for _, a := range actions {
+		if status, body := send(t, c, a.method, base+a.path, j, a.body); status != 403 || errorCode(body) != "forbidden" {
+			t.Errorf("%s %s as viewer: %d %v", a.method, a.path, status, body)
+		}
+	}
+}
+
+func TestAPINodeActionsValidateBeforeDocker(t *testing.T) {
+	c, base := adminSession(t)
+	for name, tc := range map[string]struct{ method, path, body string }{
+		"an availability that does not exist": {"PUT", "/api/v1/nodes/n1/availability", `{"availability":"explode"}`},
+		"a join role that does not exist":     {"POST", "/api/v1/nodes/join/rotate", `{"role":"owner"}`},
+	} {
+		if status, body := send(t, c, tc.method, base+tc.path, "application/json", tc.body); status != 422 {
+			t.Errorf("%s: %d %v", name, status, body)
+		}
+	}
+}

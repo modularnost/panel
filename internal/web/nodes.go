@@ -43,7 +43,14 @@ func (s *Server) rotateJoinToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setNodeAvailability(w http.ResponseWriter, r *http.Request) {
-	err := s.Docker.SetAvailability(r.Context(), r.PathValue("id"), r.FormValue("availability"))
+	id, availability := r.PathValue("id"), r.FormValue("availability")
+	nodes, err := s.Docker.Nodes(r.Context())
+	if err == nil {
+		err = refuseDrain(nodes, id, availability)
+	}
+	if err == nil {
+		err = s.Docker.SetAvailability(r.Context(), id, availability)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
