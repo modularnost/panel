@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { api, call } from "../../api/client";
 import { useService } from "./Layout";
 import { Button } from "../../components/Button";
+import { TextField } from "../../components/TextField";
 
 export function Traefik() {
   const s = useService();
@@ -51,28 +52,10 @@ export function Traefik() {
 
   return (
     <form className="form" onSubmit={submit}>
-      <label>
-        Host
-        <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="app.example.com" />
-      </label>
-      <label>
-        Container port
-        <input
-          value={port}
-          onChange={(e) => setPort(e.target.value)}
-          inputMode="numeric"
-          pattern="[0-9]*"
-          placeholder="8080"
-        />
-      </label>
-      <label>
-        Entrypoint
-        <input value={entrypoint} onChange={(e) => setEntrypoint(e.target.value)} placeholder="websecure" />
-      </label>
-      <label>
-        Certificate resolver
-        <input value={resolver} onChange={(e) => setResolver(e.target.value)} placeholder="empty: plain HTTP" />
-      </label>
+      <TextField label="Host" value={host} onChange={setHost} placeholder="app.example.com" />
+      <TextField label="Container port" value={port} onChange={setPort} inputMode="numeric" pattern="[0-9]*" placeholder="8080" />
+      <TextField label="Entrypoint" value={entrypoint} onChange={setEntrypoint} placeholder="websecure" />
+      <TextField label="Certificate resolver" value={resolver} onChange={setResolver} placeholder="empty: plain HTTP" />
       {!host && !port && <p className="muted">With no host and no port the service is taken off Traefik.</p>}
       {save.isError && <p className="error">{save.error.message}</p>}
       {save.isSuccess && <p className="muted">Saved. Traefik picks it up on its own.</p>}
