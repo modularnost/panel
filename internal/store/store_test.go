@@ -1,6 +1,8 @@
 package store
 
 import (
+	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -181,5 +183,44 @@ func TestBackupIsAReadableCopy(t *testing.T) {
 	}
 	if err := db.Backup(copyPath); err == nil {
 		t.Fatal("an existing file must not be overwritten")
+	}
+}
+
+// A database from before the column was dropped keeps its webhooks.
+func TestDroppingImagePatternKeepsExistingWebhooks(t *testing.T) {
+	path := t.TempDir() + "/old.db"
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, name := range []string{"0001_init.sql", "0002_users.sql", "0003_stacks.sql"} {
+		text, err := migrations.ReadFile("migrations/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := old.Exec(string(text)); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if _, err := old.Exec(fmt.Sprintf("PRAGMA user_version=%d", i+1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := old.Exec(`INSERT INTO webhooks (service_name, secret_token, action_type, image_pattern)
+		VALUES ('app_web', 'tok', 'force_update', 'ghcr.io/me/app:*')`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	hooks, err := db.Webhooks()
+	if err != nil || len(hooks) != 1 || hooks[0].SecretToken != "tok" || hooks[0].ServiceName != "app_web" {
+		t.Fatalf("hooks=%+v err=%v", hooks, err)
+	}
+	if _, err := db.Exec(`SELECT image_pattern FROM webhooks`); err == nil {
+		t.Fatal("the column must be gone")
 	}
 }

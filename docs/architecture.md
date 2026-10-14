@@ -239,7 +239,6 @@ Store only:
 webhooks (
   id, service_name, stack_name,
   secret_token, action_type,      -- 'force_update' | 'stack_redeploy'
-  image_pattern,
   created_at, last_triggered_at
 )
 

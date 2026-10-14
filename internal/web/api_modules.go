@@ -43,11 +43,10 @@ func toAPIModules(in []modules.Module) []apiModule {
 }
 
 type apiWebhook struct {
-	ID           int64  `json:"id"`
-	Service      string `json:"service,omitempty"`
-	Stack        string `json:"stack,omitempty"`
-	Action       string `json:"action" enum:"force_update,stack_redeploy"`
-	ImagePattern string `json:"image_pattern,omitempty"`
+	ID      int64  `json:"id"`
+	Service string `json:"service,omitempty"`
+	Stack   string `json:"stack,omitempty"`
+	Action  string `json:"action" enum:"force_update,stack_redeploy"`
 	// Path carries the secret: whoever has it can trigger the redeploy, so
 	// webhooks are listed for admins only.
 	Path          string     `json:"path"`
@@ -60,7 +59,7 @@ func toAPIWebhooks(in []store.Webhook) []apiWebhook {
 	for _, w := range in {
 		h := apiWebhook{
 			ID: w.ID, Service: w.ServiceName, Stack: w.StackName, Action: w.ActionType,
-			ImagePattern: w.ImagePattern, Path: "/hook/" + w.SecretToken, CreatedAt: w.CreatedAt,
+			Path: "/hook/" + w.SecretToken, CreatedAt: w.CreatedAt,
 		}
 		if w.LastTriggered.Valid {
 			h.LastTriggered = &w.LastTriggered.Time
