@@ -10,8 +10,7 @@ describe("installCommand", () => {
 
 describe("healthzVersion", () => {
   it("reads the version after ok", () => {
-    expect(healthzVersion("ok v0.2.0
-")).toBe("v0.2.0");
+    expect(healthzVersion("ok v0.2.0\n")).toBe("v0.2.0");
     expect(healthzVersion("ok v0.1.0-4-gabc1234")).toBe("v0.1.0-4-gabc1234");
   });
 });
