@@ -199,8 +199,7 @@ tbody tr:hover {
   color: var(--md-sys-color-on-error-container);
 }
 
-.banner,
-.secret {
+.banner {
   padding: 12px 16px;
   margin-bottom: 16px;
   border-radius: var(--md-sys-shape-medium);

@@ -4,6 +4,7 @@ import { api, call } from "../api/client";
 import type { User } from "../api/generated";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
+import { Banner } from "../components/Banner";
 import { Table } from "../components/Table";
 
 type Role = "admin" | "operator" | "viewer";
@@ -176,7 +177,7 @@ export function Users() {
 
       <h2>API tokens</h2>
       {created && (
-        <div className="secret">
+        <Banner>
           <p>
             Token <strong>{created.name}</strong> — copy it now, it is not shown again:
           </p>
@@ -184,7 +185,7 @@ export function Users() {
           <Button variant="text" onClick={() => setCreated(null)}>
             Done
           </Button>
-        </div>
+        </Banner>
       )}
       {tokens.data.length === 0 ? (
         <p className="muted">No tokens.</p>
