@@ -2,11 +2,16 @@ package web
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 
 	"modularnost/internal/docker"
@@ -166,41 +171,91 @@ func (s *Server) installPage(r *http.Request, errMsg string) installPage {
 // installModule deploys a module image; the panel fills in the labels, the
 // network and the callback address.
 func (s *Server) installModule(w http.ResponseWriter, r *http.Request) {
-	name := strings.TrimSpace(r.FormValue("name"))
-	image := strings.TrimSpace(r.FormValue("image"))
-	port := cmp.Or(strings.TrimSpace(r.FormValue("port")), "8080")
-	network := r.FormValue("network")
-
-	self, _ := s.Docker.Self(r.Context())
-	if network == "" {
-		network = self.Network
-	}
-	env := lines(r.FormValue("env"))
-	if self.Service != "" {
-		env = append(env, "PANEL_CORE_URL=http://"+self.Service+":8080")
-	}
-
-	_, err := s.Docker.CreateService(r.Context(), docker.NewService{
-		Name:     cmp.Or(strings.TrimSpace(r.FormValue("service")), name+"_module"),
-		Image:    image,
-		Replicas: 1,
-		Env:      env,
-		Networks: []string{network},
-		Labels: map[string]string{
-			modules.LabelEnabled: "true",
-			modules.LabelName:    name,
-			modules.LabelPort:    port,
-		},
+	err := s.deployModule(r.Context(), moduleInstall{
+		Name:    r.FormValue("name"),
+		Image:   r.FormValue("image"),
+		Port:    r.FormValue("port"),
+		Service: r.FormValue("service"),
+		Network: r.FormValue("network"),
+		Env:     lines(r.FormValue("env")),
 	})
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		s.render(w, "install.html", s.installPage(r, err.Error()))
 		return
 	}
-	// The module is not up yet, but the list must stop showing the old state.
-	s.Modules.Forget()
 	w.Header().Set("HX-Redirect", "/modules")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type moduleInstall struct {
+	Name, Image, Port, Service, Network string
+	Env                                 []string
+}
+
+var envRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
+
+// validate refuses what would end up in a label, a service name or the
+// environment of a new service.
+func (m moduleInstall) validate() error {
+	if !docker.ValidName(m.Name) {
+		return errors.New("name: letters, digits, dot, dash and underscore only")
+	}
+	if strings.TrimSpace(m.Image) == "" {
+		return errors.New("image is required")
+	}
+	if m.Port != "" {
+		if n, err := strconv.Atoi(m.Port); err != nil || n < 1 || n > 65535 {
+			return errors.New("port: a number from 1 to 65535")
+		}
+	}
+	if m.Service != "" && !docker.ValidName(m.Service) {
+		return errors.New("service: letters, digits, dot, dash and underscore only")
+	}
+	if m.Network != "" && !docker.ValidName(m.Network) {
+		return errors.New("network: letters, digits, dot, dash and underscore only")
+	}
+	for _, e := range m.Env {
+		if !envRe.MatchString(e) {
+			return errors.New("env: each entry is KEY=value, got " + strconv.Quote(e))
+		}
+	}
+	return nil
+}
+
+// deployModule creates the service that makes a module appear in the panel: the
+// labels, the overlay network and the core's address are filled in here.
+func (s *Server) deployModule(ctx context.Context, m moduleInstall) error {
+	m.Name, m.Image = strings.TrimSpace(m.Name), strings.TrimSpace(m.Image)
+	m.Port, m.Service = strings.TrimSpace(m.Port), strings.TrimSpace(m.Service)
+	m.Network = strings.TrimSpace(m.Network)
+	if err := m.validate(); err != nil {
+		return err
+	}
+
+	self, _ := s.Docker.Self(ctx)
+	env := slices.Clone(m.Env)
+	if self.Service != "" {
+		env = append(env, "PANEL_CORE_URL=http://"+self.Service+":8080")
+	}
+	_, err := s.Docker.CreateService(ctx, docker.NewService{
+		Name:     cmp.Or(m.Service, m.Name+"_module"),
+		Image:    m.Image,
+		Replicas: 1,
+		Env:      env,
+		Networks: []string{cmp.Or(m.Network, self.Network)},
+		Labels: map[string]string{
+			modules.LabelEnabled: "true",
+			modules.LabelName:    m.Name,
+			modules.LabelPort:    cmp.Or(m.Port, "8080"),
+		},
+	})
+	if err != nil {
+		return err
+	}
+	// The module is not up yet, but the list must stop showing the old state.
+	s.Modules.Forget()
+	return nil
 }
 
 // uninstallModule removes the module's service only, not its image or data.

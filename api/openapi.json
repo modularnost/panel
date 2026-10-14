@@ -141,6 +141,61 @@
         ],
         "type": "object"
       },
+      "ModuleInstall": {
+        "additionalProperties": false,
+        "properties": {
+          "env": {
+            "description": "KEY=value entries",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "image": {
+            "type": "string"
+          },
+          "name": {
+            "description": "Shown in the panel and used in the module's URL",
+            "type": "string"
+          },
+          "network": {
+            "description": "Overlay network; the panel's own when empty",
+            "type": "string"
+          },
+          "port": {
+            "description": "The module's HTTP port; 8080 when empty",
+            "type": "string"
+          },
+          "service": {
+            "description": "Swarm service name; \u003cname\u003e_module when empty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "image"
+        ],
+        "type": "object"
+      },
+      "ModuleInstalled": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "service"
+        ],
+        "type": "object"
+      },
       "NavEntry": {
         "additionalProperties": false,
         "properties": {
@@ -635,6 +690,34 @@
           "created_at"
         ],
         "type": "object"
+      },
+      "WebhookCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "force_update",
+              "stack_redeploy"
+            ],
+            "type": "string"
+          },
+          "image_pattern": {
+            "description": "Stored, but not enforced yet",
+            "type": "string"
+          },
+          "service": {
+            "description": "Required for force_update",
+            "type": "string"
+          },
+          "stack": {
+            "description": "Required for stack_redeploy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -860,6 +943,89 @@
           }
         ],
         "summary": "Installed modules with their manifests"
+      },
+      "post": {
+        "operationId": "install-module",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleInstall"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleInstalled"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deploy a module image as a service the panel will pick up"
+      }
+    },
+    "/api/v1/modules/{name}": {
+      "delete": {
+        "operationId": "uninstall-module",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the module's service; its image and data are not touched"
       }
     },
     "/api/v1/nodes": {
@@ -1745,6 +1911,90 @@
           }
         ],
         "summary": "All webhooks"
+      },
+      "post": {
+        "operationId": "create-webhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a webhook; its path carries the secret"
+      }
+    },
+    "/api/v1/webhooks/{id}": {
+      "delete": {
+        "operationId": "delete-webhook",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a webhook"
       }
     }
   }
