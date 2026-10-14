@@ -43,7 +43,7 @@ type Props = {
 };
 
 export function TextField({ onChange, value, autoFocus, error, mono, autoComplete, ...rest }: Props) {
-  const ref = useRef<HTMLElement & { value: string; form: HTMLFormElement | null }>(null);
+  const ref = useRef<HTMLElement & { value: string; form: HTMLFormElement | null; updateComplete: Promise<unknown> }>(null);
   const multiline = rest.type === "textarea";
 
   useEffect(() => {
@@ -65,6 +65,14 @@ export function TextField({ onChange, value, autoFocus, error, mono, autoComplet
   useEffect(() => {
     if (autoFocus) ref.current?.focus();
   }, [autoFocus]);
+
+  // The field has no spellcheck option and the attribute does not cross its shadow root.
+  const { spellCheck } = rest;
+  useEffect(() => {
+    const el = ref.current;
+    if (spellCheck !== false || !el) return;
+    void el.updateComplete.then(() => el.shadowRoot?.querySelector("input, textarea")?.setAttribute("spellcheck", "false"));
+  }, [spellCheck]);
 
   return (
     <md-outlined-text-field
