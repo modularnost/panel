@@ -236,6 +236,44 @@ module that needs it.
 authenticates, and how many open tabs it may hold. Isolating a frame and
 reporting its height concern frame mode only.
 
+### 9. A node firewall of our own (decided 2026-10-15)
+
+A fresh install left the swarm's ports (2377, 7946, 4789) on the public
+interface: `docker swarm init` listens everywhere, and nothing restricted it.
+The panel holds the cluster, so the host it starts on is not left that way.
+
+- **A service with the host's network.** `PANEL_MODE=firewall`, the panel's
+  binary, global, with `network: host` and `cap_add: NET_ADMIN` and no Docker
+  socket. A Swarm service cannot be privileged, and the host's `iptables` need
+  the host's network namespace. It is separate from the agent on purpose: the
+  agent reads the socket and is on the overlay; this one changes the host and
+  must not be. It listens on nothing, so the host gains no port: it asks the
+  panel at its public address (`PANEL_CORE_URL`, a host-network container is off
+  the overlay), authenticated with the module secret as the agents are, applies
+  what it is told and reports back.
+- **One mechanism, ours.** One chain, `MODULARNOST`, hooked into `INPUT`, rebuilt
+  whole and atomically with `iptables-restore`, for IPv4 and IPv6. Not `ufw`:
+  Debian has none, and two firewalls on one host confuse each other. In order:
+  established traffic, loopback and the Docker bridges, SSH (the port or ports
+  `sshd` listens on, and 22 always, whatever the panel says), the allowed ports,
+  the swarm's ports for the nodes' addresses and ESP, then drop. A rule set that
+  cannot be applied leaves the previous one; a stopped service leaves its rules
+  in the kernel, which fails closed.
+- **Closes what we opened, breaks nothing else.** The swarm's ports are closed
+  to everyone but the nodes, whose addresses come from Swarm itself, and to a
+  server that was allowed to join, which the Nodes page asks for before the
+  join. What the host already listened on before the install is allowed and
+  listed, and the list is not extended by a later run.
+- **The overlay is created encrypted.** It cannot be encrypted afterwards, and
+  on one node it costs nothing.
+
+**Not yet.** A port a container publishes is DNATed before `INPUT` and is not
+touched by this chain; closing those, and a screen that opens a port from the
+panel, are the next step (the `DOCKER-USER` chain, and the allowed ports in the
+database, not as labels, which a `docker stack deploy` would remove).
+
+**Not chosen.** `ufw`. Listening on loopback: a worker has to reach 2377.
+Putting the rules in the panel or the agent: they would need the host's network.
 ## Feature order (do not change without discussion)
 
 1. **Core MVP**:
@@ -291,7 +329,8 @@ reporting its height concern frame mode only.
    an overlay network, Traefik with an ACME resolver, and the panel behind it on
    a real domain with TLS. Points to settle when it is written:
    - the panel stops publishing 8080 and gets Traefik labels of its own, so the
-     only ports open on the host are 80 and 443
+     only ports a service of ours opens on the host are 80 and 443; what the
+     host as a whole answers on is the node firewall's business (ADR 9)
    - ACME storage lives on a volume pinned to the same node as the SQLite file
    - the script asks for a domain and an email, and nothing else; the admin
      password is generated and printed once

@@ -49,6 +49,43 @@ in step with an update.
 | `PANEL_IMAGE` | `ghcr.io/modularnost/panel:$PANEL_VERSION` | your own build |
 | `PANEL_STACK` | `panel` | stack name |
 | `ADVERTISE_ADDR` | detected | swarm address, if the host has several |
+| `FIREWALL` | `on` | `off` leaves the host's firewall as it was, see [Ports](#ports) |
+| `FIREWALL_ALLOW` | | more ports to keep reachable, `10050/tcp,53/udp` |
+
+### Ports
+
+The installer closes the host: from the internet only SSH, 80 and 443 answer,
+and the swarm's own ports (2377, 7946, 4789 and ESP) answer only to the nodes of
+the cluster. A small service on every node, `firewall`, keeps one iptables chain
+of its own, `MODULARNOST`, in step with the panel; it holds `NET_ADMIN` and the
+host's network and nothing else, and listens on nothing.
+
+| Port | Open to | |
+| --- | --- | --- |
+| SSH (the ports `sshd` listens on, and 22) | everyone | never closed by this |
+| 80, 443 | everyone | Traefik and the certificate challenge |
+| 2377, 7946, 4789, ESP | the nodes of the cluster and servers allowed on the Nodes page | the swarm |
+| what listened here before the install | everyone, as before | listed at the end of the install; `/etc/modularnost/firewall-keep` |
+| anything else | nobody | |
+
+What was there before stays reachable, so that an install does not break what a
+server already did; the list is written down at the first install and not
+extended by a later run. `FIREWALL_ALLOW` adds to it.
+
+**A port a service publishes is not closed yet.** Docker publishes it before the
+host's firewall sees the packet, so this chain does not cover it: a service that
+publishes 5432 is open to the world until a later release adds the rule that
+closes it. Publish only what you mean to, and prefer routing HTTP through Traefik.
+
+To add a server, open **Nodes**, **Add a server**, give its address and run the
+command it shows on that server. The address is allowed for a day or until the
+node appears in the swarm. Between servers of different providers a private
+network or WireGuard (`ADVERTISE_ADDR`) is still the better way. The overlay
+network is created encrypted, which costs nothing on one node.
+
+The rules live in the kernel: a stopped service leaves them in place, a reboot
+clears them until the service is back (some seconds), and `uninstall.sh` removes
+the chain on the node it runs on.
 
 To remove it again — the swarm and other stacks are left alone:
 

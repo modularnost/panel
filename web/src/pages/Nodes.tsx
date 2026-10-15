@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
+import { TextField } from "../components/TextField";
 
 type Role = "worker" | "manager";
 
@@ -21,6 +22,24 @@ export function Nodes() {
   const join = useQuery({
     queryKey: ["join", role],
     queryFn: () => call(api.getJoin({ role })),
+  });
+
+  const [address, setAddress] = useState("");
+  const peers = useQuery({
+    queryKey: ["firewall-peers"],
+    queryFn: () => call(api.listFirewallPeers()),
+    refetchInterval: 10_000,
+  });
+  const allow = useMutation({
+    mutationFn: () => call(api.allowFirewallPeer({ address: address.trim() })),
+    onSuccess: () => {
+      setAddress("");
+      queryClient.invalidateQueries({ queryKey: ["firewall-peers"] });
+    },
+  });
+  const revoke = useMutation({
+    mutationFn: (a: string) => call(api.revokeFirewallPeer({ address: a })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["firewall-peers"] }),
   });
 
   const { confirm } = useDialogs();
@@ -62,6 +81,7 @@ export function Nodes() {
             <th>Status</th>
             <th>Availability</th>
             <th>Address</th>
+            <th>Firewall</th>
             <th>Engine</th>
           </tr>
         </thead>
@@ -90,6 +110,9 @@ export function Nodes() {
                 </Select>
               </td>
               <td className="mono">{n.address ?? ""}</td>
+              <td>
+                <Chip tone={n.firewall === "applied" ? "ok" : n.firewall === "failed" ? "bad" : ""}>{n.firewall}</Chip>
+              </td>
               <td className="muted">
                 {n.engine} {n.os}
               </td>
@@ -100,6 +123,27 @@ export function Nodes() {
       {setAvailability.isError && <p className="error">{setAvailability.error.message}</p>}
 
       <h2>Add a server</h2>
+      <p className="muted">The swarm's ports are closed to everyone but the nodes: allow the new server's address first.</p>
+      <form className="toolbar" onSubmit={(e) => (e.preventDefault(), allow.mutate())}>
+        <TextField label="Address of the server" value={address} onChange={setAddress} placeholder="203.0.113.7" required />
+        <Button variant="tonal" disabled={allow.isPending}>
+          Allow
+        </Button>
+      </form>
+      {allow.isError && <p className="error">{allow.error.message}</p>}
+      {peers.data && peers.data.length > 0 && (
+        <p>
+          Waiting to join:{" "}
+          {peers.data.map((p) => (
+            <span key={p.address}>
+              <span className="mono">{p.address}</span>{" "}
+              <Button variant="text" disabled={revoke.isPending} onClick={() => revoke.mutate(p.address)}>
+                Revoke
+              </Button>{" "}
+            </span>
+          ))}
+        </p>
+      )}
       <div className="toolbar">
         <Select label="Joins as" value={role} onChange={(v) => setRole(v as Role)}>
             <option value="worker">worker</option>

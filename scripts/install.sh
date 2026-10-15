@@ -154,7 +154,9 @@ fi
 # recreated, and on one node it costs nothing. A second server then talks over
 # IPsec, which needs ESP between the nodes (the firewall allows it for them).
 if docker network inspect "$NET" >/dev/null 2>&1; then
-	if [ "$(docker network inspect "$NET" --format '{{index .Options "encrypted"}}' 2>/dev/null)" != true ]; then
+	# The option is a flag: Docker stores it with an empty value, so ask whether
+	# the key is there, not what it says.
+	if ! docker network inspect "$NET" --format '{{json .Options}}' 2>/dev/null | grep -q '"encrypted"'; then
 		NET_PLAIN=yes
 	fi
 else
