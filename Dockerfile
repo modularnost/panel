@@ -24,8 +24,9 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
 
 FROM alpine:3.22
 # The CLI is what implements `docker stack deploy`: compose is a client-side
-# format the daemon API knows nothing about.
-RUN apk add --no-cache docker-cli
+# format the daemon API knows nothing about. iptables is for the node firewall
+# (ADR 9), which only ever runs as the same binary with the host's network.
+RUN apk add --no-cache docker-cli iptables ip6tables
 COPY --from=build /panel /panel
 ENV PANEL_DB=/data/modularnost.db
 VOLUME /data
