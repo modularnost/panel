@@ -143,6 +143,38 @@
         ],
         "type": "object"
       },
+      "FirewallPeer": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "FirewallPeerAddress": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "description": "The public address of the server that is going to join",
+            "maxLength": 45,
+            "minLength": 2,
+            "type": "string"
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "type": "object"
+      },
       "Join": {
         "additionalProperties": false,
         "properties": {
@@ -332,6 +364,15 @@
           "engine": {
             "type": "string"
           },
+          "firewall": {
+            "description": "Whether the node's firewall reported the current rules lately",
+            "enum": [
+              "applied",
+              "failed",
+              "unknown"
+            ],
+            "type": "string"
+          },
           "hostname": {
             "type": "string"
           },
@@ -361,7 +402,8 @@
           "role",
           "leader",
           "status",
-          "availability"
+          "availability",
+          "firewall"
         ],
         "type": "object"
       },
@@ -1221,6 +1263,127 @@
           }
         ],
         "summary": "Recent deploys, newest first"
+      }
+    },
+    "/api/v1/firewall/peers": {
+      "delete": {
+        "operationId": "revoke-firewall-peer",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close the swarm's ports to a server again"
+      },
+      "get": {
+        "operationId": "list-firewall-peers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FirewallPeer"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Servers allowed to join that are not in the swarm yet"
+      },
+      "post": {
+        "operationId": "allow-firewall-peer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirewallPeerAddress"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirewallPeer"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open the swarm's ports to a server that is going to join, for a day or until it has"
       }
     },
     "/api/v1/me": {

@@ -247,3 +247,54 @@ func (d *DB) DeleteStack(name string) error {
 	_, err := d.Exec(`DELETE FROM stacks WHERE name=?`, name)
 	return err
 }
+
+// FirewallPeers are the addresses of servers that were allowed to join and
+// have not yet appeared in the swarm.
+func (d *DB) FirewallPeers() ([]FirewallPeer, error) {
+	rows, err := d.Query(`SELECT address, created_at FROM firewall_peers ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FirewallPeer
+	for rows.Next() {
+		var p FirewallPeer
+		if err := rows.Scan(&p.Address, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+type FirewallPeer struct {
+	Address   string
+	CreatedAt time.Time
+}
+
+func (d *DB) AddFirewallPeer(address string) error {
+	_, err := d.Exec(`INSERT INTO firewall_peers (address) VALUES (?)
+		ON CONFLICT(address) DO UPDATE SET created_at = CURRENT_TIMESTAMP`, address)
+	return err
+}
+
+func (d *DB) DeleteFirewallPeer(address string) error {
+	_, err := d.Exec(`DELETE FROM firewall_peers WHERE address = ?`, address)
+	return err
+}
+
+// PruneFirewallPeers drops what is older than max and what Swarm knows now.
+func (d *DB) PruneFirewallPeers(max time.Duration, known map[string]bool) error {
+	peers, err := d.FirewallPeers()
+	if err != nil {
+		return err
+	}
+	for _, p := range peers {
+		if known[p.Address] || time.Since(p.CreatedAt) > max {
+			if err := d.DeleteFirewallPeer(p.Address); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
