@@ -203,7 +203,8 @@ func TestClearTakesTheChainAway(t *testing.T) {
 }
 
 func TestTokenIsStableAndKeyedByTheSecret(t *testing.T) {
-	if Token("a") != Token("a") || Token("a") == Token("b") || len(Token("a")) != 64 {
+	first, again := Token("a"), Token("a")
+	if first != again || first == Token("b") || len(first) != 64 {
 		t.Error("token")
 	}
 }
