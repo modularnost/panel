@@ -11,6 +11,7 @@ import { ModuleInstall } from "./pages/ModuleInstall";
 import { ModulePage } from "./pages/ModulePage";
 import { Modules } from "./pages/Modules";
 import { Nodes } from "./pages/Nodes";
+import { Ports } from "./pages/Ports";
 import { Resources } from "./pages/Resources";
 import { Stack } from "./pages/Stack";
 import { StackNew } from "./pages/StackNew";
@@ -107,6 +108,10 @@ function Shell() {
               <Icon name="hub" />
               Nodes
             </NavLink>
+            <NavLink to="/ports" className="item">
+              <Icon name="dns" />
+              Ports
+            </NavLink>
             <NavLink to="/webhooks" className="item">
               <Icon name="webhook" />
               Webhooks
@@ -171,6 +176,7 @@ export function App() {
           <Route path="install-module" element={<ModuleInstall />} />
           <Route path="module/:name/*" element={<ModulePage />} />
           <Route path="nodes" element={<Nodes />} />
+          <Route path="ports" element={<Ports />} />
           <Route path="webhooks" element={<Webhooks />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />

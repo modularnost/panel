@@ -1,12 +1,15 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"crypto/hmac"
 	"encoding/json"
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,7 +22,7 @@ import (
 
 // FirewallConfig is what the installer told the panel about the host the
 // cluster started on: the SSH ports to keep, and the listeners that were there
-// before the install and stay open.
+// before the install and stay open (copied to the database once, see Seed).
 type FirewallConfig struct {
 	SSH  []int
 	Keep []firewall.Port
@@ -135,13 +138,17 @@ func (s *Server) currentFirewallSpec(ctx context.Context) (firewall.Spec, error)
 	for _, p := range pending {
 		addrs = append(addrs, p.Address)
 	}
-	return buildFirewallSpec(s.Firewall, nodes, addrs), nil
+	ports, err := s.DB.FirewallPorts()
+	if err != nil {
+		return firewall.Spec{}, err
+	}
+	return buildFirewallSpec(s.Firewall, nodes, addrs, ports), nil
 }
 
-// buildFirewallSpec: the panel and the web are always allowed, the installer's
-// list is kept, and the swarm's ports are for the nodes Swarm knows and the
+// buildFirewallSpec: the panel and the web are always allowed, so are the ports
+// of the Ports page, and the swarm's ports are for the nodes Swarm knows and the
 // servers allowed to join.
-func buildFirewallSpec(cfg FirewallConfig, nodes []docker.Node, pending []string) firewall.Spec {
+func buildFirewallSpec(cfg FirewallConfig, nodes []docker.Node, pending []string, ports []store.FirewallPort) firewall.Spec {
 	var peers []string
 	for _, n := range nodes {
 		if h, ok := hostOf(n.Address); ok {
@@ -150,7 +157,9 @@ func buildFirewallSpec(cfg FirewallConfig, nodes []docker.Node, pending []string
 	}
 	peers = append(peers, pending...)
 	allow := []firewall.Port{{Port: 80, Proto: "tcp"}, {Port: 443, Proto: "tcp"}}
-	allow = append(allow, cfg.Keep...)
+	for _, p := range ports {
+		allow = append(allow, firewall.Port{Port: p.Port, Proto: p.Proto})
+	}
 	return firewall.Spec{SSH: cfg.SSH, Allow: allow, Peers: peers}
 }
 func (s *Server) firewallApplied(w http.ResponseWriter, r *http.Request) {
@@ -187,6 +196,7 @@ type firewallPeersOutput struct {
 
 func (s *Server) registerFirewall(api huma.API) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
+	s.registerFirewallPorts(api, admin)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "list-firewall-peers", Method: http.MethodGet, Path: "/api/v1/firewall/peers",
@@ -236,4 +246,119 @@ func (s *Server) registerFirewall(api huma.API) {
 		}
 		return nil, nil
 	})
+}
+
+// Seed copies the listeners that were there before the install into the
+// database, the first time only.
+func (c FirewallConfig) Seed(db *store.DB) error {
+	ports := make([]store.FirewallPort, len(c.Keep))
+	for i, p := range c.Keep {
+		ports[i] = store.FirewallPort{Port: p.Port, Proto: p.Proto, Note: "there before the install"}
+	}
+	return db.SeedFirewallPorts(ports)
+}
+
+type apiFirewallPort struct {
+	Port  int    `json:"port"`
+	Proto string `json:"proto"`
+	Note  string `json:"note"`
+	// Fixed ports (SSH, 80, 443) cannot be removed.
+	Fixed bool `json:"fixed"`
+}
+
+type apiPublishedPort struct {
+	Port    int    `json:"port"`
+	Proto   string `json:"proto"`
+	Service string `json:"service"`
+	Open    bool   `json:"open" doc:"Reachable from the internet"`
+}
+
+type apiFirewallPorts struct {
+	Allowed   []apiFirewallPort  `json:"allowed" nullable:"false"`
+	Published []apiPublishedPort `json:"published" nullable:"false"`
+}
+
+type firewallPortsOutput struct{ Body apiFirewallPorts }
+
+type apiNewFirewallPort struct {
+	Port  int    `json:"port" minimum:"1" maximum:"65535"`
+	Proto string `json:"proto" enum:"tcp,udp"`
+	Note  string `json:"note,omitempty" maxLength:"200"`
+}
+
+type firewallPortInput struct{ Body apiNewFirewallPort }
+
+func (s *Server) firewallPorts(ctx context.Context) (apiFirewallPorts, error) {
+	stored, err := s.DB.FirewallPorts()
+	if err != nil {
+		return apiFirewallPorts{}, err
+	}
+	out := apiFirewallPorts{Allowed: []apiFirewallPort{}, Published: []apiPublishedPort{}}
+	open := map[firewall.Port]bool{}
+	for _, p := range []int{80, 443} {
+		out.Allowed = append(out.Allowed, apiFirewallPort{Port: p, Proto: "tcp", Note: "the panel and Traefik", Fixed: true})
+		open[firewall.Port{Port: p, Proto: "tcp"}] = true
+	}
+	for _, p := range stored {
+		out.Allowed = append(out.Allowed, apiFirewallPort{Port: p.Port, Proto: p.Proto, Note: p.Note})
+		open[firewall.Port{Port: p.Port, Proto: p.Proto}] = true
+	}
+	svcs, err := s.Docker.Services(ctx)
+	if err != nil {
+		return out, nil // the allowed list is still worth showing
+	}
+	for _, sv := range svcs {
+		for _, p := range sv.Ports {
+			out.Published = append(out.Published, apiPublishedPort{p.Port, p.Proto, sv.Name, open[firewall.Port{Port: p.Port, Proto: p.Proto}]})
+		}
+	}
+	slices.SortFunc(out.Published, func(a, b apiPublishedPort) int { return cmp.Or(a.Port-b.Port, strings.Compare(a.Proto, b.Proto)) })
+	return out, nil
+}
+
+func (s *Server) registerFirewallPorts(api huma.API, admin huma.Middlewares) {
+	huma.Register(api, huma.Operation{
+		OperationID: "list-firewall-ports", Method: http.MethodGet, Path: "/api/v1/firewall/ports",
+		Summary: "Ports open to everyone, and the ports services publish", Middlewares: admin, Security: signedIn,
+	}, func(ctx context.Context, _ *struct{}) (*firewallPortsOutput, error) {
+		out, err := s.firewallPorts(ctx)
+		if err != nil {
+			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+		}
+		return &firewallPortsOutput{Body: out}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "allow-firewall-port", Method: http.MethodPost, Path: "/api/v1/firewall/ports",
+		Summary: "Open a port to everyone, on every node", Middlewares: admin, Security: signedIn,
+		DefaultStatus: http.StatusCreated,
+	}, func(ctx context.Context, in *firewallPortInput) (*struct{ Body apiFirewallPort }, error) {
+		b := in.Body
+		if swarmOwned(b.Port, b.Proto) {
+			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "that port belongs to the swarm and is open to the cluster's nodes already")
+		}
+		if err := s.DB.AddFirewallPort(store.FirewallPort{Port: b.Port, Proto: b.Proto, Note: b.Note}); err != nil {
+			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+		}
+		return &struct{ Body apiFirewallPort }{apiFirewallPort{Port: b.Port, Proto: b.Proto, Note: b.Note}}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "close-firewall-port", Method: http.MethodDelete, Path: "/api/v1/firewall/ports",
+		Summary: "Close a port again", Middlewares: admin, Security: signedIn,
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *struct {
+		Port  int    `query:"port" required:"true"`
+		Proto string `query:"proto" required:"true" enum:"tcp,udp"`
+	}) (*struct{}, error) {
+		if err := s.DB.DeleteFirewallPort(in.Port, in.Proto); err != nil {
+			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+		}
+		return nil, nil
+	})
+}
+
+// swarmOwned: opening these to everyone would undo the cluster's own rule.
+func swarmOwned(port int, proto string) bool {
+	return (proto == "tcp" && (port == 2377 || port == 7946)) || (proto == "udp" && (port == 7946 || port == 4789))
 }

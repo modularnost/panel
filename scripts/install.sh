@@ -153,12 +153,21 @@ fi
 # Encrypted from the start: an overlay cannot be encrypted afterwards, only
 # recreated, and on one node it costs nothing. A second server then talks over
 # IPsec, which needs ESP between the nodes (the firewall allows it for them).
+# Some images switch the ESP module off; an encrypted overlay then carries
+# nothing between servers, so it is created plain there and the end says so.
+ESP=yes
+modprobe esp4 >/dev/null 2>&1 || grep -qw '^esp4' /proc/modules || ESP=no
 if docker network inspect "$NET" >/dev/null 2>&1; then
 	# The option is a flag: Docker stores it with an empty value, so ask whether
 	# the key is there, not what it says.
 	if ! docker network inspect "$NET" --format '{{json .Options}}' 2>/dev/null | grep -q '"encrypted"'; then
 		NET_PLAIN=yes
+	elif [ "$ESP" = no ]; then
+		NET_BROKEN=yes
 	fi
+elif [ "$ESP" = no ]; then
+	run docker network create --driver overlay --attachable "$NET"
+	NET_PLAIN=yes
 else
 	run docker network create --driver overlay --opt encrypted --attachable "$NET"
 fi
@@ -419,7 +428,13 @@ summary() {
 	else
 		echo "  Firewall  NOT in force: its service did not start (docker service ps ${STACK}_firewall --no-trunc)"
 	fi
-	if [ "${NET_PLAIN:-}" = yes ]; then
+	if [ "${NET_BROKEN:-}" = yes ]; then
+		echo "  Network   $NET is encrypted but this kernel has no IPsec (esp4): a second server will not reach it."
+		echo "            recreate it without --opt encrypted before adding one"
+	elif [ "${NET_PLAIN:-}" = yes ] && [ "$ESP" = no ]; then
+		echo "  Network   $NET is not encrypted: this kernel has no IPsec (esp4). Traffic between servers"
+		echo "            travels in the clear, so join servers over a private network or WireGuard (ADVERTISE_ADDR)"
+	elif [ "${NET_PLAIN:-}" = yes ]; then
 		echo "  Network   $NET was created earlier and is not encrypted; recreate it to encrypt traffic between servers"
 	fi
 	if [ "$FIRST_RUN" = yes ]; then

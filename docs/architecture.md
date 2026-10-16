@@ -263,14 +263,21 @@ The panel holds the cluster, so the host it starts on is not left that way.
   to everyone but the nodes, whose addresses come from Swarm itself, and to a
   server that was allowed to join, which the Nodes page asks for before the
   join. What the host already listened on before the install is allowed and
-  listed, and the list is not extended by a later run.
-- **The overlay is created encrypted.** It cannot be encrypted afterwards, and
-  on one node it costs nothing.
-
-**Not yet.** A port a container publishes is DNATed before `INPUT` and is not
-touched by this chain; closing those, and a screen that opens a port from the
-panel, are the next step (the `DOCKER-USER` chain, and the allowed ports in the
-database, not as labels, which a `docker stack deploy` would remove).
+  listed, and it is the starting point of the Ports page.
+- **The overlay is created encrypted, when the kernel can.** It cannot be
+  encrypted afterwards, and on one node it costs nothing. Docker does it with
+  IPsec, which needs the `esp4` module; some images switch it off, and an
+  encrypted overlay then carries nothing between servers. The installer
+  creates the network plain there and says so (WireGuard instead is #94).
+- **Published ports are closed by a second chain.** A port a container
+  publishes is redirected (DNAT) before `INPUT`, so `MODULARNOST-FWD`, hooked
+  into `DOCKER-USER`, drops what was redirected unless its original port is
+  allowed; traffic from the docker bridges is not touched. Docker keeps
+  `DOCKER-USER` across restarts and the service restores the jump every 30
+  seconds if it is gone.
+- **Allowed ports live in the database,** not as service labels, which a
+  `docker stack deploy` would remove. The installer's list of earlier
+  listeners is copied in once; the Ports page changes it from there.
 
 **Not chosen.** `ufw`. Listening on loopback: a worker has to reach 2377.
 Putting the rules in the panel or the agent: they would need the host's network.

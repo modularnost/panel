@@ -175,6 +175,53 @@
         ],
         "type": "object"
       },
+      "FirewallPort": {
+        "additionalProperties": false,
+        "properties": {
+          "fixed": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          },
+          "port": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "proto": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "port",
+          "proto",
+          "note",
+          "fixed"
+        ],
+        "type": "object"
+      },
+      "FirewallPorts": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed": {
+            "items": {
+              "$ref": "#/components/schemas/FirewallPort"
+            },
+            "type": "array"
+          },
+          "published": {
+            "items": {
+              "$ref": "#/components/schemas/PublishedPort"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "allowed",
+          "published"
+        ],
+        "type": "object"
+      },
       "Join": {
         "additionalProperties": false,
         "properties": {
@@ -352,6 +399,33 @@
         ],
         "type": "object"
       },
+      "NewFirewallPort": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "port": {
+            "format": "int64",
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "proto": {
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "port",
+          "proto"
+        ],
+        "type": "object"
+      },
       "Node": {
         "additionalProperties": false,
         "properties": {
@@ -444,6 +518,32 @@
         "required": [
           "code",
           "message"
+        ],
+        "type": "object"
+      },
+      "PublishedPort": {
+        "additionalProperties": false,
+        "properties": {
+          "open": {
+            "description": "Reachable from the internet",
+            "type": "boolean"
+          },
+          "port": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "proto": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "port",
+          "proto",
+          "service",
+          "open"
         ],
         "type": "object"
       },
@@ -1384,6 +1484,138 @@
           }
         ],
         "summary": "Open the swarm's ports to a server that is going to join, for a day or until it has"
+      }
+    },
+    "/api/v1/firewall/ports": {
+      "delete": {
+        "operationId": "close-firewall-port",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "port",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "proto",
+            "required": true,
+            "schema": {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close a port again"
+      },
+      "get": {
+        "operationId": "list-firewall-ports",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirewallPorts"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ports open to everyone, and the ports services publish"
+      },
+      "post": {
+        "operationId": "allow-firewall-port",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewFirewallPort"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirewallPort"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open a port to everyone, on every node"
       }
     },
     "/api/v1/me": {

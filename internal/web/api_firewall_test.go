@@ -9,6 +9,7 @@ import (
 
 	"modularnost/internal/docker"
 	"modularnost/internal/firewall"
+	"modularnost/internal/store"
 )
 
 func TestHostOfTakesTheAddressOutOfWhatSwarmReports(t *testing.T) {
@@ -30,9 +31,9 @@ func TestHostOfTakesTheAddressOutOfWhatSwarmReports(t *testing.T) {
 }
 
 func TestBuildFirewallSpec(t *testing.T) {
-	cfg := FirewallConfig{SSH: []int{2222}, Keep: []firewall.Port{{Port: 10050, Proto: "tcp"}}}
+	cfg := FirewallConfig{SSH: []int{2222}}
 	nodes := []docker.Node{{Address: "10.0.0.1:2377"}, {Address: "10.0.0.2"}, {Address: ""}}
-	spec := buildFirewallSpec(cfg, nodes, []string{"10.0.0.9"})
+	spec := buildFirewallSpec(cfg, nodes, []string{"10.0.0.9"}, []store.FirewallPort{{Port: 10050, Proto: "tcp"}})
 
 	if err := spec.Validate(); err != nil {
 		t.Fatal(err)
@@ -143,5 +144,45 @@ func TestFirewallPeersAreForAdminsAndMustBeAddresses(t *testing.T) {
 	}
 	if peers, _ := db.FirewallPeers(); len(peers) != 0 {
 		t.Errorf("%v", peers)
+	}
+}
+
+func TestFirewallPortsAreSeededOnceAndSwarmPortsRefused(t *testing.T) {
+	c, base, db := apiServer(t)
+	const j = "application/json"
+	cfg := FirewallConfig{Keep: []firewall.Port{{Port: 10050, Proto: "tcp"}}}
+	if err := cfg.Seed(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DeleteFirewallPort(10050, "tcp"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Seed(db); err != nil { // the next start of the panel
+		t.Fatal(err)
+	}
+	if ports, _ := db.FirewallPorts(); len(ports) != 0 {
+		t.Errorf("a removed port came back: %v", ports)
+	}
+
+	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", j, `{"username":"ann","password":"s3cret-pass"}`); status != 200 {
+		t.Fatal("login")
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/firewall/ports", j, `{"port":5432,"proto":"tcp"}`); status != 403 {
+		t.Errorf("a viewer opened a port: %d", status)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", j, `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatal("login")
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/firewall/ports", j, `{"port":2377,"proto":"tcp"}`); status != 422 {
+		t.Errorf("the swarm's port was opened to everyone: %d", status)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/firewall/ports", j, `{"port":5432,"proto":"tcp"}`); status != 201 {
+		t.Errorf("an admin could not open a port: %d", status)
+	}
+	if ports, _ := db.FirewallPorts(); len(ports) != 1 || ports[0].Port != 5432 {
+		t.Errorf("%v", ports)
 	}
 }
