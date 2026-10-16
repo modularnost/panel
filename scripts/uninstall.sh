@@ -25,6 +25,11 @@ say() { echo "==> $*"; }
 
 [ "$(id -u)" = 0 ] || die "run as root"
 
+# The firewall's rules are in the kernel and outlive its service: without this
+# the host would stay closed to everything but SSH, 80, 443 and the nodes. The
+# image to run it from is the one the service used.
+FW_IMAGE=$(docker service inspect "${STACK}_firewall" --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null | sed 's/@sha256:.*//' || true)
+
 if docker stack ls --format '{{.Name}}' | grep -qx "$STACK"; then
 	say "removing the $STACK stack"
 	docker stack rm "$STACK" >/dev/null
@@ -38,6 +43,13 @@ if docker stack ls --format '{{.Name}}' | grep -qx "$STACK"; then
 	echo " done"
 else
 	say "no $STACK stack here"
+fi
+
+if [ -n "$FW_IMAGE" ]; then
+	say "removing the firewall chain from this host"
+	docker run --rm --network host --cap-add NET_ADMIN -e PANEL_MODE=firewall-clear "$FW_IMAGE" >/dev/null 2>&1 ||
+		echo "could not remove it; on this host: iptables -D INPUT -j MODULARNOST; iptables -F MODULARNOST; iptables -X MODULARNOST (and ip6tables)" >&2
+	say "other nodes of the cluster keep their chain until the same is done there: docker run --rm --network host --cap-add NET_ADMIN -e PANEL_MODE=firewall-clear $FW_IMAGE"
 fi
 
 # A volume stays busy until the stopped task containers are reaped, which

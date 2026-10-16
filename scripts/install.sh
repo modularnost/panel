@@ -9,6 +9,11 @@
 # Leave EMAIL empty to skip TLS and serve plain HTTP — for an internal network
 # where Let's Encrypt cannot reach the host.
 #
+# The host is firewalled: only SSH, 80 and 443 answer, and the swarm's own ports
+# only to the nodes of the cluster. What the host already listened on before the
+# install stays reachable (and is listed at the end). FIREWALL=off leaves the host
+# as it was; FIREWALL_ALLOW="10050/tcp,53/udp" keeps more ports reachable.
+#
 # The screen gets one line per step; the chatty output of Docker goes to
 # /var/log/modularnost-install.log, and the tail of it is shown on failure.
 set -eu
@@ -22,6 +27,8 @@ STACK=${PANEL_STACK:-panel}
 NET=${PANEL_NETWORK:-modularnost}
 CONFIG=${PANEL_CONFIG:-/etc/modularnost}
 ADVERTISE=${ADVERTISE_ADDR:-}
+FIREWALL=${FIREWALL:-on}
+FIREWALL_ALLOW=${FIREWALL_ALLOW:-}
 LOG=${PANEL_INSTALL_LOG:-/var/log/modularnost-install.log}
 TOTAL=5
 N=0
@@ -143,8 +150,18 @@ if [ "$(docker info --format '{{.Swarm.LocalNodeState}}')" != active ]; then
 	[ -n "$ADVERTISE" ] || die "could not detect an address; set ADVERTISE_ADDR"
 	run docker swarm init --advertise-addr "$ADVERTISE"
 fi
-docker network inspect "$NET" >/dev/null 2>&1 ||
-	run docker network create --driver overlay --attachable "$NET"
+# Encrypted from the start: an overlay cannot be encrypted afterwards, only
+# recreated, and on one node it costs nothing. A second server then talks over
+# IPsec, which needs ESP between the nodes (the firewall allows it for them).
+if docker network inspect "$NET" >/dev/null 2>&1; then
+	# The option is a flag: Docker stores it with an empty value, so ask whether
+	# the key is there, not what it says.
+	if ! docker network inspect "$NET" --format '{{json .Options}}' 2>/dev/null | grep -q '"encrypted"'; then
+		NET_PLAIN=yes
+	fi
+else
+	run docker network create --driver overlay --opt encrypted --attachable "$NET"
+fi
 # Traefik reaches the panel from this network, so its address is the one whose
 # X-Forwarded-For the panel may believe; nothing outside the network is trusted.
 NET_SUBNETS=$(docker network inspect "$NET" --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}' | tr -s ' ' ',' | sed 's/,$//')
@@ -158,6 +175,43 @@ if [ ! -f "$CONFIG/secret" ]; then
 	chmod 600 "$CONFIG/secret"
 fi
 SECRET=$(cat "$CONFIG/secret")
+
+# --- Firewall ---
+# What this host listens on besides SSH, 80 and 443, before the cluster does: it
+# stays reachable, so that an install does not break what a server already did.
+# The list is written down at the first install and used again after that, so
+# that running this script again does not open what has appeared since.
+FW_SSH=
+FW_KEEP=
+FW_NOTE=
+if [ "$FIREWALL" = off ]; then
+	FW_NOTE="FIREWALL=off: the host's firewall is left as it was"
+elif ! command -v ss >/dev/null 2>&1; then
+	FIREWALL=off
+	FW_NOTE="no ss on this host, so the firewall was not set up (FIREWALL=off)"
+else
+	# The SSH port or ports, from sshd itself; 22 is always allowed as well.
+	FW_SSH=$(ss -H -ltnp 2>/dev/null | awk '/"sshd"/ { n = split($4, a, ":"); print a[n] }' | sort -un | tr '\n' ',' | sed 's/,$//')
+	if [ -f "$CONFIG/firewall-keep" ]; then
+		FW_KEEP=$(cat "$CONFIG/firewall-keep")
+	else
+		FW_SKIP="22 80 443 2377 7946 4789 68 546 $(echo "$FW_SSH" | tr ',' ' ')"
+		FW_KEEP=$(ss -H -ltnu 2>/dev/null | awk -v skip="$FW_SKIP" '
+			BEGIN { n = split(skip, s, " "); for (i = 1; i <= n; i++) bad[s[i]] = 1 }
+			{
+				local = $5
+				if (local ~ /^127\./ || local ~ /^\[::1\]/ || local ~ /%lo:/) next
+				m = split(local, a, ":"); port = a[m]
+				key = port "/" $1
+				if (!(port in bad) && !(key in seen)) { seen[key] = 1; printf "%s%s", sep, key; sep = "," }
+			}')
+		echo "$FW_KEEP" >"$CONFIG/firewall-keep"
+		chmod 600 "$CONFIG/firewall-keep"
+	fi
+	if [ -n "$FIREWALL_ALLOW" ]; then
+		FW_KEEP=${FW_KEEP:+$FW_KEEP,}$(echo "$FIREWALL_ALLOW" | tr ' ' ',')
+	fi
+fi
 
 # The admin password only matters on the very first start; after that the
 # database has users and the panel ignores it.
@@ -181,6 +235,33 @@ else
 	ENTRYPOINT=web
 	TLS_LABELS=""
 	ACME_ARGS=""
+fi
+
+if [ "$FIREWALL" = off ]; then
+	FW_PANEL_ENV=""
+	FW_SERVICE=""
+	FW_NETWORK=""
+else
+	FW_PANEL_ENV="      PANEL_FIREWALL_SSH: \"$FW_SSH\"
+      PANEL_FIREWALL_KEEP: \"$FW_KEEP\""
+	# The host's network namespace and NET_ADMIN, no Docker socket, and nothing
+	# listening: it asks the panel by its public address, since a service on the
+	# host network is not on the overlay (ADR 9).
+	FW_SERVICE="
+  firewall:
+    image: $IMAGE
+    environment:
+      PANEL_MODE: firewall
+      PANEL_MODULE_SECRET: \"$SECRET\"
+      PANEL_CORE_URL: \"$SCHEME://$DOMAIN\"
+      PANEL_NODE: \"{{.Node.Hostname}}\"
+    cap_add: [NET_ADMIN]
+    networks: [hostnet]
+    deploy:
+      mode: global"
+	FW_NETWORK="  hostnet:
+    external: true
+    name: host"
 fi
 
 cat >"$CONFIG/stack.yml" <<COMPOSE
@@ -215,6 +296,7 @@ $ACME_ARGS
       PANEL_AGENT_SERVICE: ${STACK}_agent
       PANEL_STACK_FILE: /config/stack.yml
       PANEL_TRUSTED_PROXIES: "$NET_SUBNETS"
+$FW_PANEL_ENV
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - panel-data:/data
@@ -243,10 +325,12 @@ $TLS_LABELS
     networks: [$NET]
     deploy:
       mode: global
+$FW_SERVICE
 
 networks:
   $NET:
     external: true
+$FW_NETWORK
 
 volumes:
   panel-data:
@@ -279,6 +363,18 @@ acme_failed() {
 	docker service logs --tail 50 "${STACK}_traefik" 2>&1 | grep -q "Unable to obtain ACME certificate"
 }
 
+# The firewall is a service of its own with NET_ADMIN; a Docker that refuses
+# that leaves the host as it was, which is worth saying rather than assuming.
+FW_STATE=
+if [ "$FIREWALL" != off ]; then
+	i=0
+	while [ "$i" -lt 15 ]; do
+		[ "$(docker service ls --filter "name=${STACK}_firewall" --format '{{.Replicas}}' 2>/dev/null)" = 1/1 ] && { FW_STATE=ok; break; }
+		i=$((i + 1))
+		sleep 2
+	done
+fi
+
 step "Waiting for the panel to answer (up to 3 minutes)"
 READY=no
 ACME_FAILED=no
@@ -293,10 +389,39 @@ if [ "$READY" != yes ] && [ "$SCHEME" = https ] && acme_failed; then
 	if wait_for_panel 30; then READY=yes; fi
 fi
 
+# "Running" is not "in force": the service asks the panel by its public address,
+# and that can be a domain that does not resolve yet.
+if [ "$FW_STATE" = ok ]; then
+	FW_STATE=pending
+	i=0
+	while [ "$i" -lt 30 ]; do
+		if docker service logs "${STACK}_firewall" 2>&1 | grep -q 'firewall: applied'; then
+			FW_STATE=applied
+			break
+		fi
+		i=$((i + 1))
+		sleep 2
+	done
+fi
+
 # The stack is deployed and the password is already in its compose file, so a
 # timeout still shows it: the user would otherwise have a panel they cannot sign in to.
 summary() {
 	printf '  Address   %s%s://%s%s\n' "$BLUE" "$SCHEME" "$DOMAIN" "$OFF"
+	if [ "$FIREWALL" = off ]; then
+		echo "  Firewall  ${FW_NOTE:-off}"
+	elif [ "$FW_STATE" = pending ]; then
+		echo "  Firewall  started, but it has not applied its rules yet: it asks $SCHEME://$DOMAIN (docker service logs ${STACK}_firewall)"
+	elif [ "$FW_STATE" = applied ]; then
+		echo "  Firewall  closed except SSH${FW_SSH:+ ($FW_SSH)}, 80 and 443; the swarm's ports are for the cluster's nodes"
+		[ -z "$FW_KEEP" ] || echo "            still reachable, as before the install: $FW_KEEP"
+		echo "            to add a server: Nodes, Add a server (it asks for the server's address)"
+	else
+		echo "  Firewall  NOT in force: its service did not start (docker service ps ${STACK}_firewall --no-trunc)"
+	fi
+	if [ "${NET_PLAIN:-}" = yes ]; then
+		echo "  Network   $NET was created earlier and is not encrypted; recreate it to encrypt traffic between servers"
+	fi
 	if [ "$FIRST_RUN" = yes ]; then
 		printf '  Login     %sadmin%s\n' "$BLUE" "$OFF"
 		printf '  Password  %s%s%s   (shown once; change it on the Users page)\n' "$BLUE" "$ADMIN_PASSWORD" "$OFF"

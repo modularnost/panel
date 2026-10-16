@@ -9,6 +9,7 @@ import (
 
 	"modularnost/internal/agent"
 	"modularnost/internal/docker"
+	"modularnost/internal/firewall"
 	"modularnost/internal/modules"
 	"modularnost/internal/stackfile"
 	"modularnost/internal/store"
@@ -68,7 +69,35 @@ func syncStackFile(dk *docker.Client, path string) {
 	}
 }
 
+// firewallMode runs the node firewall: the same binary, one per node, with the
+// host's network and NET_ADMIN and no Docker socket (ADR 9). It listens on
+// nothing; it asks the panel what to allow.
+func firewallMode(mode string) {
+	if mode == "firewall-clear" {
+		if err := firewall.Clear(context.Background()); err != nil {
+			log.Fatalf("firewall: %v", err)
+		}
+		log.Print("firewall: the chain is gone")
+		return
+	}
+	secret, core := os.Getenv("PANEL_MODULE_SECRET"), os.Getenv("PANEL_CORE_URL")
+	if secret == "" || core == "" {
+		log.Fatal("PANEL_MODULE_SECRET and PANEL_CORE_URL are required in firewall mode")
+	}
+	node := os.Getenv("PANEL_NODE")
+	if node == "" {
+		node, _ = os.Hostname()
+	}
+	log.Printf("modularnost %s: firewall for node %q, rules from %s", version, node, core)
+	firewall.Run(context.Background(), core, secret, node, 30*time.Second)
+}
+
 func main() {
+	if mode := os.Getenv("PANEL_MODE"); mode == "firewall" || mode == "firewall-clear" {
+		firewallMode(mode)
+		return
+	}
+
 	dk, err := docker.New()
 	if err != nil {
 		log.Fatalf("docker: %v", err)
@@ -125,9 +154,21 @@ func main() {
 		log.Fatalf("PANEL_TRUSTED_PROXIES: %v", err)
 	}
 
+	// What the installer saw on this host: the SSH ports to keep and the
+	// listeners that were there before it ran.
+	var fw web.FirewallConfig
+	if fw.SSH, err = firewall.ParseInts(os.Getenv("PANEL_FIREWALL_SSH")); err != nil {
+		log.Fatalf("PANEL_FIREWALL_SSH: %v", err)
+	}
+	if fw.Keep, err = firewall.ParsePorts(os.Getenv("PANEL_FIREWALL_KEEP")); err != nil {
+		log.Fatalf("PANEL_FIREWALL_KEEP: %v", err)
+	}
+
 	addr := env("PANEL_ADDR", ":8080")
 	srv := &web.Server{
 		Addr:         addr,
+		Secret:       secret,
+		Firewall:     fw,
 		Docker:       dk,
 		DB:           db,
 		Modules:      registry,

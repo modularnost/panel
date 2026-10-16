@@ -47,6 +47,7 @@ type apiNode struct {
 	Address      string `json:"address,omitempty"`
 	Engine       string `json:"engine,omitempty"`
 	OS           string `json:"os,omitempty"`
+	Firewall     string `json:"firewall" enum:"applied,failed,unknown" doc:"Whether the node's firewall reported the current rules lately"`
 }
 
 func toAPINodes(in []docker.Node) []apiNode {
@@ -98,7 +99,7 @@ func (s *Server) registerCluster(api huma.API, viewer huma.Middlewares) {
 		if err != nil {
 			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
 		}
-		return &nodeListOutput{Body: toAPINodes(nodes)}, nil
+		return &nodeListOutput{Body: s.apiNodes(nodes)}, nil
 	})
 
 	huma.Register(api, huma.Operation{

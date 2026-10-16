@@ -76,7 +76,7 @@ func (s *Server) registerNodeActions(api huma.API) {
 			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
 		}
 		node.Availability = in.Body.Availability
-		return &nodeOutput{Body: toAPINodes([]docker.Node{*node})[0]}, nil
+		return &nodeOutput{Body: s.apiNodes([]docker.Node{*node})[0]}, nil
 	})
 
 	huma.Register(api, huma.Operation{
