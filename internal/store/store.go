@@ -298,3 +298,59 @@ func (d *DB) PruneFirewallPeers(max time.Duration, known map[string]bool) error 
 	}
 	return nil
 }
+
+type FirewallPort struct {
+	Port  int
+	Proto string
+	Note  string
+}
+
+func (d *DB) FirewallPorts() ([]FirewallPort, error) {
+	rows, err := d.Query(`SELECT port, proto, note FROM firewall_ports ORDER BY port, proto`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FirewallPort
+	for rows.Next() {
+		var p FirewallPort
+		if err := rows.Scan(&p.Port, &p.Proto, &p.Note); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) AddFirewallPort(p FirewallPort) error {
+	_, err := d.Exec(`INSERT INTO firewall_ports (port, proto, note) VALUES (?, ?, ?)
+		ON CONFLICT(port, proto) DO UPDATE SET note = excluded.note`, p.Port, p.Proto, p.Note)
+	return err
+}
+
+func (d *DB) DeleteFirewallPort(port int, proto string) error {
+	_, err := d.Exec(`DELETE FROM firewall_ports WHERE port = ? AND proto = ?`, port, proto)
+	return err
+}
+
+// SeedFirewallPorts copies the installer's list in the first time only, so that
+// a port removed on the Ports page does not come back with the next start.
+func (d *DB) SeedFirewallPorts(ports []FirewallPort) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('firewall_seeded', '1')`)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 1 {
+		for _, p := range ports {
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO firewall_ports (port, proto, note) VALUES (?, ?, ?)`, p.Port, p.Proto, p.Note); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}

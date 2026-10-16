@@ -26,8 +26,14 @@ import (
 	"time"
 )
 
-// Chain is the one chain this package owns, hooked into INPUT.
-const Chain = "MODULARNOST"
+// Chain is hooked into INPUT and guards what the host itself listens on.
+// ForwardChain is hooked into DOCKER-USER and guards the ports that containers
+// publish: Docker redirects those before INPUT ever sees the packet.
+const (
+	Chain        = "MODULARNOST"
+	ForwardChain = "MODULARNOST-FWD"
+	userChain    = "DOCKER-USER"
+)
 
 // The swarm's own ports: management and gossip, and the overlay's VXLAN. They
 // are open to the nodes of the cluster and to nobody else.
@@ -162,6 +168,20 @@ func Rules(s Spec, v6 bool) string {
 	}
 
 	w("-A %s -j DROP", Chain)
+
+	// A published port is a connection Docker redirected (DNAT); it is let
+	// through only when its port is allowed. Containers talking to each other
+	// and to the outside come in on a docker bridge and are not touched.
+	w(":%s - [0:0]", ForwardChain)
+	w("-F %s", ForwardChain)
+	w("-A %s -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT", ForwardChain)
+	for _, ifc := range []string{"docker0", "docker_gwbridge", "br-+"} {
+		w("-A %s -i %s -j ACCEPT", ForwardChain, ifc)
+	}
+	for _, p := range slices.Compact(allow) {
+		w("-A %s -p %s -m conntrack --ctstate DNAT --ctorigdstport %d -j ACCEPT", ForwardChain, p.Proto, p.Port)
+	}
+	w("-A %s -m conntrack --ctstate DNAT -j DROP", ForwardChain)
 	w("COMMIT")
 	return b.String()
 }
@@ -235,9 +255,19 @@ func family(ctx context.Context, run runner, bin string, v6 bool, s Spec) error 
 	if err := run(ctx, Rules(s, v6), bin+"-restore", "--noflush"); err != nil {
 		return err
 	}
-	// The jump goes in after the chain is full, never before.
+	// The jumps go in after the chains are full, never before.
 	if run(ctx, "", bin, "-C", "INPUT", "-j", Chain) != nil {
-		return run(ctx, "", bin, "-I", "INPUT", "1", "-j", Chain)
+		if err := run(ctx, "", bin, "-I", "INPUT", "1", "-j", Chain); err != nil {
+			return err
+		}
+	}
+	if run(ctx, "", bin, "-C", userChain, "-j", ForwardChain) != nil {
+		if err := run(ctx, "", bin, "-I", userChain, "1", "-j", ForwardChain); err != nil {
+			if v6 {
+				return nil // Docker does not publish over IPv6 unless told to
+			}
+			return err
+		}
 	}
 	return nil
 }
@@ -251,14 +281,16 @@ func clearWith(ctx context.Context, run runner) error {
 	var errs []error
 	for _, bin := range []string{"iptables", "ip6tables"} {
 		// A jump may have been inserted more than once by hand.
-		for range 8 {
-			if run(ctx, "", bin, "-D", "INPUT", "-j", Chain) != nil {
-				break
+		for _, c := range []struct{ hook, chain string }{{"INPUT", Chain}, {userChain, ForwardChain}} {
+			for range 8 {
+				if run(ctx, "", bin, "-D", c.hook, "-j", c.chain) != nil {
+					break
+				}
 			}
-		}
-		_ = run(ctx, "", bin, "-F", Chain)
-		if err := run(ctx, "", bin, "-X", Chain); err != nil && !strings.Contains(err.Error(), "No chain") && !strings.Contains(err.Error(), "does not exist") {
-			errs = append(errs, err)
+			_ = run(ctx, "", bin, "-F", c.chain)
+			if err := run(ctx, "", bin, "-X", c.chain); err != nil && !strings.Contains(err.Error(), "No chain") && !strings.Contains(err.Error(), "does not exist") {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return errors.Join(errs...)

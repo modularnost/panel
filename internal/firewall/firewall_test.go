@@ -131,6 +131,7 @@ func recorder(failing map[string]bool) (runner, *[]call) {
 func TestApplyFillsTheChainBeforeTheJumpIsInserted(t *testing.T) {
 	run, calls := recorder(map[string]bool{
 		"iptables -C INPUT -j MODULARNOST": true, "ip6tables -C INPUT -j MODULARNOST": true,
+		"iptables -C DOCKER-USER -j MODULARNOST-FWD": true, "ip6tables -C DOCKER-USER -j MODULARNOST-FWD": true,
 	})
 	if err := apply(context.Background(), Spec{SSH: []int{22}}, run); err != nil {
 		t.Fatal(err)
@@ -141,7 +142,9 @@ func TestApplyFillsTheChainBeforeTheJumpIsInserted(t *testing.T) {
 	}
 	want := []string{
 		"iptables-restore --noflush", "iptables -C INPUT -j MODULARNOST", "iptables -I INPUT 1 -j MODULARNOST",
+		"iptables -C DOCKER-USER -j MODULARNOST-FWD", "iptables -I DOCKER-USER 1 -j MODULARNOST-FWD",
 		"ip6tables-restore --noflush", "ip6tables -C INPUT -j MODULARNOST", "ip6tables -I INPUT 1 -j MODULARNOST",
+		"ip6tables -C DOCKER-USER -j MODULARNOST-FWD", "ip6tables -I DOCKER-USER 1 -j MODULARNOST-FWD",
 	}
 	if !slices.Equal(seq, want) {
 		t.Errorf("commands:\n%s", strings.Join(seq, "\n"))
@@ -188,7 +191,7 @@ func TestClearTakesTheChainAway(t *testing.T) {
 	if err := clearWith(context.Background(), run); err != nil {
 		t.Fatal(err)
 	}
-	if len(*calls) > 40 {
+	if len(*calls) > 80 {
 		t.Errorf("%d commands: removing the jump never ends", len(*calls))
 	}
 	var tail []string
@@ -197,7 +200,7 @@ func TestClearTakesTheChainAway(t *testing.T) {
 			tail = append(tail, c.name)
 		}
 	}
-	if len(tail) != 2 {
+	if len(tail) != 4 {
 		t.Errorf("the chain is deleted for both families: %v", tail)
 	}
 }
@@ -206,5 +209,22 @@ func TestTokenIsStableAndKeyedByTheSecret(t *testing.T) {
 	first, again := Token("a"), Token("a")
 	if first != again || first == Token("b") || len(first) != 64 {
 		t.Error("token")
+	}
+}
+
+func TestPublishedPortsAreDroppedUnlessAllowed(t *testing.T) {
+	rules := Rules(Spec{Allow: []Port{{80, "tcp"}, {53, "udp"}}}, false)
+	fwd := rules[strings.Index(rules, ":MODULARNOST-FWD"):]
+	for _, want := range []string{
+		"-A MODULARNOST-FWD -i br-+ -j ACCEPT",
+		"-A MODULARNOST-FWD -p udp -m conntrack --ctstate DNAT --ctorigdstport 53 -j ACCEPT",
+		"-A MODULARNOST-FWD -p tcp -m conntrack --ctstate DNAT --ctorigdstport 80 -j ACCEPT",
+	} {
+		if !strings.Contains(fwd, want) {
+			t.Errorf("missing %q in\n%s", want, fwd)
+		}
+	}
+	if !strings.Contains(fwd, "--ctstate DNAT -j DROP\nCOMMIT") {
+		t.Error("what is not allowed must be dropped last")
 	}
 }

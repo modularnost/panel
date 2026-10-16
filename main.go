@@ -164,6 +164,10 @@ func main() {
 		log.Fatalf("PANEL_FIREWALL_KEEP: %v", err)
 	}
 
+	if err := fw.Seed(db); err != nil {
+		log.Fatalf("firewall: %v", err)
+	}
+
 	addr := env("PANEL_ADDR", ":8080")
 	srv := &web.Server{
 		Addr:         addr,

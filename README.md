@@ -50,7 +50,7 @@ in step with an update.
 | `PANEL_STACK` | `panel` | stack name |
 | `ADVERTISE_ADDR` | detected | swarm address, if the host has several |
 | `FIREWALL` | `on` | `off` leaves the host's firewall as it was, see [Ports](#ports) |
-| `FIREWALL_ALLOW` | | more ports to keep reachable, `10050/tcp,53/udp` |
+| `FIREWALL_ALLOW` | | more ports to keep reachable, `10050/tcp,53/udp`; read on the first install only, later use the Ports page |
 
 ### Ports
 
@@ -65,23 +65,30 @@ host's network and nothing else, and listens on nothing.
 | SSH (the ports `sshd` listens on, and 22) | everyone | never closed by this |
 | 80, 443 | everyone | Traefik and the certificate challenge |
 | 2377, 7946, 4789, ESP | the nodes of the cluster and servers allowed on the Nodes page | the swarm |
-| what listened here before the install | everyone, as before | listed at the end of the install; `/etc/modularnost/firewall-keep` |
-| anything else | nobody | |
+| what listened here before the install | everyone, as before | listed at the end of the install; copied to the Ports page once |
+| a port opened on the **Ports** page | everyone | on every node |
+| anything else, published ports included | nobody | |
 
 What was there before stays reachable, so that an install does not break what a
-server already did; the list is written down at the first install and not
-extended by a later run. `FIREWALL_ALLOW` adds to it.
+server already did; the list is written down at the first install and then lives
+on the Ports page, where it can be changed. `FIREWALL_ALLOW` adds to it.
 
-**A port a service publishes is not closed yet.** Docker publishes it before the
-host's firewall sees the packet, so this chain does not cover it: a service that
-publishes 5432 is open to the world until a later release adds the rule that
-closes it. Publish only what you mean to, and prefer routing HTTP through Traefik.
+**A port a service publishes is closed too.** Docker redirects it before the
+host's firewall sees the packet, so a second chain, `MODULARNOST-FWD`, sits in
+`DOCKER-USER` and drops what Docker redirected unless the port is open. A service
+that publishes 5432 is therefore unreachable from outside until an admin opens
+5432 on **Ports**, which lists every published port and whether it is open.
+Containers reach each other and the outside as before. Prefer routing HTTP
+through Traefik over publishing a port.
 
 To add a server, open **Nodes**, **Add a server**, give its address and run the
 command it shows on that server. The address is allowed for a day or until the
 node appears in the swarm. Between servers of different providers a private
 network or WireGuard (`ADVERTISE_ADDR`) is still the better way. The overlay
-network is created encrypted, which costs nothing on one node.
+network is created encrypted, which costs nothing on one node. That needs the
+kernel's IPsec (`esp4`); some images switch it off, and the installer then creates
+the network plain and says so. Traffic between servers is then not encrypted: use a
+private network or WireGuard (`ADVERTISE_ADDR`) there.
 
 The rules live in the kernel: a stopped service leaves them in place, a reboot
 clears them until the service is back (some seconds), and `uninstall.sh` removes

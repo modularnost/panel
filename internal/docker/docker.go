@@ -47,6 +47,13 @@ type Service struct {
 	Desired uint64
 	Mode    string // replicated | global
 	Labels  map[string]string
+	Ports   []PublishedPort
+}
+
+// PublishedPort is a port a service opens on the nodes.
+type PublishedPort struct {
+	Port  int
+	Proto string
 }
 
 func (s Service) Healthy() bool { return s.Desired > 0 && s.Running == s.Desired }
@@ -84,6 +91,11 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 		}
 		if s.Spec.Mode.Global != nil {
 			svc.Mode = "global"
+		}
+		for _, p := range s.Endpoint.Ports {
+			if p.PublishedPort > 0 {
+				svc.Ports = append(svc.Ports, PublishedPort{int(p.PublishedPort), string(p.Protocol)})
+			}
 		}
 		svc.Running = running[s.ID]
 		svc.Desired = desiredReplicas(s, scheduled)
