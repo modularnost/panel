@@ -120,13 +120,12 @@ is the work ahead, not the current screens: live status, logs and later
 features want client state, and one API serves scripts and CI as well.
 
 - the built bundle is embedded in the binary: still one binary, one image
-- the SPA is served at `/`; the server renders no HTML of its own. Module
-  pages are framed from `/modules/<name>/`, and the SPA route that frames them
-  is `/module/<name>/`, so the two never share a URL
+- the SPA is served at `/`; the server renders no HTML of its own. A
+  module's page is the SPA route `/module/<name>/`, drawn from the module's
+  document (ADR 8)
 - `/api/v1` is the contract for the UI and external clients, authenticated as
   today (session cookie or token); `/internal/*` stays the module API
-- the SPA frames module pages and shows what modules contribute to its own
-  screens (see ADR 7)
+- the SPA draws what modules contribute to its own screens (see ADR 7)
 - the API is written with Huma: `api/openapi.json` is generated from the
   handlers and committed, and the TypeScript types are generated from it
 - state-changing requests accept only `application/json`, which a plain HTML
@@ -138,11 +137,10 @@ A module is more than a page of its own: it needs a tab on a service, an action
 on the services list, a menu entry. The manifest says where, and the panel draws
 it.
 
-**Trust.** A module is code the administrator installed, so it is trusted. It is
-still kept away from the user's session: the proxy never forwards `Cookie` or
-`Authorization`, drops the `Set-Cookie` a module answers with, and discards the
-`X-Panel-*` headers a browser sends. This is defence in depth, not a boundary
-against hostile code: a module's page is served from the panel's origin.
+**Trust.** A module is code the administrator installed, so it is trusted. Even so
+it never sees the user's session: the panel asks the module itself, server to
+server, and nothing the browser sent, cookies included, goes along. A module
+draws nothing in the browser, so it shares no origin with the panel.
 
 **The manifest is a versioned contract.**
 
@@ -163,7 +161,7 @@ against hostile code: a module's page is served from the panel's origin.
   for a newer panel loads on an older one. A change that cannot be made that way
   raises `contract`; a manifest of another contract is shown as failed, with the
   reason. We break rather than carry two shapes before 1.0.
-- The **role belongs to the contribution** and is enforced by the proxy, by the
+- The **role belongs to the contribution** and is enforced by the core, by the
   longest declared path that is a prefix at a `/` boundary; a path nothing
   covers needs `operator`. The SPA hides what a role cannot use, but only as a
   courtesy.
@@ -171,37 +169,31 @@ against hostile code: a module's page is served from the panel's origin.
   `X-Panel-Role`, `X-Panel-Time`, `X-Panel-User-Sig`), an HMAC keyed with the
   module's own token: the module can verify it and holds no shared secret.
 - **Context** (the service a tab is on) comes from the slot, as query
-  parameters of the framed page. It is a convenience: anybody can write that
+  parameters of the request. It is a convenience: anybody can write that
   query, so the role check, not the context, is what protects an action.
 
-**Rendering.** A contribution is a page in a frame, as module pages already
-are. The field `render` is where a declarative renderer goes, which would be
-safer and consistent with the panel without a frame: see ADR 8.
+**Rendering.** A contribution is a document the panel draws: see ADR 8. Until
+2026-10-22 it could also be a page in a frame; that mode is gone (ADR 8).
 
 **Not chosen.** A JavaScript bundle per module loaded into the panel's page:
 it would run with the panel's privileges and bind modules to the SPA's
 libraries, which is a different trust model from "any language, a separate
 service" (ADR 3).
 
-**Open.** A frame served from the panel's origin shares it; isolating it
-(a `sandbox` without `allow-same-origin`) needs another way for the proxy to
-know the caller, such as a short-lived signed prefix per frame. The frame's
-height and navigation are not reported to the shell. Core-to-module events and
-more rights on `/internal` come with the first module that needs them.
+**Open.** Core-to-module events and more rights on `/internal` come with the
+first module that needs them.
 
 ### 8. A module may describe its page and let the panel draw it (decided 2026-10-15)
 
-A frame lets a module draw anything, and that costs: the page has a look of its
-own (its stylesheet, not the panel's seed color, no phone layout), its height
-and navigation have to be reported, and it shares the panel's origin. Most
-module pages are a few numbers, a table, a chart and a form. For those the
-module describes the page and the panel draws it.
+Most module pages are a few numbers, a table, a chart and a form. The module
+describes the page and the panel draws it: in its own look, with its seed color,
+dark scheme and phone layout, and with no module code in the browser.
 
-- **A second mode, not a replacement.** A contribution says `"render": "ui"` or
-  `"render": "frame"`, which stays the default and keeps today's behavior. `ui`
-  is preferred; a frame remains for what the vocabulary cannot say. Adding the
-  field raises `contract` to 2, because a panel of contract 1 would frame the
-  JSON.
+- **The only mode** (changed 2026-10-22, #96). The first version kept framed
+  HTML pages beside this one, for what the vocabulary cannot say. Nobody needed
+  it: heavy tools such as Grafana are linked to (ADR 5), not framed. Removing it
+  took the HTML proxy, `/static/` and the `render` field with it, and raised
+  `contract` to 3.
 - **The document.** A `GET` on the contribution's path answers
   `{"blocks": [...]}`; the role, the signed identity and the context are as in
   ADR 7. The first vocabulary: text, stat, key-value list, table, meter, chart,
@@ -233,8 +225,7 @@ module that needs it.
 
 **Open.** The exact block schemas, written with the contract in
 `docs/modules.md`. Row actions and paging in a table. How the stream
-authenticates, and how many open tabs it may hold. Isolating a frame and
-reporting its height concern frame mode only.
+authenticates, and how many open tabs it may hold. 
 
 ### 9. A node firewall of our own (decided 2026-10-15)
 
@@ -366,8 +357,8 @@ Putting the rules in the panel or the agent: they would need the host's network.
 8. **SPA and JSON API** (decided 2026-10-14, ADR 6): the API read before write,
    then the frontend scaffold, then screens until parity, then the cutover and
    removal of the HTML templates
-9. **Declarative module pages** (decided 2026-10-15, ADR 8): the contract with
-   `render: "ui"`, the blocks, the module-to-panel change events, then the
+9. **Declarative module pages** (decided 2026-10-15, ADR 8): the contract,
+   the blocks, the module-to-panel change events, then the
    metrics module rewritten as the first one
 10. Everything else (a build system, git integration for building images) is out
    of the current scope — do not implement without an explicit request
