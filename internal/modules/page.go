@@ -1,13 +1,16 @@
 package modules
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -97,6 +100,17 @@ func (m Module) UIPage(p string) (Contribution, bool) {
 // Viewer is who is looking at a page, as the module is told.
 type Viewer struct{ Username, Role string }
 
+// sign adds how the module knows the request is the panel's and who is looking.
+func (r *Registry) sign(req *http.Request, m Module, v Viewer) {
+	token, now := r.Token(m.Name), time.Now().Unix()
+	req.Header.Set("X-Panel-Module", m.Name)
+	req.Header.Set("X-Panel-Token", token)
+	req.Header.Set("X-Panel-User", v.Username)
+	req.Header.Set("X-Panel-Role", v.Role)
+	req.Header.Set("X-Panel-Time", strconv.FormatInt(now, 10))
+	req.Header.Set("X-Panel-User-Sig", SignUser(token, m.Name, v.Username, v.Role, now))
+}
+
 // FetchPage asks a module for the document of one of its pages. The request is
 // the panel's own: nothing the browser sent, cookies included, goes with it.
 func (r *Registry) FetchPage(ctx context.Context, m Module, p, rawQuery string, v Viewer) (Document, error) {
@@ -108,14 +122,8 @@ func (r *Registry) FetchPage(ctx context.Context, m Module, p, rawQuery string, 
 	if err != nil {
 		return Document{}, err
 	}
-	token, now := r.Token(m.Name), time.Now().Unix()
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Panel-Module", m.Name)
-	req.Header.Set("X-Panel-Token", token)
-	req.Header.Set("X-Panel-User", v.Username)
-	req.Header.Set("X-Panel-Role", v.Role)
-	req.Header.Set("X-Panel-Time", strconv.FormatInt(now, 10))
-	req.Header.Set("X-Panel-User-Sig", SignUser(token, m.Name, v.Username, v.Role, now))
+	r.sign(req, m, v)
 	resp, err := r.http.Do(req)
 	if err != nil {
 		return Document{}, err
@@ -125,4 +133,54 @@ func (r *Registry) FetchPage(ctx context.Context, m Module, p, rawQuery string, 
 		return Document{}, fmt.Errorf("the page returned %s", resp.Status)
 	}
 	return ParseDocument(resp.Body)
+}
+
+// MaxActionValues and MaxActionAnswer bound what crosses on an action: a form
+// is a few fields, and the answer is a sentence.
+const (
+	MaxActionValues = 50
+	MaxActionAnswer = 4 << 10
+)
+
+// ActionPath is the cleaned path of an action below /action/, or false: a
+// button may call only what the module keeps for that.
+func ActionPath(p string) (string, bool) {
+	c := path.Clean("/" + p)
+	return c, strings.HasPrefix(c, "/action/") && c == p
+}
+
+// Act sends what a button or a form carried to one of the module's actions and
+// returns the sentence it answered with, if any. A module that refuses answers
+// with a status other than 2xx and the reason as text.
+func (r *Registry) Act(ctx context.Context, m Module, action string, values map[string]string, v Viewer) (string, error) {
+	if values == nil {
+		values = map[string]string{}
+	}
+	body, err := json.Marshal(values)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.BaseURL+action, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	r.sign(req, m, v)
+	resp, err := r.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	answer, _ := io.ReadAll(io.LimitReader(resp.Body, MaxActionAnswer))
+	if resp.StatusCode/100 != 2 {
+		if reason := strings.TrimSpace(string(answer)); reason != "" {
+			return "", errors.New(reason)
+		}
+		return "", fmt.Errorf("the action returned %s", resp.Status)
+	}
+	var out struct {
+		Message string `json:"message"`
+	}
+	_ = json.Unmarshal(answer, &out)
+	return out.Message, nil
 }

@@ -120,3 +120,20 @@ func TestFetchPageFailures(t *testing.T) {
 		}
 	}
 }
+
+func TestActionPath(t *testing.T) {
+	for p, ok := range map[string]bool{
+		"/action/redeploy": true,
+		"/action/a/b":      true,
+		"/action/":         false,
+		"/action":          false,
+		"/manifest":        false,
+		"/action/../x":     false,
+		"/action//x":       false,
+		"action/x":         false,
+	} {
+		if _, got := ActionPath(p); got != ok {
+			t.Errorf("%q: %v, want %v", p, got, ok)
+		}
+	}
+}

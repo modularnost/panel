@@ -88,3 +88,33 @@ export function groupStats(blocks: Block[]): (Block | Block[])[] {
   }
   return out;
 }
+
+export type Field = { name: string; label: string; type: "text" | "select" | "switch"; value: string; options: { value: string; label: string }[] };
+
+const text = (v: unknown): string => (typeof v === "string" ? v : "");
+
+// strings keeps what a module sent as the fixed values of a button: names and
+// strings, nothing else crosses to the action.
+export function strings(v: unknown): Record<string, string> {
+  if (typeof v !== "object" || v === null) return {};
+  return Object.fromEntries(Object.entries(v).filter((e): e is [string, string] => typeof e[1] === "string"));
+}
+
+// formFields reads the fields of a form block; one without a name cannot be sent.
+export function formFields(v: unknown): Field[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((f): Field[] => {
+    if (typeof f !== "object" || f === null || !text(f.name)) return [];
+    const options = (Array.isArray(f.options) ? f.options : []).flatMap((o: Record<string, unknown>) =>
+      text(o?.value) !== "" || o?.value === "" ? [{ value: text(o.value), label: text(o.label) || text(o.value) }] : [],
+    );
+    const type = f.type === "select" || f.type === "switch" ? f.type : "text";
+    const value = f.value === true ? "true" : type === "switch" ? "false" : text(f.value) || (type === "select" ? (options[0]?.value ?? "") : "");
+    return [{ name: f.name, label: text(f.label) || f.name, type, value, options }];
+  });
+}
+
+// formDefaults is what a form holds before anybody touches it.
+export function formDefaults(fields: Field[]): Record<string, string> {
+  return Object.fromEntries(fields.map((f) => [f.name, f.value]));
+}

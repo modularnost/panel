@@ -24,6 +24,18 @@ type pageOutput struct {
 	Body         apiDocument
 }
 
+type apiModuleAction struct {
+	Page   string            `json:"page" doc:"The contribution's path the button is on"`
+	Action string            `json:"action" doc:"A path below /action/ of the module"`
+	Values map[string]string `json:"values,omitempty" doc:"The fields of a form, or the fixed values of a button"`
+}
+
+type apiActionResult struct {
+	Message string `json:"message" doc:"What the module said about it; may be empty"`
+}
+
+type actionOutput struct{ Body apiActionResult }
+
 type apiPageChanged struct {
 	Path string `json:"path"`
 }
@@ -70,6 +82,31 @@ func (s *Server) registerPages(api huma.API, viewer huma.Middlewares) {
 			return nil, problem(http.StatusBadGateway, "module_error", err.Error())
 		}
 		return &pageOutput{CacheControl: "no-store", Body: apiDocument{UI: doc.UI, Blocks: doc.Blocks}}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "run-module-action", Method: http.MethodPost, Path: "/api/v1/modules/{name}/action",
+		Summary: "Run an action of a module's ui page: what a button or a form sends", Middlewares: viewer, Security: signedIn,
+	}, func(ctx context.Context, in *struct {
+		Name string `path:"name"`
+		Body apiModuleAction
+	}) (*actionOutput, error) {
+		m, u, _, err := s.uiPage(ctx, in.Name, in.Body.Page)
+		if err != nil {
+			return nil, err
+		}
+		action, ok := modules.ActionPath(in.Body.Action)
+		if !ok || len(in.Body.Values) > modules.MaxActionValues {
+			return nil, problem(http.StatusBadRequest, "bad_request", "action: a path below /action/, with at most 50 values")
+		}
+		if need := m.RoleFor(action); !store.AtLeast(u.Role, need) {
+			return nil, problem(http.StatusForbidden, "forbidden", "role "+need+" required, you have "+u.Role)
+		}
+		msg, err := s.Modules.Act(ctx, m, action, in.Body.Values, modules.Viewer{Username: u.Username, Role: u.Role})
+		if err != nil {
+			return nil, problem(http.StatusBadGateway, "module_error", err.Error())
+		}
+		return &actionOutput{Body: apiActionResult{Message: msg}}, nil
 	})
 
 	sse.Register(api, huma.Operation{

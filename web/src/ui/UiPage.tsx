@@ -5,6 +5,7 @@ import { api, call } from "../api/client";
 import { Banner } from "../components/Banner";
 import { Chip, type Tone } from "../components/Chip";
 import { Table } from "../components/Table";
+import { ButtonBlock, FormBlock } from "./Action";
 import { Chart, CursorProvider, type ChartBlock } from "./Chart";
 import { type Block, formatUnix, formatValue, groupStats, linkTarget } from "./document";
 
@@ -62,7 +63,7 @@ export function UiPage({ module, path, context = "" }: { module: string; path: s
               ))}
             </div>
           ) : (
-            <BlockView key={i} block={b} module={module} />
+            <BlockView key={i} block={b} module={module} page={path} />
           ),
         )}
       </div>
@@ -70,7 +71,7 @@ export function UiPage({ module, path, context = "" }: { module: string; path: s
   );
 }
 
-function BlockView({ block, module }: { block: Block; module: string }) {
+function BlockView({ block, module, page }: { block: Block; module: string; page: string }) {
   switch (block.type) {
     case "heading":
       return block.level === 1 ? <h2>{str(block.text)}</h2> : <h3>{str(block.text)}</h3>;
@@ -97,6 +98,10 @@ function BlockView({ block, module }: { block: Block; module: string }) {
       return <Chart block={block as ChartBlock} />;
     case "choice":
       return <Choice block={block} />;
+    case "button":
+      return <ButtonBlock block={block} module={module} page={page} />;
+    case "form":
+      return <FormBlock block={block} module={module} page={page} />;
     case "link":
       return (
         <p>

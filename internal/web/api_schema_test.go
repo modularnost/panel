@@ -94,6 +94,8 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"NewFirewallPort":     apiNewFirewallPort{},
 		"PublishedPort":       apiPublishedPort{},
 		"PageChanged":         apiPageChanged{},
+		"ModuleAction":        apiModuleAction{},
+		"ActionResult":        apiActionResult{},
 		"Problem":             apiProblem{},
 		"ProblemBody":         problemBody{},
 	}
