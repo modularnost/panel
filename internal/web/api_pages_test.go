@@ -11,8 +11,8 @@ import (
 	"modularnost/internal/store"
 )
 
-// uiFixture is a pinned module "m" with three pages: a viewer's ui page, an
-// operator's ui tab and a frame. seen records what the module was asked.
+// uiFixture is a pinned module "m" with two ui pages: a viewer's page and an
+// operator's tab. seen records what the module was asked.
 type uiFixture struct {
 	c      *http.Client
 	base   string
@@ -36,10 +36,9 @@ func newUIFixture(t *testing.T) *uiFixture {
 
 	f.reg = modules.NewRegistry(nil, "secret")
 	f.reg.Pin(modules.Module{Name: "m", BaseURL: mod.URL, Manifest: modules.Manifest{Contributions: []modules.Contribution{
-		{Slot: modules.SlotNav, Path: "/", Role: store.RoleViewer, Render: modules.RenderUI},
-		{Slot: modules.SlotServiceTab, Path: "/service", Role: store.RoleOperator, Render: modules.RenderUI},
-		{Slot: modules.SlotNav, Path: "/framed", Role: store.RoleViewer, Render: modules.RenderFrame},
-		{Slot: modules.SlotNav, Path: "/action/danger", Role: store.RoleAdmin, Render: modules.RenderUI},
+		{Slot: modules.SlotNav, Path: "/", Role: store.RoleViewer},
+		{Slot: modules.SlotServiceTab, Path: "/service", Role: store.RoleOperator},
+		{Slot: modules.SlotNav, Path: "/action/danger", Role: store.RoleAdmin},
 	}}})
 	f.c, f.base, _ = apiServerWith(t, func(s *Server) { s.Modules = f.reg; f.server = s })
 	if status, _ := send(t, f.c, "POST", f.base+"/api/v1/auth/login", "application/json", `{"username":"ann","password":"s3cret-pass"}`); status != 200 {
@@ -68,7 +67,6 @@ func TestModulePageRefusals(t *testing.T) {
 		code   string
 	}{
 		"a role below the page's":        {"/api/v1/modules/m/page?path=/service", 403, "forbidden"},
-		"a frame is not a document":      {"/api/v1/modules/m/page?path=/framed", 404, "not_found"},
 		"a page the module never said":   {"/api/v1/modules/m/page?path=/other", 404, "not_found"},
 		"a module that is not installed": {"/api/v1/modules/nope/page?path=/", 404, "not_found"},
 		"no path at all":                 {"/api/v1/modules/m/page", 422, "invalid_input"},
@@ -113,7 +111,6 @@ func TestModuleActionReachesTheModuleAsTheViewer(t *testing.T) {
 		"a role below the action's":         {`{"page":"/","action":"/action/danger"}`, 403, "forbidden"},
 		"outside /action/":                  {`{"page":"/","action":"/service"}`, 400, "bad_request"},
 		"climbing out of /action/":          {`{"page":"/","action":"/action/../manifest"}`, 400, "bad_request"},
-		"from a page that is no ui":         {`{"page":"/framed","action":"/action/x"}`, 404, "not_found"},
 		"from a page the module never said": {`{"page":"/other","action":"/action/x"}`, 404, "not_found"},
 	} {
 		if status, body := send(t, f.c, "POST", url, "application/json", c.body); status != c.status || errorCode(body) != c.code {
@@ -157,7 +154,6 @@ func TestModuleReportsAChangedPage(t *testing.T) {
 	}{
 		"no token":                  {"", "m", `{"path":"/"}`, 401},
 		"a token of another module": {f.reg.Token("other"), "m", `{"path":"/"}`, 401},
-		"a frame is not a ui page":  {token, "m", `{"path":"/framed"}`, 404},
 		"a page it never declared":  {token, "m", `{"path":"/other"}`, 404},
 		"a body that is not a path": {token, "m", `nope`, 400},
 	} {

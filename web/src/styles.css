@@ -416,17 +416,6 @@ pre.notes {
   gap: 16px;
 }
 
-.module-frame {
-  width: 100%;
-  height: calc(100vh - 48px);
-  border: 0;
-}
-
-/* A tab sits below the service's heading and tabs. */
-.module-frame.tab {
-  height: 70vh;
-}
-
 @media (max-width: 840px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
@@ -488,10 +477,6 @@ pre.notes {
 
   .main {
     padding: 16px 12px;
-  }
-
-  .module-frame {
-    height: 75vh;
   }
 }
 

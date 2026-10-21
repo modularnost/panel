@@ -50,13 +50,11 @@ func TestParseDocument(t *testing.T) {
 
 func TestUIPageIsOnlyWhatTheManifestDeclared(t *testing.T) {
 	m := Module{Manifest: Manifest{Contributions: []Contribution{
-		{Slot: SlotNav, Path: "/", Render: RenderUI},
-		{Slot: SlotServiceTab, Path: "/service/", Render: RenderUI},
-		{Slot: SlotNav, Path: "/framed", Render: RenderFrame},
+		{Slot: SlotNav, Path: "/"},
+		{Slot: SlotServiceTab, Path: "/service/"},
 	}}}
 	for p, want := range map[string]bool{
 		"/": true, "": true, "/service": true, "/service/": true, "/a/../service": true,
-		"/framed":    false, // a frame is not a document
 		"/other":     false,
 		"/service/x": false, // a page is exact: a prefix does not declare what is below it
 	} {

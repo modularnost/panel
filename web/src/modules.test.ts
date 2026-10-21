@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Module, Service } from "./api/generated";
-import { envLines, matchesLabels, modulePath, moduleURL, serviceContext, serviceTabs, slot, uiContribution } from "./modules";
+import { envLines, matchesLabels, modulePath, serviceContext, serviceTabs, slot, uiContribution } from "./modules";
 
 const mod = (name: string, ok: boolean, contributions: Module["contributions"]): Module => ({
   name,
@@ -17,7 +17,6 @@ const tab = (title: string, role: "viewer" | "operator" | "admin", match: Record
   path: "/service",
   role,
   match,
-  render: "frame" as const,
 });
 const svc = (labels?: Record<string, string>, stack?: string): Service =>
   ({ id: "abc", name: "shop_web", stack, labels, image: "", mode: "replicated", running: 1, desired: 1, healthy: true }) as Service;
@@ -60,16 +59,8 @@ describe("serviceContext", () => {
   });
 });
 
-describe("moduleURL", () => {
-  it("joins the module name and its path with one slash", () => {
-    expect(moduleURL("metrics", "/")).toBe("/modules/metrics/");
-    expect(moduleURL("metrics", "page")).toBe("/modules/metrics/page");
-    expect(moduleURL("metrics", "//a/b")).toBe("/modules/metrics/a/b");
-  });
-});
-
 describe("modulePath", () => {
-  it("is the framing route, not the proxied URL", () => {
+  it("is the route of the module's page", () => {
     expect(modulePath("metrics", "/page")).toBe("/module/metrics/page");
   });
 });
@@ -85,17 +76,17 @@ describe("envLines", () => {
 });
 
 describe("uiContribution", () => {
-  const page = (path: string, render: "frame" | "ui") => ({ ...tab("T", "viewer"), path, render });
-  const modules = [mod("metrics", true, [page("/", "ui"), page("/service/", "ui"), page("/old", "frame")])];
+  const page = (path: string) => ({ ...tab("T", "viewer"), path });
+  const modules = [mod("metrics", true, [page("/"), page("/service/")])];
 
-  it("finds the page the module declared as a document, ignoring slashes at the ends", () => {
+  it("finds the page the module declared, ignoring slashes at the ends", () => {
     expect(uiContribution(modules, "metrics", "")?.path).toBe("/");
     expect(uiContribution(modules, "metrics", "/")?.path).toBe("/");
     expect(uiContribution(modules, "metrics", "service")?.path).toBe("/service/");
     expect(uiContribution(modules, "metrics", "/service/")?.path).toBe("/service/");
   });
 
-  it("leaves a frame, a path nobody declared and another module to the frame", () => {
+  it("finds nothing for a path nobody declared or another module", () => {
     expect(uiContribution(modules, "metrics", "old")).toBeUndefined();
     expect(uiContribution(modules, "metrics", "service/deep")).toBeUndefined();
     expect(uiContribution(modules, "other", "")).toBeUndefined();

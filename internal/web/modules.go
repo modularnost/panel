@@ -5,94 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
-	"path"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"modularnost/internal/docker"
 	"modularnost/internal/modules"
 	"modularnost/internal/store"
 )
-
-// moduleProxy forwards the request as is: the module renders its own page.
-func (s *Server) moduleProxy(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
-	m, ok := s.Modules.Get(r.Context(), name)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	if !m.OK() {
-		http.Error(w, "module unavailable: "+m.Err, http.StatusBadGateway)
-		return
-	}
-	target, err := url.Parse(m.BaseURL)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	// A top-level navigation gets the shell with the module in a frame; the
-	// frame's own requests, and browsers without Sec-Fetch-Dest, get the bare page.
-	if r.Header.Get("Sec-Fetch-Dest") == "document" {
-		http.Redirect(w, r, "/module/"+strings.TrimPrefix(r.URL.RequestURI(), "/modules/"), http.StatusFound)
-		return
-	}
-
-	rest := path.Clean("/" + strings.TrimPrefix(r.URL.Path, "/modules/"+name))
-	u := userFrom(r)
-	if need := m.RoleFor(rest); !store.AtLeast(u.Role, need) {
-		http.Error(w, "role "+need+" required, you have "+u.Role, http.StatusForbidden)
-		return
-	}
-	r.URL.Path = "/modules/" + name + rest
-	newModuleProxy(name, target, s.Modules.Token(name), u).ServeHTTP(w, r)
-}
-
-// newModuleProxy forwards to a module. The module's page is served from the
-// panel's own origin, so what crosses in either direction is limited: the
-// session cookie would let the module act as the signed-in user, and a cookie
-// the module sets would land in the panel's jar (it could replace the session).
-func newModuleProxy(name string, target *url.URL, token string, user store.User) *httputil.ReverseProxy {
-	prefix := "/modules/" + name
-	return &httputil.ReverseProxy{
-		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(target)
-			pr.Out.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(pr.In.URL.Path, prefix), "/")
-			pr.Out.Header.Del("Authorization")
-			pr.Out.Header.Del("Cookie")
-			// Whatever the browser put in X-Panel-* is the browser's.
-			for k := range pr.Out.Header {
-				if strings.HasPrefix(http.CanonicalHeaderKey(k), "X-Panel-") {
-					pr.Out.Header.Del(k)
-				}
-			}
-			// How the module calls the core back: its name plus an HMAC of it.
-			pr.Out.Header.Set("X-Panel-Module", name)
-			pr.Out.Header.Set("X-Panel-Token", token)
-			now := time.Now().Unix()
-			pr.Out.Header.Set("X-Panel-User", user.Username)
-			pr.Out.Header.Set("X-Panel-Role", user.Role)
-			pr.Out.Header.Set("X-Panel-Time", strconv.FormatInt(now, 10))
-			pr.Out.Header.Set("X-Panel-User-Sig", modules.SignUser(token, name, user.Username, user.Role, now))
-		},
-		ModifyResponse: func(resp *http.Response) error {
-			resp.Header.Del("Set-Cookie")
-			return nil
-		},
-		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
-			log.Printf("module %s: %v", name, err)
-			http.Error(w, "module not responding", http.StatusBadGateway)
-		},
-	}
-}
 
 // moduleAuth admits only a module with a valid token and the required permission.
 func (s *Server) moduleAuth(perm string, next func(http.ResponseWriter, *http.Request, modules.Module)) http.HandlerFunc {

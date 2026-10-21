@@ -33,12 +33,12 @@ func or(v, def string) string {
 }
 
 const manifest = `{
-  "contract": 2,
+  "contract": 3,
   "name": "metrics",
   "version": "0.2.0",
   "contributions": [
-    {"slot": "nav", "title": "Metrics", "path": "/", "role": "viewer", "render": "ui"},
-    {"slot": "service.tab", "title": "Metrics", "path": "/service", "role": "viewer", "render": "ui"}
+    {"slot": "nav", "title": "Metrics", "path": "/", "role": "viewer"},
+    {"slot": "service.tab", "title": "Metrics", "path": "/service", "role": "viewer"}
   ],
   "permissions": ["stats:read"]
 }`

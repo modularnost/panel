@@ -1,10 +1,8 @@
 package web
 
 import (
-	"context"
 	"errors"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -17,11 +15,6 @@ const (
 )
 
 type ctxKey struct{}
-
-func userFrom(r *http.Request) store.User {
-	u, _ := r.Context().Value(ctxKey{}).(store.User)
-	return u
-}
 
 // identify resolves the user from a session cookie, a Bearer token or basic
 // auth. Basic and Bearer are there for CI and curl, which have no cookie jar.
@@ -57,26 +50,6 @@ func (s *Server) authorize(r *http.Request, need string) (store.User, int, strin
 		return u, http.StatusForbidden, "role " + need + " required, you have " + u.Role
 	}
 	return u, 0, ""
-}
-
-func (s *Server) require(need string, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		u, status, msg := s.authorize(r, need)
-		if status != 0 {
-			s.denied(w, r, status, msg)
-			return
-		}
-		next(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))
-	}
-}
-
-func (s *Server) denied(w http.ResponseWriter, r *http.Request, code int, msg string) {
-	browser := strings.Contains(r.Header.Get("Accept"), "text/html")
-	if code == http.StatusUnauthorized && browser && r.Method == http.MethodGet {
-		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
-		return
-	}
-	http.Error(w, msg, code)
 }
 
 func (s *Server) sessionCookie(r *http.Request, userID int64) (*http.Cookie, error) {

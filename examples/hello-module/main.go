@@ -1,7 +1,7 @@
-// A demo panel module that draws its own page, a frame (the other example,
-// metrics-module, sends blocks and lets the panel draw them): its own HTTP server, a manifest, and one action that
-// asks the core (PANEL_CORE_URL) to redeploy a service. It has no docker.sock;
-// it identifies itself with the X-Panel-Module / X-Panel-Token headers.
+// A demo panel module: its own HTTP server, a manifest, one ui page with a form
+// and one action that asks the core (PANEL_CORE_URL) to redeploy a service. It
+// has no docker.sock; it identifies itself with the X-Panel-Module /
+// X-Panel-Token headers. The other example, metrics-module, shows charts.
 package main
 
 import (
@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sync/atomic"
 )
@@ -26,20 +27,11 @@ func cmp(v, def string) string {
 	return def
 }
 
-// docHead makes every response a real document: without a doctype the frame
-// is in quirks mode and the panel cannot measure its height. The stylesheet
-// link is optional and makes the module match the panel's theme.
-const docHead = `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>hello-module</title>
-<link rel="stylesheet" href="/static/panel.css">
-<style>body{margin:1rem}</style></head><body>
-`
-
 const manifest = `{
-  "contract": 2,
+  "contract": 3,
   "name": "hello",
-  "version": "0.1.0",
-  "contributions": [{"slot": "nav", "title": "Hello", "path": "/", "role": "operator", "render": "frame"}],
+  "version": "0.2.0",
+  "contributions": [{"slot": "nav", "title": "Hello", "path": "/", "role": "operator"}],
   "permissions": ["service:read", "service:update"]
 }`
 
@@ -53,33 +45,43 @@ func main() {
 		io.WriteString(w, "ok")
 	})
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		remember(r)
 		names, err := services()
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		io.WriteString(w, docHead)
+		blocks := []any{map[string]any{"type": "heading", "level": 1, "text": "hello-module"}}
 		if err != nil {
-			fmt.Fprintf(w, "<p>core unreachable: %v</p>", err)
-			return
+			blocks = append(blocks, map[string]any{"type": "banner", "tone": "error", "text": "core unreachable: " + err.Error()})
+		} else {
+			options := make([]map[string]string, 0, len(names))
+			for _, n := range names {
+				options = append(options, map[string]string{"value": n})
+			}
+			blocks = append(blocks,
+				map[string]any{"type": "text", "text": "Services the core can see:"},
+				map[string]any{
+					"type": "form", "action": "/action/redeploy", "submit": "Redeploy",
+					"confirm": "Redeploy this service?",
+					"fields":  []any{map[string]any{"name": "service", "label": "Service", "type": "select", "options": options}},
+				})
 		}
-		io.WriteString(w, "<h1>hello-module</h1><p>Services the core can see:</p><ul>")
-		for _, n := range names {
-			fmt.Fprintf(w, `<li>%s <form method=post action="/modules/hello/action/redeploy">`+
-				`<input type=hidden name=service value="%s"><button>redeploy</button></form></li>`, n, n)
-		}
-		io.WriteString(w, "</ul>")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"ui": 1, "blocks": blocks})
 	})
 
 	http.HandleFunc("POST /action/redeploy", func(w http.ResponseWriter, r *http.Request) {
 		remember(r)
-		body, err := call(http.MethodPost, "/internal/services/"+r.FormValue("service")+"/update")
-		if err != nil {
+		var values map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&values); err != nil || values["service"] == "" {
+			http.Error(w, `send {"service": "<name>"}`, http.StatusBadRequest)
+			return
+		}
+		service := values["service"]
+		if _, err := call(http.MethodPost, "/internal/services/"+url.PathEscape(service)+"/update"); err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		io.WriteString(w, docHead)
-		fmt.Fprintf(w, "<p>done: %s</p><a href='/modules/hello/'>back</a>", body)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "redeployed " + service})
 	})
 
 	addr := cmp(os.Getenv("ADDR"), ":8080")
