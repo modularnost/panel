@@ -153,6 +153,7 @@ no scripts. A document is refused over 1 MiB, 200 blocks, 8 series in a chart or
 | `heading` | `text`, `level` (`1` or `2`, default `2`) |
 | `text` | `text`, `tone` (`muted`) |
 | `banner` | `text`, `tone` (`info`, `warning`, `error`; default `info`) |
+| `code` | `text` kept as written in a monospace box that scrolls, e.g. a build log; `title` |
 | `stat` | `label`, `value`, `unit`, `caption` |
 | `facts` | `items`: a list of `{label, value, unit}` |
 | `table` | `columns`: `{key, title, type, align}`; `rows`: an object per row, keyed by column; `empty`: the text of an empty table |

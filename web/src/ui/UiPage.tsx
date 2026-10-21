@@ -79,6 +79,13 @@ function BlockView({ block, module, page }: { block: Block; module: string; page
       return <p className={block.tone === "muted" ? "muted" : undefined}>{str(block.text)}</p>;
     case "banner":
       return <Banner tone={block.tone === "warning" || block.tone === "error" ? block.tone : "info"}>{str(block.text)}</Banner>;
+    case "code":
+      return (
+        <>
+          {str(block.title) && <h3>{str(block.title)}</h3>}
+          <pre className="logbox">{str(block.text)}</pre>
+        </>
+      );
     case "facts":
       return (
         <dl className="facts">
