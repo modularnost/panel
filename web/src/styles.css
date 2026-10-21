@@ -791,3 +791,11 @@ md-outlined-text-field.mono {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+.ui-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 420px;
+}

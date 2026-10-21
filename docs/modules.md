@@ -168,6 +168,8 @@ no scripts. A document is refused over 1 MiB, 200 blocks, 8 series in a chart or
 | `chart` | `title`, `unit`, `from`, `to` (unix seconds), `series`: `{name, points: [[time, value], ...]}`, `sync`, `empty` |
 | `choice` | `param`, `value`, `options`: `{value, label}`; picking one asks for the page again with `?<param>=<value>` |
 | `link` | `text`, `href` |
+| `button` | `label`, `action` (a path below `/action/`), `values` (fixed strings), `confirm` (a question the panel asks first), `tone` (`danger`) |
+| `form` | `fields`, `action`, `submit` (the button's text), `confirm`; a field is `{name, label, type, value, options}` with `type` `text` (default), `select` (`options`: `{value, label}`) or `switch` |
 
 A value is a string or a number, and a table cell may also be
 `{"text": "...", "href": ..., "tone": "ok"}`. A column `type` is `text` (the
@@ -179,6 +181,29 @@ or `seconds`; the panel formats the number, so send it raw. Charts with the same
 An `href` is one of `{"path": "/service?name=x"}` (a page of the module),
 `{"service": "shop_web"}` (the panel's page of that service) or
 `{"url": "https://..."}`. Nothing else is a link.
+
+### Actions
+
+A `button` or a `form` makes the panel send `POST <action>` to the module, as
+the signed-in viewer, with the fixed `values` of the button or the fields of the
+form as a JSON object of strings (a switch is `"true"` or `"false"`):
+
+```http
+POST /action/redeploy HTTP/1.1
+Content-Type: application/json
+X-Panel-User: ann
+...
+
+{"service": "shop_web"}
+```
+
+Answer `2xx`, optionally with `{"message": "redeployed"}`, which the panel shows
+under the block; anything else is shown as the error, with the body as the
+reason (up to 4 KiB). The panel then asks for the page again. The role is the
+one of the longest declared `path` that covers the action, as for a page: give a
+dangerous action its own `path` in the manifest with a higher `role`. An action
+outside `/action/` is refused, and so is one from a page the module did not
+declare as `ui`.
 
 ### Telling the panel a page changed
 

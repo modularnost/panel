@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chartTop, formatValue, groupStats, linkTarget, nearest } from "./document";
+import { chartTop, formatValue, formDefaults, formFields, groupStats, linkTarget, nearest, strings } from "./document";
 
 describe("formatValue", () => {
   it("formats a raw number by its unit", () => {
@@ -68,5 +68,25 @@ describe("groupStats", () => {
     const a = { type: "stat" };
     const b = { type: "stat" };
     expect(groupStats([text, a, b, text, a])).toEqual([text, [a, b], text, [a]]);
+  });
+});
+
+describe("forms", () => {
+  it("starts a form from what the module said, and leaves out what cannot be sent", () => {
+    const fields = formFields([
+      { name: "tag", label: "Tag", value: "v1" },
+      { name: "mode", type: "select", options: [{ value: "a" }, { value: "b", label: "B" }] },
+      { name: "force", type: "switch", value: true },
+      { name: "quiet", type: "switch" },
+      { label: "no name" },
+      "junk",
+    ]);
+    expect(formDefaults(fields)).toEqual({ tag: "v1", mode: "a", force: "true", quiet: "false" });
+    expect(fields[1].options[0].label).toBe("a");
+  });
+
+  it("sends only strings for a button", () => {
+    expect(strings({ a: "1", b: 2, c: null })).toEqual({ a: "1" });
+    expect(strings("x")).toEqual({});
   });
 });

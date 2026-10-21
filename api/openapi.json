@@ -1,6 +1,19 @@
 {
   "components": {
     "schemas": {
+      "ActionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "description": "What the module said about it; may be empty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "Availability": {
         "additionalProperties": false,
         "properties": {
@@ -344,6 +357,31 @@
           "state",
           "contributions",
           "permissions"
+        ],
+        "type": "object"
+      },
+      "ModuleAction": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "A path below /action/ of the module",
+            "type": "string"
+          },
+          "page": {
+            "description": "The contribution's path the button is on",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The fields of a form, or the fixed values of a button",
+            "type": "object"
+          }
+        },
+        "required": [
+          "page",
+          "action"
         ],
         "type": "object"
       },
@@ -1774,6 +1812,62 @@
           }
         ],
         "summary": "Remove the module's service; its image and data are not touched"
+      }
+    },
+    "/api/v1/modules/{name}/action": {
+      "post": {
+        "operationId": "run-module-action",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleAction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run an action of a module's ui page: what a button or a form sends"
       }
     },
     "/api/v1/modules/{name}/events": {

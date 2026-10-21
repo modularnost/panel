@@ -1,6 +1,7 @@
 package web
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,7 +18,7 @@ type uiFixture struct {
 	base   string
 	server *Server
 	reg    *modules.Registry
-	seen   struct{ path, query, user, role string }
+	seen   struct{ method, path, query, user, role, body string }
 	answer string
 }
 
@@ -25,7 +26,9 @@ func newUIFixture(t *testing.T) *uiFixture {
 	t.Helper()
 	f := &uiFixture{answer: `{"ui":1,"blocks":[{"type":"text","text":"hello"}]}`}
 	mod := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		f.seen.path, f.seen.query = r.URL.Path, r.URL.RawQuery
+		f.seen.method, f.seen.path, f.seen.query = r.Method, r.URL.Path, r.URL.RawQuery
+		b, _ := io.ReadAll(r.Body)
+		f.seen.body = string(b)
 		f.seen.user, f.seen.role = r.Header.Get("X-Panel-User"), r.Header.Get("X-Panel-Role")
 		w.Write([]byte(f.answer))
 	}))
@@ -36,6 +39,7 @@ func newUIFixture(t *testing.T) *uiFixture {
 		{Slot: modules.SlotNav, Path: "/", Role: store.RoleViewer, Render: modules.RenderUI},
 		{Slot: modules.SlotServiceTab, Path: "/service", Role: store.RoleOperator, Render: modules.RenderUI},
 		{Slot: modules.SlotNav, Path: "/framed", Role: store.RoleViewer, Render: modules.RenderFrame},
+		{Slot: modules.SlotNav, Path: "/action/danger", Role: store.RoleAdmin, Render: modules.RenderUI},
 	}}})
 	f.c, f.base, _ = apiServerWith(t, func(s *Server) { s.Modules = f.reg; f.server = s })
 	if status, _ := send(t, f.c, "POST", f.base+"/api/v1/auth/login", "application/json", `{"username":"ann","password":"s3cret-pass"}`); status != 200 {
@@ -85,6 +89,39 @@ func TestModulePageRefusals(t *testing.T) {
 	anon := &http.Client{}
 	if status, _ := send(t, anon, "GET", f.base+"/api/v1/modules/m/page?path=/", "", ""); status != 401 {
 		t.Errorf("anonymous: %d", status)
+	}
+}
+
+func TestModuleActionReachesTheModuleAsTheViewer(t *testing.T) {
+	f := newUIFixture(t)
+	f.answer = `{"message":"redeployed"}`
+	url := f.base + "/api/v1/modules/m/action"
+	status, body := send(t, f.c, "POST", url, "application/json", `{"page":"/","action":"/action/redeploy","values":{"service":"shop"}}`)
+	if status != 200 || body["message"] != "redeployed" {
+		t.Fatalf("%d %v", status, body)
+	}
+	if f.seen.method != "POST" || f.seen.path != "/action/redeploy" || f.seen.body != `{"service":"shop"}` || f.seen.user != "ann" {
+		t.Errorf("the module was asked %+v", f.seen)
+	}
+
+	f.seen.path = ""
+	for name, c := range map[string]struct {
+		body   string
+		status int
+		code   string
+	}{
+		"a role below the action's":         {`{"page":"/","action":"/action/danger"}`, 403, "forbidden"},
+		"outside /action/":                  {`{"page":"/","action":"/service"}`, 400, "bad_request"},
+		"climbing out of /action/":          {`{"page":"/","action":"/action/../manifest"}`, 400, "bad_request"},
+		"from a page that is no ui":         {`{"page":"/framed","action":"/action/x"}`, 404, "not_found"},
+		"from a page the module never said": {`{"page":"/other","action":"/action/x"}`, 404, "not_found"},
+	} {
+		if status, body := send(t, f.c, "POST", url, "application/json", c.body); status != c.status || errorCode(body) != c.code {
+			t.Errorf("%s: %d %v, want %d %s", name, status, body, c.status, c.code)
+		}
+	}
+	if f.seen.path != "" {
+		t.Errorf("a refused action still reached the module: %+v", f.seen)
 	}
 }
 
