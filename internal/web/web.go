@@ -5,7 +5,6 @@ package web
 import (
 	"cmp"
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -27,26 +26,6 @@ import (
 
 // Version is set by main at build time.
 var Version = "dev"
-
-// Bundled so that an air-gapped cluster needs no CDN. Modules link panel.css
-// from their frames, so /static/ is part of the module contract.
-//
-//go:embed static
-var staticFS embed.FS
-
-// staticHandler serves the bundle without auth: module frames link the stylesheet.
-func staticHandler() http.Handler {
-	sub, err := fs.Sub(staticFS, "static")
-	if err != nil {
-		panic(err)
-	}
-	files := http.FileServerFS(sub)
-	return http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Plain URLs (modules) may be an hour stale.
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-		files.ServeHTTP(w, r)
-	}))
-}
 
 type Server struct {
 	Docker  *docker.Client
@@ -87,7 +66,6 @@ func (s *Server) Routes() http.Handler {
 	// A module needs no permission to tell that its own page changed.
 	mux.HandleFunc("POST /internal/ui/changed", s.moduleAuth("", s.uiChanged))
 
-	mux.Handle("GET /static/", staticHandler())
 	// Unauthenticated: load balancers and HEALTHCHECK call it.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "ok %s\n", Version)
@@ -95,10 +73,6 @@ func (s *Server) Routes() http.Handler {
 
 	s.registerAPI(mux)
 	mux.HandleFunc("/api/v1/", apiNotFound)
-
-	// Signed in is enough to arrive; the module's manifest says what a role may
-	// reach, and what it does not cover needs operator.
-	mux.HandleFunc("/modules/{name}/", s.require(store.RoleViewer, s.moduleProxy))
 
 	// Every other GET is a client-side route of the SPA.
 	if dist, err := fs.Sub(webui.Dist, "dist"); err == nil {

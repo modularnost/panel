@@ -42,15 +42,7 @@
             "type": "object"
           },
           "path": {
-            "description": "Below /modules/\u003cname\u003e",
-            "type": "string"
-          },
-          "render": {
-            "description": "frame: the module draws the page; ui: the module sends a document and the panel draws it",
-            "enum": [
-              "frame",
-              "ui"
-            ],
+            "description": "The page the module answers at",
             "type": "string"
           },
           "role": {
@@ -79,8 +71,7 @@
           "title",
           "path",
           "role",
-          "match",
-          "render"
+          "match"
         ],
         "type": "object"
       },

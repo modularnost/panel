@@ -41,27 +41,19 @@ export function serviceContext(s: Service): string {
   return `?${q}`;
 }
 
-// moduleURL is where a module's own page lives. The panel proxies it under
-// /modules/<name>/, and the module chooses what follows.
-export function moduleURL(name: string, path: string): string {
-  return `/modules/${name}/${path.replace(/^\/+/, "")}`;
-}
-
-// modulePath is the SPA route that frames the page. It cannot be moduleURL:
-// the server answers that one, so a reload there would skip the shell.
+// modulePath is the SPA route of a module's page.
 export function modulePath(name: string, path: string): string {
   return `/module/${name}/${path.replace(/^\/+/, "")}`;
 }
 
 const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
 
-// uiContribution is the contribution a route shows as a document, when the
-// module declared that path with render "ui"; anything else is a frame.
+// uiContribution is the contribution a route shows, when the module declared that path.
 export function uiContribution(modules: Module[] | undefined, name: string, path: string): Contribution | undefined {
   const want = trimSlash("/" + path.replace(/^\/+/, ""));
   return modules
     ?.find((m) => m.name === name)
-    ?.contributions.find((c) => c.render === "ui" && trimSlash(c.path) === want);
+    ?.contributions.find((c) => trimSlash(c.path) === want);
 }
 
 // envLines turns the textarea into KEY=value entries, ignoring blank lines.

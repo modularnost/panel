@@ -20,7 +20,7 @@ export default defineConfig({
   server: {
     // Everything the Go server answers itself; the rest is the SPA's routes.
     proxy: Object.fromEntries(
-      ["/api", "/healthz", "/modules/", "/static"].map((p) => [p, "http://localhost:8080"]),
+      ["/api", "/healthz"].map((p) => [p, "http://localhost:8080"]),
     ),
   },
 });

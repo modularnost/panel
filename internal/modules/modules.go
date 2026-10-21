@@ -38,14 +38,7 @@ const (
 )
 
 // ContractVersion is the manifest format this core understands.
-const ContractVersion = 2
-
-// How a contribution's page is shown: a frame the module draws itself, or a
-// document of blocks the panel draws (ADR 8).
-const (
-	RenderFrame = "frame"
-	RenderUI    = "ui"
-)
+const ContractVersion = 3
 
 // The places a module may put something in. A slot the core does not know is
 // ignored, so a newer module does not break an older core.
@@ -73,8 +66,6 @@ type Contribution struct {
 	Role string `json:"role,omitempty"`
 	// Match narrows a service.tab to services that carry all these labels.
 	Match map[string]string `json:"match,omitempty"`
-	// Render is RenderFrame (the default) or RenderUI.
-	Render string `json:"render,omitempty"`
 }
 
 // validate checks the manifest and drops what this core does not know. A
@@ -105,13 +96,6 @@ func (m *Manifest) validate() error {
 		}
 		if c.Role == "" {
 			c.Role = store.RoleOperator
-		}
-		switch c.Render {
-		case "":
-			c.Render = RenderFrame
-		case RenderFrame, RenderUI:
-		default:
-			return fmt.Errorf("contribution %d (%s): unknown render %q", i, c.Slot, c.Render)
 		}
 		known = append(known, c)
 	}

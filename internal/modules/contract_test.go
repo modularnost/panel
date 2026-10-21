@@ -19,34 +19,28 @@ func fetch(t *testing.T, body string) (Manifest, error) {
 }
 
 func TestManifestContract(t *testing.T) {
-	good, err := fetch(t, `{"contract":2,"name":"m","contributions":[
+	good, err := fetch(t, `{"contract":3,"name":"m","contributions":[
 		{"slot":"nav","title":"M","path":"/"},
 		{"slot":"service.tab","title":"Build","path":"/service","role":"viewer","match":{"build":"on"}},
 		{"slot":"dashboard.widget","title":"Later","path":"/w"},
-		{"slot":"nav","title":"Newer","path":"/x","someday":true},
-		{"slot":"nav","title":"Doc","path":"/d","render":"ui"}
+		{"slot":"nav","title":"Newer","path":"/x","someday":true}
 	]}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// The slot the core does not know is dropped; the field it does not know is ignored.
-	// A contribution that says nothing about render is a frame.
-	if good.Contributions[0].Render != RenderFrame || good.Contributions[3].Render != RenderUI {
-		t.Fatalf("render: %+v", good.Contributions)
-	}
-	if len(good.Contributions) != 4 || good.Contributions[0].Role != "operator" || good.Contributions[1].Match["build"] != "on" {
+	if len(good.Contributions) != 3 || good.Contributions[0].Role != "operator" || good.Contributions[1].Match["build"] != "on" {
 		t.Fatalf("%+v", good.Contributions)
 	}
 
 	for name, c := range map[string]struct{ body, want string }{
 		"no contract (an old manifest)": {`{"name":"m","nav_entries":[{"title":"M","path":"/"}]}`, "no \"contract\""},
-		"an older contract":             {`{"contract":1}`, "contract 1"},
-		"a newer contract":              {`{"contract":3}`, "contract 3"},
-		"an unknown render":             {`{"contract":2,"contributions":[{"slot":"nav","title":"M","path":"/","render":"html"}]}`, "unknown render"},
-		"an unknown role":               {`{"contract":2,"contributions":[{"slot":"nav","title":"M","path":"/","role":"root"}]}`, "unknown role"},
-		"a path that climbs":            {`{"contract":2,"contributions":[{"slot":"nav","title":"M","path":"/a/../b"}]}`, "must start with /"},
-		"a relative path":               {`{"contract":2,"contributions":[{"slot":"nav","title":"M","path":"a"}]}`, "must start with /"},
-		"no title":                      {`{"contract":2,"contributions":[{"slot":"nav","path":"/"}]}`, "no title"},
+		"the contract of frames":        {`{"contract":2}`, "contract 2"},
+		"a newer contract":              {`{"contract":4}`, "contract 4"},
+		"an unknown role":               {`{"contract":3,"contributions":[{"slot":"nav","title":"M","path":"/","role":"root"}]}`, "unknown role"},
+		"a path that climbs":            {`{"contract":3,"contributions":[{"slot":"nav","title":"M","path":"/a/../b"}]}`, "must start with /"},
+		"a relative path":               {`{"contract":3,"contributions":[{"slot":"nav","title":"M","path":"a"}]}`, "must start with /"},
+		"no title":                      {`{"contract":3,"contributions":[{"slot":"nav","path":"/"}]}`, "no title"},
 	} {
 		if _, err := fetch(t, c.body); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: error %v, want one containing %q", name, err, c.want)

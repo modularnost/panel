@@ -90,7 +90,7 @@ func checkChart(b map[string]any) error {
 func (m Module) UIPage(p string) (Contribution, bool) {
 	p = path.Clean("/" + p)
 	for _, c := range m.Manifest.Contributions {
-		if c.Render == RenderUI && path.Clean(c.Path) == p {
+		if path.Clean(c.Path) == p {
 			return c, true
 		}
 	}
