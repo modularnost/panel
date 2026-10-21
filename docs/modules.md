@@ -14,14 +14,13 @@ can do.
 ## Quick start
 
 Start from [examples/metrics-module](../examples/metrics-module): a `ui` page,
-which is what most modules should be. It sends blocks (numbers, a table,
+the only kind there is. It sends blocks (numbers, a table,
 charts with a range to pick), asks for a permission (`stats:read`), samples the
 core on a timer and tells the panel when its pages changed. Note that the panel
 already shows those numbers on its own Resources page — that module is a
 demonstration, not a feature to install.
-[examples/hello-module](../examples/hello-module) is the other way, a frame: it
-draws its own HTML page and has a button that asks the core to redeploy a
-service, which the blocks cannot do yet. Then:
+[examples/hello-module](../examples/hello-module) is the smaller one: a page
+with a form whose action asks the core to redeploy a service. Then:
 
 ```sh
 docker build -t my-module:latest .
@@ -48,7 +47,7 @@ the other.
 | Label | | |
 | --- | --- | --- |
 | `panel.module` | `true` | required, or the module stays invisible |
-| `panel.module.name` | `hello` | the name in the URL: `/modules/hello/` |
+| `panel.module.name` | `hello` | the name of the module; changing it changes the token too |
 | `panel.module.version` | `0.1.0` | display only |
 | `panel.module.port` | `8080` | optional, defaults to 8080 |
 
@@ -65,11 +64,11 @@ with a new secret. Keep the latest one and use it to call back.
 
 ```json
 {
-  "contract": 2,
+  "contract": 3,
   "name": "hello",
   "version": "0.1.0",
   "contributions": [
-    {"slot": "nav", "title": "Hello", "path": "/", "role": "viewer", "render": "ui"}
+    {"slot": "nav", "title": "Hello", "path": "/", "role": "viewer"}
   ],
   "permissions": ["service:read", "service:update"]
 }
@@ -77,7 +76,7 @@ with a new secret. Keep the latest one and use it to call back.
 
 | Field | |
 | --- | --- |
-| `contract` | required, `2`. A manifest without it, or with another number, makes the module show as failed |
+| `contract` | required, `3`. A manifest without it, or with another number, makes the module show as failed |
 | `contributions` | what the module adds to the panel, see below |
 | `permissions` | what the module may ask the core for, see below |
 | `name`, `version` | informational; routing uses the label values |
@@ -90,7 +89,7 @@ of the menu.
 
 A contribution is one thing the module puts into the panel. Every one has a
 `slot` (where), a `title` (what the user reads), a `path` (the page of yours
-it opens, below `/modules/<name>`), and optionally a `role` and a `render`.
+it asks for), and optionally a `role`.
 
 | Slot | Where it appears |
 | --- | --- |
@@ -113,13 +112,6 @@ by the longest declared `path` that is a prefix of the request path (at a
 viewers, and `{"path": "/settings", "role": "admin"}` keeps `/settings` for
 admins. A path no contribution covers needs `operator`.
 
-`render` says how the page is shown. `"ui"` means the path answers a
-[document](#ui-pages) and the panel draws it, in its own look; `"frame"`, the
-default, means the module serves a whole HTML page and the panel shows it in a
-frame (see [Frame pages](#frame-pages)). Prefer `ui`: the page then follows the
-panel's theme, its dark scheme and its phone layout without any work of yours.
-Use a frame for what the blocks cannot say.
-
 ### `GET /health`
 
 The core does **not** poll it — it judges a module by its service replicas and
@@ -128,8 +120,8 @@ Dockerfile.
 
 ## UI pages
 
-A contribution with `"render": "ui"` answers `GET <path>` with JSON, a document
-of blocks the panel draws:
+A contribution answers `GET <path>` with JSON, a document of blocks the panel
+draws, in its own look, theme and phone layout:
 
 ```json
 {"ui": 1, "blocks": [
@@ -145,8 +137,8 @@ of blocks the panel draws:
 ```
 
 The panel asks as the signed-in viewer (the headers below) and only for a path
-the manifest declared with `render: "ui"`; the role of the contribution applies.
-For a tab the context is in the query, as for a frame (`?service=<name>`), and
+the manifest declared; the role of the contribution applies.
+For a tab the context is in the query (`?service=<name>`), and
 so is what a `choice` block set (`?range=24h`): the panel keeps it in its own
 URL and asks again when it changes.
 
@@ -225,28 +217,10 @@ must be a `ui` contribution of the module that is calling: anything else is
 `404`. An event says "ask again", not what changed. Nobody looking costs
 nothing, so report after every update.
 
-## Frame pages
+## Who is looking
 
-A contribution with `"render": "frame"` (the default) is what modules were
-before: the panel proxies the module's page and shows it in a frame.
-
-```text
-browser → GET /modules/hello/page   (panel checks the role the manifest asks for)
-        → panel proxies: GET /page to http://hello_module:8080
-```
-
-Along the way the core:
-
-- strips the `/modules/hello` prefix, so the module lives at its own `/`;
-- adds the `X-Panel-Module` and `X-Panel-Token` headers;
-- adds who is looking, signed (below);
-- drops `Authorization` and `Cookie` — neither the user's panel password nor the
-  session ever reaches the module — and drops any `Set-Cookie` the module
-  answers with, because its page is served from the panel's origin and a cookie
-  it set would land in the panel's jar;
-- discards any `X-Panel-*` header the browser sent: those are the core's to set.
-
-### Who is looking
+Every request the panel makes to the module, for a page or for an action, carries
+`X-Panel-Module`, `X-Panel-Token` and who is looking, signed:
 
 ```http
 X-Panel-User: ann
@@ -269,21 +243,9 @@ ok := hmac.Equal([]byte(hex.EncodeToString(mac.Sum(nil))), []byte(sig))
 The core already refused a request below the contribution's `role`; the headers
 are for a module that wants finer lines than that.
 
-A frame page is rendered by the module itself, and the panel shows it in a frame
-inside its own layout: sidebar on the left, your page on the right. The core
-never parses or rewrites your HTML, so the styling is yours — and so is the
-responsibility to return a **complete document** with a `<!doctype html>`.
-Without it the browser falls into quirks mode and the panel cannot measure the
-frame's height correctly.
-
-Two things follow from living in a frame: your page is as wide as the content
-area, not the whole window, and links inside it stay inside the frame (which is
-what you want — the panel chrome stays put).
-
 ## Asking the core to act
 
-The module identifies itself with the same headers the core sent it in the
-proxied request:
+The module identifies itself with the same headers the core sent it:
 
 ```http
 GET /internal/stats HTTP/1.1
@@ -350,11 +312,6 @@ it from page requests cannot work while nobody is watching.
 **Changing `panel.module.name` changes both the URL and the token.** Existing
 links break.
 
-**The panel's stylesheet is available to you.** `/static/panel.css` is served
-without authentication and your page is same-origin, so one `<link>` gives your
-module the panel's look and its dark theme. It is not a stable API yet — class
-names may change before the first release.
-
 **The core enforces the role of the contribution, not what your page does.**
 It lets a user in when their role is at least the one of the longest matching
 `path`, and everything else needs `operator`. If one page exposes both a view
@@ -367,8 +324,8 @@ Modules live in their own repositories, with their own CI and their own image �
 that is the point of them being separate services. When yours works, add a row
 to [catalog.md](catalog.md) so people can find it.
 
-- [ ] `/manifest` returns valid JSON and a 200, with `"contract": 2`
-- [ ] a page of blocks is `"render": "ui"`; a frame only for what blocks cannot say
+- [ ] `/manifest` returns valid JSON and a 200, with `"contract": 3`
+- [ ] a page answers `{"ui": 1, "blocks": [...]}`; there is no HTML
 - [ ] every contribution has the lowest `role` that is safe, and dangerous
       paths are covered by a higher one
 - [ ] `permissions` lists only what is actually used
