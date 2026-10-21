@@ -262,6 +262,14 @@ stores nothing, and the token can't be forged without that secret.
 | `GET /internal/services` | `service:read` | services with their status |
 | `GET /internal/stats` | `stats:read` | CPU, memory, network and block I/O counters per replica; `?service=<name>` narrows it |
 | `POST /internal/services/{name}/update` | `service:update` | force-update, recorded in deploy history |
+| `POST /internal/services` | `service:create` | creates a service from `{name, image, env, labels, replicas}`; `201` |
+| `POST /internal/services/{name}/image` | `service:create` | moves a service **this module created** to the tag `{"tag": "..."}`, new task first; `403` for any other |
+
+A service made through `POST /internal/services` joins the panel's network and
+publishes no port: route traffic to it with Traefik labels. Labels that start
+with `panel.` are refused, and the core adds `panel.owner=<module>` itself, which
+is what lets only that module move the service to another image. Both calls are
+recorded in deploy history as `module:<name>`.
 
 `/internal/stats` returns one object per replica:
 

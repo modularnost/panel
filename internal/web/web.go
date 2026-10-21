@@ -60,6 +60,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /internal/services", s.moduleAuth("service:read", s.apiServices))
 	mux.HandleFunc("GET /internal/stats", s.moduleAuth("stats:read", s.apiStats))
 	mux.HandleFunc("POST /internal/services/{name}/update", s.moduleAuth("service:update", s.apiUpdateService))
+	mux.HandleFunc("POST /internal/services", s.moduleAuth("service:create", s.apiCreateService))
+	mux.HandleFunc("POST /internal/services/{name}/image", s.moduleAuth("service:create", s.apiSetServiceImage))
 	// The node firewalls ask for their rules and say what they applied.
 	mux.HandleFunc("GET /internal/firewall", s.firewallSpec)
 	mux.HandleFunc("POST /internal/firewall/applied", s.firewallApplied)

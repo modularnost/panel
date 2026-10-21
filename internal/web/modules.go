@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net"
 	"net/http"
 	"regexp"
@@ -74,6 +75,112 @@ func (s *Server) apiUpdateService(w http.ResponseWriter, r *http.Request, m modu
 		Source: "module", TriggeredBy: "module:" + m.Name,
 	})
 	d, err := s.Docker.ForceUpdate(r.Context(), sv.ID)
+	finish(d.OldDigest, d.NewDigest, err)
+	logWarnings(d)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, d)
+}
+
+// labelOwner marks a service a module created: only that module may move it to
+// another image, and a module cannot set it (or any panel.* label) itself.
+const labelOwner = "panel.owner"
+
+type moduleService struct {
+	Name     string            `json:"name"`
+	Image    string            `json:"image"`
+	Env      []string          `json:"env"`
+	Labels   map[string]string `json:"labels"`
+	Replicas uint64            `json:"replicas"`
+}
+
+func (m moduleService) validate() error {
+	if !docker.ValidName(m.Name) {
+		return errors.New("name: letters, digits, dot, dash and underscore only")
+	}
+	if strings.TrimSpace(m.Image) == "" {
+		return errors.New("image is required")
+	}
+	for k := range m.Labels {
+		if strings.HasPrefix(k, "panel.") {
+			return errors.New("labels: panel.* is the panel's, got " + strconv.Quote(k))
+		}
+	}
+	for _, e := range m.Env {
+		if !envRe.MatchString(e) {
+			return errors.New("env: each entry is KEY=value, got " + strconv.Quote(e))
+		}
+	}
+	return nil
+}
+
+// apiCreateService runs a service for a module on the panel's network. It
+// publishes no port: traffic comes in through the labels, by Traefik.
+func (s *Server) apiCreateService(w http.ResponseWriter, r *http.Request, m modules.Module) {
+	var in moduleService
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&in); err != nil {
+		http.Error(w, "send {name, image, env, labels, replicas}", http.StatusBadRequest)
+		return
+	}
+	if err := in.validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	self, _ := s.Docker.Self(r.Context())
+	if self.Network == "" {
+		http.Error(w, "the panel does not know its network", http.StatusBadGateway)
+		return
+	}
+	labels := maps.Clone(in.Labels)
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[labelOwner] = m.Name
+
+	finish, _ := s.DB.StartDeploy(store.DeployEvent{
+		ServiceName: in.Name, Source: "module", TriggeredBy: "module:" + m.Name,
+	})
+	_, err := s.Docker.CreateService(r.Context(), docker.NewService{
+		Name: in.Name, Image: strings.TrimSpace(in.Image), Replicas: in.Replicas,
+		Env: in.Env, Networks: []string{self.Network}, Labels: labels,
+	})
+	finish("", "", err)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, map[string]string{"name": in.Name})
+}
+
+var tagRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
+
+// apiSetServiceImage moves a service the module created to another tag of its
+// image, a new service version being a new tag.
+func (s *Server) apiSetServiceImage(w http.ResponseWriter, r *http.Request, m modules.Module) {
+	var in struct {
+		Tag string `json:"tag"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil || !tagRe.MatchString(in.Tag) {
+		http.Error(w, `send {"tag": "<image tag>"}`, http.StatusBadRequest)
+		return
+	}
+	sv, ok := s.findService(r.Context(), r.PathValue("name"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if sv.Labels[labelOwner] != m.Name {
+		http.Error(w, "the service was not created by "+m.Name, http.StatusForbidden)
+		return
+	}
+	finish, _ := s.DB.StartDeploy(store.DeployEvent{
+		ServiceName: sv.Name, StackName: sv.Stack,
+		Source: "module", TriggeredBy: "module:" + m.Name,
+	})
+	d, err := s.Docker.RollOut(r.Context(), sv.ID, in.Tag)
 	finish(d.OldDigest, d.NewDigest, err)
 	logWarnings(d)
 	if err != nil {
