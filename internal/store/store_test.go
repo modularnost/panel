@@ -2,11 +2,55 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestConcurrentUserChangesKeepAnAdmin(t *testing.T) {
+	db, err := Open(t.TempDir() + "/t.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	first, err := db.CreateUser("first", "password", RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := db.CreateUser("second", "password", RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	go func() {
+		<-start
+		results <- db.DeleteUser(first.ID)
+	}()
+	go func() {
+		<-start
+		results <- db.SetRole(second.ID, RoleViewer)
+	}()
+	close(start)
+
+	refused := 0
+	for range 2 {
+		err := <-results
+		switch {
+		case errors.Is(err, ErrLastAdmin):
+			refused++
+		case err != nil:
+			t.Fatal(err)
+		}
+	}
+	if refused != 1 {
+		t.Fatalf("refused %d changes, want 1", refused)
+	}
+}
 
 func TestWebhookAndDeployRoundtrip(t *testing.T) {
 	db, err := Open(t.TempDir() + "/t.db")

@@ -76,6 +76,7 @@ type User struct {
 }
 
 var ErrNoUser = errors.New("wrong username or password")
+var ErrLastAdmin = errors.New("this is the last admin — appoint another one first")
 
 func (d *DB) CreateUser(username, password, role string) (User, error) {
 	if !ValidRole(role) {
@@ -113,8 +114,7 @@ func (d *DB) SetPassword(id int64, password string) error {
 }
 
 func (d *DB) DeleteUser(id int64) error {
-	_, err := d.Exec(`DELETE FROM users WHERE id=?`, id)
-	return err
+	return d.changeAdmin(id, `DELETE FROM users WHERE id=?`, id)
 }
 
 func (d *DB) Users() ([]User, error) {
@@ -139,18 +139,35 @@ func (d *DB) CountUsers() (int, error) {
 	return n, d.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
 }
 
-// IsLastAdmin reports whether this user is the only admin left.
-func (d *DB) IsLastAdmin(id int64) (bool, error) {
+// changeAdmin keeps the last-admin check and the write in the same transaction.
+func (d *DB) changeAdmin(id int64, query string, args ...any) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var admins int
 	var role string
-	err := d.QueryRow(`SELECT (SELECT count(*) FROM users WHERE role='admin'),
-		coalesce((SELECT role FROM users WHERE id=?), '')`, id).Scan(&admins, &role)
-	return role == RoleAdmin && admins < 2, err
+	if err := tx.QueryRow(`SELECT (SELECT count(*) FROM users WHERE role='admin'),
+		coalesce((SELECT role FROM users WHERE id=?), '')`, id).Scan(&admins, &role); err != nil {
+		return err
+	}
+	if role == RoleAdmin && admins < 2 {
+		return ErrLastAdmin
+	}
+	if _, err := tx.Exec(query, args...); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (d *DB) SetRole(id int64, role string) error {
 	if !ValidRole(role) {
 		return fmt.Errorf("unknown role %q", role)
+	}
+	if role != RoleAdmin {
+		return d.changeAdmin(id, `UPDATE users SET role=? WHERE id=?`, role, id)
 	}
 	_, err := d.Exec(`UPDATE users SET role=? WHERE id=?`, role, id)
 	return err
