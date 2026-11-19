@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"modularnost/internal/agent"
@@ -44,8 +45,10 @@ type Server struct {
 	// AgentService is the swarm service of the node agents; empty on a single node.
 	AgentService string
 	// StackFile is the compose file the installer wrote, when it is mounted here.
-	StackFile string
-	updating  atomic.Bool
+	StackFile  string
+	updating   atomic.Bool
+	stackMu    sync.Mutex
+	stackLocks map[string]*stackLock
 
 	// TrustedProxies are the peers whose X-Forwarded-For is believed; empty
 	// means none, and a client is whoever connected.
@@ -208,6 +211,9 @@ func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.DB.TouchWebhook(hook.ID); err != nil {
 		log.Printf("webhook %d: %v", hook.ID, err)
+	}
+	if hook.ActionType == "stack_redeploy" {
+		defer s.lockStack(hook.StackName)()
 	}
 	finish, _ := s.DB.StartDeploy(store.DeployEvent{
 		ServiceName: hook.ServiceName, StackName: hook.StackName,

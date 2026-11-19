@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -21,6 +22,36 @@ type apiStackCompose struct {
 }
 
 type stackResultOutput struct{ Body apiStackResult }
+
+type stackLock struct {
+	mu   sync.Mutex
+	refs int
+}
+
+func (s *Server) lockStack(name string) func() {
+	s.stackMu.Lock()
+	if s.stackLocks == nil {
+		s.stackLocks = make(map[string]*stackLock)
+	}
+	lock := s.stackLocks[name]
+	if lock == nil {
+		lock = &stackLock{}
+		s.stackLocks[name] = lock
+	}
+	lock.refs++
+	s.stackMu.Unlock()
+
+	lock.mu.Lock()
+	return func() {
+		lock.mu.Unlock()
+		s.stackMu.Lock()
+		lock.refs--
+		if lock.refs == 0 {
+			delete(s.stackLocks, name)
+		}
+		s.stackMu.Unlock()
+	}
+}
 
 func (s *Server) registerStackActions(api huma.API) {
 	operator := huma.Middlewares{s.humaAuth(api, store.RoleOperator)}
@@ -40,6 +71,7 @@ func (s *Server) registerStackActions(api huma.API) {
 		if strings.TrimSpace(in.Body.Compose) == "" {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "compose: the file is empty")
 		}
+		defer s.lockStack(in.Name)()
 		me, _ := ctx.Value(ctxKey{}).(store.User)
 		finish, _ := s.DB.StartDeploy(store.DeployEvent{
 			StackName: in.Name, Source: "api", TriggeredBy: me.Username})
@@ -62,6 +94,7 @@ func (s *Server) registerStackActions(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		Name string `path:"name"`
 	}) (*stackResultOutput, error) {
+		defer s.lockStack(in.Name)()
 		me, _ := ctx.Value(ctxKey{}).(store.User)
 		finish, _ := s.DB.StartDeploy(store.DeployEvent{
 			StackName: in.Name, Source: "api", TriggeredBy: me.Username})
@@ -89,6 +122,7 @@ func (s *Server) registerStackActions(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		Name string `path:"name"`
 	}) (*struct{}, error) {
+		defer s.lockStack(in.Name)()
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
 			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
