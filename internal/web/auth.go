@@ -1,7 +1,6 @@
 package web
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -88,15 +87,4 @@ func (s *Server) changePassword(id int64, password string) error {
 		return err
 	}
 	return s.DB.RevokeSessions(id)
-}
-
-func (s *Server) guardLastAdmin(id int64) error {
-	last, err := s.DB.IsLastAdmin(id)
-	if err != nil {
-		return err
-	}
-	if last {
-		return errors.New("this is the last admin — appoint another one first")
-	}
-	return nil
 }

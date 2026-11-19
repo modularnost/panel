@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -85,13 +86,11 @@ func (s *Server) registerUserActions(api huma.API) {
 		if in.Body.Role == "" && in.Body.Password == "" {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "send a role, a password or both")
 		}
-		if in.Body.Role != "" && in.Body.Role != store.RoleAdmin {
-			if err := s.guardLastAdmin(u.ID); err != nil {
-				return nil, problem(http.StatusConflict, "last_admin", err.Error())
-			}
-		}
 		if in.Body.Role != "" {
 			if err := s.DB.SetRole(u.ID, in.Body.Role); err != nil {
+				if errors.Is(err, store.ErrLastAdmin) {
+					return nil, problem(http.StatusConflict, "last_admin", err.Error())
+				}
 				return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
 			}
 			u.Role = in.Body.Role
@@ -114,10 +113,10 @@ func (s *Server) registerUserActions(api huma.API) {
 		if _, ok := s.userByID(in.ID); !ok {
 			return nil, problem(http.StatusNotFound, "not_found", "no such user")
 		}
-		if err := s.guardLastAdmin(in.ID); err != nil {
-			return nil, problem(http.StatusConflict, "last_admin", err.Error())
-		}
 		if err := s.DB.DeleteUser(in.ID); err != nil {
+			if errors.Is(err, store.ErrLastAdmin) {
+				return nil, problem(http.StatusConflict, "last_admin", err.Error())
+			}
 			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
 		}
 		return nil, nil
