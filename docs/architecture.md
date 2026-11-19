@@ -4,7 +4,7 @@ Why this project is shaped the way it is: the decisions, their reasons, and the
 things it deliberately will not do. Read this before proposing a feature — it
 answers most "why not just…" questions, and says which answers are settled.
 
-It is also the working brief for AI assistants (`CLAUDE.md` points here).
+It is also the working brief for AI assistants (`AGENTS.md` points here).
 
 ## About the project
 
