@@ -2,9 +2,46 @@ package web
 
 import (
 	"testing"
+	"time"
 
 	"modularnost/internal/docker"
 )
+
+func TestStackLockSerializesOnlyMatchingNames(t *testing.T) {
+	s := &Server{}
+	unlock := s.lockStack("app")
+	same := make(chan struct{})
+	other := make(chan struct{})
+	go func() {
+		defer close(same)
+		defer s.lockStack("app")()
+	}()
+	go func() {
+		defer close(other)
+		defer s.lockStack("other")()
+	}()
+	select {
+	case <-other:
+	case <-time.After(time.Second):
+		unlock()
+		t.Fatal("an operation on another stack was blocked")
+	}
+	select {
+	case <-same:
+		unlock()
+		t.Fatal("an operation on the same stack ran while locked")
+	default:
+	}
+	unlock()
+	select {
+	case <-same:
+	case <-time.After(time.Second):
+		t.Fatal("the waiting operation did not resume")
+	}
+	if len(s.stackLocks) != 0 {
+		t.Fatal("unused stack locks were retained")
+	}
+}
 
 func TestHostFromRule(t *testing.T) {
 	rule := "Host(" + backtick + "app.example.com" + backtick + ")"
