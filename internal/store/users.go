@@ -145,7 +145,7 @@ func (d *DB) changeAdmin(id int64, query string, args ...any) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var admins int
 	var role string
