@@ -3,6 +3,7 @@ import { atLeast, useMe } from "../auth";
 import { Swatches } from "../components/Swatches";
 import { setSeed, storedSeed } from "../theme";
 import { Updates } from "./Updates";
+import { Registries } from "./Registries";
 
 export function Settings() {
   const me = useMe();
@@ -19,7 +20,7 @@ export function Settings() {
       <h2>Appearance</h2>
       <Swatches value={seed} onChange={choose} />
       <p className="muted">Kept in this browser.</p>
-      {atLeast(me.data?.role, "admin") && <Updates />}
+      {atLeast(me.data?.role, "admin") && <><Registries /><Updates /></>}
     </>
   );
 }

@@ -18,7 +18,8 @@ type apiStackResult struct {
 }
 
 type apiStackCompose struct {
-	Compose string `json:"compose" doc:"The compose file; services missing from it are removed"`
+	Compose      string  `json:"compose" doc:"The compose file; services missing from it are removed"`
+	RegistryHost *string `json:"registry_host,omitempty" maxLength:"255" doc:"Saved registry host; omit to keep the current selection, or send an empty string to clear it"`
 }
 
 type stackResultOutput struct{ Body apiStackResult }
@@ -72,16 +73,25 @@ func (s *Server) registerStackActions(api huma.API) {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "compose: the file is empty")
 		}
 		defer s.lockStack(in.Name)()
+		stored, _ := s.DB.Stack(in.Name)
+		host := stored.RegistryHost
+		if in.Body.RegistryHost != nil {
+			host = *in.Body.RegistryHost
+		}
+		auth, err := s.registryCredentials(host)
+		if err != nil {
+			return nil, err
+		}
 		me, _ := ctx.Value(ctxKey{}).(store.User)
 		finish, _ := s.DB.StartDeploy(store.DeployEvent{
 			StackName: in.Name, Source: "api", TriggeredBy: me.Username})
-		out, err := s.Docker.DeployStack(ctx, in.Name, in.Body.Compose)
+		out, err := s.Docker.DeployStack(ctx, in.Name, in.Body.Compose, auth)
 		finish("", "", err)
 		if err != nil {
 			return nil, problem(http.StatusBadGateway, "deploy_failed", err.Error())
 		}
 		// Only a file that actually deployed is kept.
-		if err := s.DB.SaveStack(in.Name, in.Body.Compose, me.Username); err != nil {
+		if err := s.DB.SaveStack(in.Name, in.Body.Compose, me.Username, host); err != nil {
 			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
 		}
 		return &stackResultOutput{Body: apiStackResult{Name: in.Name, Output: out}}, nil
@@ -102,10 +112,14 @@ func (s *Server) registerStackActions(api huma.API) {
 		var out string
 		var err error
 		if st, ok := s.DB.Stack(in.Name); ok {
-			out, err = s.Docker.DeployStack(ctx, in.Name, st.Compose)
+			auth, authErr := s.registryCredentials(st.RegistryHost)
+			err = authErr
+			if err == nil {
+				out, err = s.Docker.DeployStack(ctx, in.Name, st.Compose, auth)
+			}
 		} else {
 			var done []docker.Deploy
-			done, err = s.Docker.RedeployStack(ctx, in.Name)
+			done, err = s.Docker.RedeployStack(ctx, in.Name, s.serviceRegistryAuth)
 			logWarnings(done...)
 		}
 		finish("", "", err)

@@ -64,7 +64,7 @@ func (s *Server) registerServiceActions(api huma.API) {
 		me, _ := ctx.Value(ctxKey{}).(store.User)
 		finish, _ := s.DB.StartDeploy(store.DeployEvent{
 			ServiceName: sv.Name, StackName: sv.Stack, Source: "api", TriggeredBy: me.Username})
-		d, err := s.Docker.ForceUpdate(ctx, sv.ID)
+		d, err := s.Docker.ForceUpdate(ctx, sv.ID, s.serviceRegistryAuth)
 		finish(d.OldDigest, d.NewDigest, err)
 		logWarnings(d)
 		if err != nil {

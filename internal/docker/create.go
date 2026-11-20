@@ -3,24 +3,27 @@ package docker
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/swarm"
 )
 
 // NewService is what the "run a service" form collects. Anything fancier than
 // this belongs in a compose file and goes through DeployStack.
 type NewService struct {
-	Name     string
-	Image    string
-	Replicas uint64
-	Env      []string // KEY=value
-	Ports    []string // published:target[/proto]
-	Networks []string
-	Labels   map[string]string
+	Name         string
+	Image        string
+	Replicas     uint64
+	Env          []string // KEY=value
+	Ports        []string // published:target[/proto]
+	Networks     []string
+	Labels       map[string]string
+	RegistryAuth string
 }
 
 // Swarm object names: the CLI is not a shell here, but a name starting with a
@@ -98,7 +101,7 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 		Mode:         swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &n.Replicas}},
 		EndpointSpec: &swarm.EndpointSpec{Ports: ports},
 	}
-	resp, err := c.api.ServiceCreate(ctx, spec, swarm.ServiceCreateOptions{QueryRegistry: true})
+	resp, err := c.api.ServiceCreate(ctx, spec, swarm.ServiceCreateOptions{QueryRegistry: true, EncodedRegistryAuth: n.RegistryAuth})
 	if err != nil {
 		return "", err
 	}
@@ -107,18 +110,32 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 
 // DeployStack runs `docker stack deploy`: compose is a client-side format the
 // daemon API does not know, so the image ships the CLI.
-func (c *Client) DeployStack(ctx context.Context, name, compose string) (string, error) {
+func (c *Client) DeployStack(ctx context.Context, name, compose string, auth *registry.AuthConfig) (string, error) {
 	if !ValidName(name) {
 		return "", fmt.Errorf("stack name %q: letters, digits, dot, dash and underscore only", name)
 	}
 	if strings.TrimSpace(compose) == "" {
 		return "", fmt.Errorf("compose file is empty")
 	}
-	cmd := exec.CommandContext(ctx, "docker", "stack", "deploy",
+	args := []string{"stack", "deploy",
 		"--compose-file", "-", // read the file from stdin, nothing hits the disk
 		"--prune", // services dropped from the file leave the cluster
-		"--detach=true",
-		name)
+		"--detach=true"}
+	var env []string
+	if auth != nil {
+		dir, err := os.MkdirTemp("", "panel-registry-")
+		if err != nil {
+			return "", err
+		}
+		defer func() { _ = os.RemoveAll(dir) }()
+		if err := writeRegistryConfig(dir, auth); err != nil {
+			return "", err
+		}
+		env = registryEnv(os.Environ(), dir)
+		args = append(args, "--with-registry-auth")
+	}
+	cmd := exec.CommandContext(ctx, "docker", append(args, name)...)
+	cmd.Env = env
 	cmd.Stdin = strings.NewReader(compose)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

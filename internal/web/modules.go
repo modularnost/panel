@@ -74,7 +74,7 @@ func (s *Server) apiUpdateService(w http.ResponseWriter, r *http.Request, m modu
 		ServiceName: sv.Name, StackName: sv.Stack,
 		Source: "module", TriggeredBy: "module:" + m.Name,
 	})
-	d, err := s.Docker.ForceUpdate(r.Context(), sv.ID)
+	d, err := s.Docker.ForceUpdate(r.Context(), sv.ID, nil)
 	finish(d.OldDigest, d.NewDigest, err)
 	logWarnings(d)
 	if err != nil {
@@ -233,7 +233,7 @@ func corePort(addr string) string {
 
 // deployModule creates the service that makes a module appear in the panel: the
 // labels, the overlay network and the core's address are filled in here.
-func (s *Server) deployModule(ctx context.Context, m moduleInstall) error {
+func (s *Server) deployModule(ctx context.Context, m moduleInstall, registryHost, auth string) error {
 	m.Name, m.Image = strings.TrimSpace(m.Name), strings.TrimSpace(m.Image)
 	m.Port, m.Service = strings.TrimSpace(m.Port), strings.TrimSpace(m.Service)
 	m.Network = strings.TrimSpace(m.Network)
@@ -246,17 +246,22 @@ func (s *Server) deployModule(ctx context.Context, m moduleInstall) error {
 	if self.Service != "" {
 		env = append(env, "PANEL_CORE_URL=http://"+net.JoinHostPort(self.Service, corePort(s.Addr)))
 	}
+	labels := map[string]string{
+		modules.LabelEnabled: "true",
+		modules.LabelName:    m.Name,
+		modules.LabelPort:    cmp.Or(m.Port, "8080"),
+	}
+	if registryHost != "" {
+		labels[registryLabel] = registryHost
+	}
 	_, err := s.Docker.CreateService(ctx, docker.NewService{
-		Name:     cmp.Or(m.Service, m.Name+"_module"),
-		Image:    m.Image,
-		Replicas: 1,
-		Env:      env,
-		Networks: []string{cmp.Or(m.Network, self.Network)},
-		Labels: map[string]string{
-			modules.LabelEnabled: "true",
-			modules.LabelName:    m.Name,
-			modules.LabelPort:    cmp.Or(m.Port, "8080"),
-		},
+		Name:         cmp.Or(m.Service, m.Name+"_module"),
+		Image:        m.Image,
+		Replicas:     1,
+		Env:          env,
+		Networks:     []string{cmp.Or(m.Network, self.Network)},
+		Labels:       labels,
+		RegistryAuth: auth,
 	})
 	if err != nil {
 		return err

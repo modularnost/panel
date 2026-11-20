@@ -5,6 +5,7 @@ package web
 import (
 	"cmp"
 	"context"
+	"crypto/cipher"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -29,10 +30,11 @@ import (
 var Version = "dev"
 
 type Server struct {
-	Docker  *docker.Client
-	Metrics *agent.Collector
-	DB      *store.DB
-	Modules *modules.Registry
+	Docker             *docker.Client
+	Metrics            *agent.Collector
+	DB                 *store.DB
+	RegistryEncryption cipher.AEAD
+	Modules            *modules.Registry
 	// Secret is the shared module secret: the firewall services present a token made from it.
 	Secret   string
 	Firewall FirewallConfig
@@ -223,10 +225,10 @@ func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
 	var d docker.Deploy
 	if hook.ActionType == "stack_redeploy" {
 		var done []docker.Deploy
-		done, err = s.Docker.RedeployStack(r.Context(), hook.StackName)
+		done, err = s.Docker.RedeployStack(r.Context(), hook.StackName, s.serviceRegistryAuth)
 		logWarnings(done...)
 	} else {
-		d, err = s.Docker.ForceUpdate(r.Context(), hook.ServiceName)
+		d, err = s.Docker.ForceUpdate(r.Context(), hook.ServiceName, s.serviceRegistryAuth)
 		logWarnings(d)
 	}
 	finish(d.OldDigest, d.NewDigest, err)
