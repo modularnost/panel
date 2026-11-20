@@ -401,6 +401,11 @@
             "description": "The module's HTTP port; 8080 when empty",
             "type": "string"
           },
+          "registry_host": {
+            "description": "Saved registry host for this image",
+            "maxLength": 255,
+            "type": "string"
+          },
           "service": {
             "description": "Swarm service name; \u003cname\u003e_module when empty",
             "type": "string"
@@ -601,6 +606,62 @@
         ],
         "type": "object"
       },
+      "Registry": {
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "host",
+          "username"
+        ],
+        "type": "object"
+      },
+      "RegistryInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string",
+            "writeOnly": true
+          },
+          "username": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "token"
+        ],
+        "type": "object"
+      },
+      "RegistryListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "registries": {
+            "items": {
+              "$ref": "#/components/schemas/Registry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "configured",
+          "registries"
+        ],
+        "type": "object"
+      },
       "Release": {
         "additionalProperties": false,
         "properties": {
@@ -726,6 +787,11 @@
           "compose": {
             "description": "The compose file; services missing from it are removed",
             "type": "string"
+          },
+          "registry_host": {
+            "description": "Saved registry host; omit to keep the current selection, or send an empty string to clear it",
+            "maxLength": 255,
+            "type": "string"
           }
         },
         "required": [
@@ -751,6 +817,9 @@
             "type": "boolean"
           },
           "name": {
+            "type": "string"
+          },
+          "registry_host": {
             "type": "string"
           },
           "running": {
@@ -2240,6 +2309,129 @@
           }
         ],
         "summary": "Make a node active, paused or drained"
+      }
+    },
+    "/api/v1/registries": {
+      "get": {
+        "operationId": "list-registries",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryListOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List saved private registries without their tokens"
+      }
+    },
+    "/api/v1/registries/{host}": {
+      "delete": {
+        "operationId": "delete-registry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove saved registry credentials from the panel"
+      },
+      "put": {
+        "operationId": "save-registry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistryInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save or rotate a registry pull token"
       }
     },
     "/api/v1/services": {

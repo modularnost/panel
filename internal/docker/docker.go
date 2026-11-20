@@ -153,8 +153,8 @@ type Deploy struct {
 }
 
 // ForceUpdate redeploys a service, re-pulling its image from the registry.
-func (c *Client) ForceUpdate(ctx context.Context, nameOrID string) (Deploy, error) {
-	return c.updateSpec(ctx, nameOrID, func(spec *swarm.ServiceSpec, img string) {
+func (c *Client) ForceUpdate(ctx context.Context, nameOrID string, auth RegistryAuth) (Deploy, error) {
+	return c.updateSpec(ctx, nameOrID, auth, func(spec *swarm.ServiceSpec, img string) {
 		// Drop the digest pin, or the daemon won't go to the registry for a new image.
 		spec.TaskTemplate.ContainerSpec.Image = img
 		spec.TaskTemplate.ForceUpdate++
@@ -175,7 +175,7 @@ func (c *Client) RollOut(ctx context.Context, nameOrID, tag string) (Deploy, err
 }
 
 func (c *Client) moveToTag(ctx context.Context, nameOrID, tag, order string) (Deploy, error) {
-	return c.updateSpec(ctx, nameOrID, func(spec *swarm.ServiceSpec, img string) {
+	return c.updateSpec(ctx, nameOrID, nil, func(spec *swarm.ServiceSpec, img string) {
 		spec.TaskTemplate.ContainerSpec.Image = ImageRepo(img) + ":" + tag
 		spec.UpdateConfig = &swarm.UpdateConfig{
 			Parallelism:   1,
@@ -197,7 +197,9 @@ func ImageRepo(img string) string {
 
 // updateSpec applies change to the service's spec; img is the image without
 // its digest pin.
-func (c *Client) updateSpec(ctx context.Context, nameOrID string, change func(spec *swarm.ServiceSpec, img string)) (Deploy, error) {
+type RegistryAuth func(image string, labels map[string]string) (string, error)
+
+func (c *Client) updateSpec(ctx context.Context, nameOrID string, auth RegistryAuth, change func(spec *swarm.ServiceSpec, img string)) (Deploy, error) {
 	var d Deploy
 	// Swarm bumps the service version itself while tasks converge, and then
 	// ServiceUpdate fails with "update out of sequence". Re-inspect and retry.
@@ -212,7 +214,14 @@ func (c *Client) updateSpec(ctx context.Context, nameOrID string, change func(sp
 		spec := s.Spec
 		change(&spec, img)
 
-		resp, err := c.api.ServiceUpdate(ctx, s.ID, s.Version, spec, swarm.ServiceUpdateOptions{QueryRegistry: true})
+		options := swarm.ServiceUpdateOptions{QueryRegistry: true}
+		if auth != nil {
+			options.EncodedRegistryAuth, err = auth(spec.TaskTemplate.ContainerSpec.Image, spec.Labels)
+			if err != nil {
+				return d, err
+			}
+		}
+		resp, err := c.api.ServiceUpdate(ctx, s.ID, s.Version, spec, options)
 		if err != nil {
 			if strings.Contains(err.Error(), "out of sequence") && attempt < 2 {
 				time.Sleep(300 * time.Millisecond)
@@ -251,7 +260,7 @@ func (c *Client) SetLabels(ctx context.Context, nameOrID string, labels map[stri
 }
 
 // RedeployStack force-updates every service in a stack.
-func (c *Client) RedeployStack(ctx context.Context, stack string) ([]Deploy, error) {
+func (c *Client) RedeployStack(ctx context.Context, stack string, auth RegistryAuth) ([]Deploy, error) {
 	list, err := c.stackServices(ctx, stack)
 	if err != nil {
 		return nil, err
@@ -263,7 +272,7 @@ func (c *Client) RedeployStack(ctx context.Context, stack string) ([]Deploy, err
 	var done []Deploy
 	var errs []error
 	for _, s := range list {
-		d, err := c.ForceUpdate(ctx, s.ID)
+		d, err := c.ForceUpdate(ctx, s.ID, auth)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", s.Spec.Name, err))
 			continue

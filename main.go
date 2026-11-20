@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"modularnost/internal/agent"
@@ -182,6 +184,20 @@ func main() {
 
 		TrustedProxies: proxies,
 		Metrics:        agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
+	}
+	if path := os.Getenv("PANEL_REGISTRY_KEY_FILE"); path != "" {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			log.Fatalf("registry key: %v", err)
+		}
+		key, err := hex.DecodeString(strings.TrimSpace(string(raw)))
+		if err != nil {
+			log.Fatal("registry key must be 32 bytes in hex")
+		}
+		srv.RegistryEncryption, err = store.RegistryCipher(key)
+		if err != nil {
+			log.Fatalf("registry key: %v", err)
+		}
 	}
 	log.Printf("modularnost %s listening on %s", version, addr)
 	log.Fatal(http.ListenAndServe(addr, srv.Routes()))

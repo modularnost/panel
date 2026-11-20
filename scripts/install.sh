@@ -184,6 +184,9 @@ if [ ! -f "$CONFIG/secret" ]; then
 	chmod 600 "$CONFIG/secret"
 fi
 SECRET=$(cat "$CONFIG/secret")
+if [ ! -f "$CONFIG/registry-key" ]; then
+	(umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' >"$CONFIG/registry-key")
+fi
 
 # --- Firewall ---
 # What this host listens on besides SSH, 80 and 443, before the cluster does: it
@@ -304,6 +307,7 @@ $ACME_ARGS
       PANEL_MODULE_SECRET: "$SECRET"
       PANEL_AGENT_SERVICE: ${STACK}_agent
       PANEL_STACK_FILE: /config/stack.yml
+      PANEL_REGISTRY_KEY_FILE: /config/registry-key
       PANEL_TRUSTED_PROXIES: "$NET_SUBNETS"
 $FW_PANEL_ENV
     volumes:

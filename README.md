@@ -161,6 +161,7 @@ it.
 | `PANEL_MODE` | unset | `agent` runs this binary as a node agent instead of the panel |
 | `PANEL_UPDATE_CHECK` | on | `off` stops the panel from asking GitHub for new releases |
 | `PANEL_STACK_FILE` | unset | the installer's compose file, mounted into the panel: an update from the panel retags its image lines |
+| `PANEL_REGISTRY_KEY_FILE` | unset | path to a file with a 32-byte hex key for saved private registry tokens |
 | `PANEL_TRUSTED_PROXIES` | unset | addresses or CIDR ranges of the proxies in front of the panel, comma separated; see below |
 
 Sign-in attempts are slowed down per client address and per user name: after five
@@ -170,6 +171,23 @@ client, so it reads the client from `X-Forwarded-For` only when the request
 comes from an address in `PANEL_TRUSTED_PROXIES`; the installer sets it to its
 own network. Unset, the header is ignored. Do not put a range there that
 clients can reach the panel from.
+
+### Private registry images
+
+In **Settings → Registries**, save a pull token for the registry hostname
+(for example `ghcr.io` or `registry.example.net:5000`). Select that registry
+when deploying a stack or installing a module, and use image references
+from the same host. A stack can select one registry and still use public
+images. Deploys and webhooks reuse the saved selection. Paste new credentials
+under the same host to rotate the token.
+
+The installer creates `/etc/modularnost/registry-key` on install or re-run.
+For a manual installation, generate a key with `openssl rand -hex 32`,
+mount the file into the panel and set `PANEL_REGISTRY_KEY_FILE`. Back up
+the key separately from SQLite. Both are needed to restore saved tokens.
+Use HTTPS for the panel and registry. Removing credentials in the panel
+does not revoke tokens already passed to Swarm. Revoke or rotate the token
+at the registry when removing access.
 
 ## What it does
 

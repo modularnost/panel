@@ -6,6 +6,7 @@ declare module "react" {
     interface IntrinsicElements {
       "md-outlined-text-field": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
         label?: string;
+        name?: string;
         value?: string;
         type?: string;
         required?: boolean;
@@ -24,6 +25,7 @@ declare module "react" {
 
 type Props = {
   label: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
   type?: "text" | "password" | "textarea";

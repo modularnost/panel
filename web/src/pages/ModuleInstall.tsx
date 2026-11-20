@@ -5,10 +5,12 @@ import { api, call } from "../api/client";
 import { envLines } from "../modules";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { RegistrySelect } from "../components/RegistrySelect";
 
 export function ModuleInstall() {
   const [name, setName] = useState("");
   const [image, setImage] = useState("");
+  const [registryHost, setRegistryHost] = useState("");
   const [port, setPort] = useState("");
   const [env, setEnv] = useState("");
   const queryClient = useQueryClient();
@@ -16,7 +18,9 @@ export function ModuleInstall() {
 
   const install = useMutation({
     mutationFn: () =>
-      call(api.installModule({ name: name.trim(), image: image.trim(), port: port.trim(), env: envLines(env) })),
+      call(api.installModule({
+        name: name.trim(), image: image.trim(), port: port.trim(), env: envLines(env), registry_host: registryHost,
+      })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["modules"] });
       navigate("/modules");
@@ -37,6 +41,7 @@ export function ModuleInstall() {
       <form className="form" onSubmit={submit}>
         <TextField label="Name" value={name} onChange={setName} placeholder="metrics" autoFocus required />
         <TextField label="Image" value={image} onChange={setImage} placeholder="ghcr.io/modularnost/metrics-module:0.1.0" required />
+        <RegistrySelect value={registryHost} onChange={setRegistryHost} />
         <TextField label="Port" value={port} onChange={setPort} placeholder="8080" inputMode="numeric" />
         <TextField label="Environment" type="textarea" value={env} onChange={setEnv} rows={4} placeholder="KEY=value" mono />
         {install.isError && <p className="error">{install.error.message}</p>}

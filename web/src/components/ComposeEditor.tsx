@@ -3,22 +3,25 @@ import { type FormEvent, useState } from "react";
 import { api, call } from "../api/client";
 import { Button } from "./Button";
 import { TextField } from "./TextField";
+import { RegistrySelect } from "./RegistrySelect";
 
 type Props = {
   name: string;
   initial: string;
+  initialRegistry?: string;
   placeholder?: string;
   onDeployed?: (name: string) => void;
 };
 
 // ComposeEditor deploys a compose file for a stack. Deploying prunes, so what
 // is not in the file leaves the cluster; that is the one thing worth saying.
-export function ComposeEditor({ name, initial, placeholder, onDeployed }: Props) {
+export function ComposeEditor({ name, initial, initialRegistry = "", placeholder, onDeployed }: Props) {
   const [compose, setCompose] = useState(initial);
+  const [registryHost, setRegistryHost] = useState(initialRegistry);
   const queryClient = useQueryClient();
 
   const deploy = useMutation({
-    mutationFn: () => call(api.deployStack(name, { compose })),
+    mutationFn: () => call(api.deployStack(name, { compose, registry_host: registryHost })),
     onSuccess: () => {
       for (const key of ["stacks", "stack", "services", "deploys"]) {
         queryClient.invalidateQueries({ queryKey: [key] });
@@ -44,6 +47,7 @@ export function ComposeEditor({ name, initial, placeholder, onDeployed }: Props)
         rows={18}
         mono
       />
+      <RegistrySelect value={registryHost} onChange={setRegistryHost} />
       <p className="muted">Services that are not in the file are removed.</p>
       {deploy.isError && <p className="error">{deploy.error.message}</p>}
       {deploy.isSuccess && deploy.data.output && <pre className="output">{deploy.data.output}</pre>}

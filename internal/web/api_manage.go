@@ -3,9 +3,11 @@ package web
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"modularnost/internal/docker"
 	"modularnost/internal/store"
 )
 
@@ -16,12 +18,13 @@ type apiWebhookCreate struct {
 }
 
 type apiModuleInstall struct {
-	Name    string   `json:"name" doc:"Shown in the panel and used in the module's URL"`
-	Image   string   `json:"image"`
-	Port    string   `json:"port,omitempty" doc:"The module's HTTP port; 8080 when empty"`
-	Service string   `json:"service,omitempty" doc:"Swarm service name; <name>_module when empty"`
-	Network string   `json:"network,omitempty" doc:"Overlay network; the panel's own when empty"`
-	Env     []string `json:"env,omitempty" doc:"KEY=value entries" nullable:"false"`
+	Name         string   `json:"name" doc:"Shown in the panel and used in the module's URL"`
+	Image        string   `json:"image"`
+	Port         string   `json:"port,omitempty" doc:"The module's HTTP port; 8080 when empty"`
+	Service      string   `json:"service,omitempty" doc:"Swarm service name; <name>_module when empty"`
+	Network      string   `json:"network,omitempty" doc:"Overlay network; the panel's own when empty"`
+	RegistryHost string   `json:"registry_host,omitempty" maxLength:"255" doc:"Saved registry host for this image"`
+	Env          []string `json:"env,omitempty" doc:"KEY=value entries" nullable:"false"`
 }
 
 type apiModuleInstalled struct {
@@ -84,11 +87,19 @@ func (s *Server) registerManage(api huma.API) {
 		Summary: "Deploy a module image as a service the panel will pick up", DefaultStatus: http.StatusCreated,
 		Middlewares: admin, Security: signedIn,
 	}, func(ctx context.Context, in *struct{ Body apiModuleInstall }) (*moduleInstalledOutput, error) {
-		m := moduleInstall(in.Body)
+		b := in.Body
+		m := moduleInstall{Name: b.Name, Image: b.Image, Port: b.Port, Service: b.Service, Network: b.Network, Env: b.Env}
 		if err := m.validate(); err != nil {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
 		}
-		if err := s.deployModule(ctx, m); err != nil {
+		if b.RegistryHost != "" && docker.RegistryHost(strings.TrimSpace(b.Image)) != b.RegistryHost {
+			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "selected registry must match the image host")
+		}
+		auth, err := s.encodeRegistryAuth(b.RegistryHost, strings.TrimSpace(b.Image))
+		if err != nil {
+			return nil, err
+		}
+		if err := s.deployModule(ctx, m, b.RegistryHost, auth); err != nil {
 			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
 		}
 		service := m.Service
