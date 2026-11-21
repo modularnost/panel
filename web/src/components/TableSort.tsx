@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "./Button";
+import { Icon } from "./Icon";
 
 type SortValue = string | number | undefined;
 
@@ -24,10 +25,11 @@ export function useTableSort<T extends { name: string }>(columns: Record<string,
     rows: (items: T[]) => sortRows(items, columns[sort.key], sort.descending),
     header: (key: string, label: string) => {
       const active = sort.key === key;
+      const icon = active ? (sort.descending ? "arrow_downward" : "arrow_upward") : "unfold_more";
       return (
         <th scope="col" aria-sort={active ? (sort.descending ? "descending" : "ascending") : undefined}>
           <Button type="button" variant="text" onClick={() => setSort({ key, descending: active && !sort.descending })}>
-            {label} <span aria-hidden="true">{active ? (sort.descending ? "↓" : "↑") : "↕"}</span>
+            {label} <Icon name={icon} size={18} />
           </Button>
         </th>
       );

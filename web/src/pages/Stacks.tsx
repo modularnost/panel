@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { Chip } from "../components/Chip";
+import { Icon } from "../components/Icon";
 import { Button } from "../components/Button";
 import { Table } from "../components/Table";
 import { useTableSort } from "../components/TableSort";
@@ -58,7 +59,7 @@ export function Stacks() {
                   <Button type="button" variant="text" aria-expanded={expanded === s.name}
                     aria-label={`Services in ${s.name}`}
                     onClick={() => setExpanded(expanded === s.name ? "" : s.name)}>
-                    <span aria-hidden="true">{expanded === s.name ? "▾" : "▸"}</span>
+                    <Icon name={expanded === s.name ? "keyboard_arrow_down" : "chevron_right"} size={18} />
                   </Button>{" "}
                   <Link to={`/stacks/${s.name}`}>{s.name}</Link>
                 </td>
