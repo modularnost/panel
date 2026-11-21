@@ -15,3 +15,6 @@ Rules for assistants:
 - Ask for a merge only when CI is green.
 - No `Co-Authored-By` or "Generated with" lines in commits or PR descriptions.
 - Comments only for a reason the code cannot show, in at most three lines.
+- Run the checks for the changed area. Use the Swarm smoke test for private
+  registry deploys and webhook changes that affect them. See
+  [Verification](CONTRIBUTING.md#verification).
