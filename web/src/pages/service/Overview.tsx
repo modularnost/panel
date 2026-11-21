@@ -7,6 +7,7 @@ import { useService } from "./Layout";
 import { Button } from "../../components/Button";
 import { useDialogs } from "../../components/Dialogs";
 import { Table } from "../../components/Table";
+import { ActivityTime } from "../../components/ActivityTime";
 
 export function Overview() {
   const s = useService();
@@ -58,6 +59,10 @@ export function Overview() {
         <dd className="mono">{shortDigest(s.digest) || "not pinned"}</dd>
         <dt>Mode</dt>
         <dd>{s.mode}</dd>
+        <dt>Last deploy</dt>
+        <dd><ActivityTime value={s.last_deploy_at} /></dd>
+        <dt>Swarm updated</dt>
+        <dd><ActivityTime value={s.swarm_updated_at} /></dd>
       </dl>
 
       <div className="actions">

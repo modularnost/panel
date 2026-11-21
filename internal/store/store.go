@@ -2,6 +2,7 @@
 package store
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"embed"
@@ -190,6 +191,46 @@ func (d *DB) StartDeploy(e DeployEvent) (finish func(oldDigest, newDigest string
 
 func (d *DB) RecentDeploys(limit int) ([]DeployEvent, error) {
 	return d.deploys("", nil, limit)
+}
+
+type DeploymentTimes struct {
+	Services map[string]*time.Time
+	Stacks   map[string]*time.Time
+}
+
+func (d *DB) LastDeployments(ctx context.Context) (DeploymentTimes, error) {
+	times := DeploymentTimes{Services: map[string]*time.Time{}, Stacks: map[string]*time.Time{}}
+	rows, err := d.QueryContext(ctx, `SELECT service_name, stack_name, MAX(unixepoch(finished_at))
+		FROM deploy_events WHERE status = 'success' AND finished_at IS NOT NULL
+		GROUP BY service_name, stack_name`)
+	if err != nil {
+		return times, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var service, stack string
+		var seconds int64
+		if err := rows.Scan(&service, &stack, &seconds); err != nil {
+			return times, err
+		}
+		finished := time.Unix(seconds, 0).UTC()
+		if service != "" {
+			if previous := times.Services[service]; previous == nil || finished.After(*previous) {
+				times.Services[service] = &finished
+			}
+		} else if stack != "" {
+			times.Stacks[stack] = &finished
+		}
+	}
+	return times, rows.Err()
+}
+
+func (t DeploymentTimes) ForService(service, stack string) *time.Time {
+	direct, group := t.Services[service], t.Stacks[stack]
+	if direct == nil || (group != nil && group.After(*direct)) {
+		return group
+	}
+	return direct
 }
 
 // DeploysFor returns the history of one service, including redeploys of the

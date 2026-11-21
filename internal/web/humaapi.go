@@ -182,8 +182,14 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
 		}
 		out := make([]apiService, 0, len(svcs))
+		deploys, err := s.DB.LastDeployments(ctx)
+		if err != nil {
+			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+		}
 		for _, sv := range svcs {
-			out = append(out, toAPIService(sv, false))
+			view := toAPIService(sv, false)
+			view.LastDeployAt = deploys.ForService(sv.Name, sv.Stack)
+			out = append(out, view)
 		}
 		return &serviceListOutput{Body: out}, nil
 	})
@@ -200,7 +206,13 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 		}
 		for _, sv := range svcs {
 			if sv.ID == in.ID || sv.Name == in.ID {
-				return &serviceOutput{Body: toAPIService(sv, true)}, nil
+				deploys, err := s.DB.LastDeployments(ctx)
+				if err != nil {
+					return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+				}
+				view := toAPIService(sv, true)
+				view.LastDeployAt = deploys.ForService(sv.Name, sv.Stack)
+				return &serviceOutput{Body: view}, nil
 			}
 		}
 		return nil, problem(http.StatusNotFound, "not_found", "no such service")

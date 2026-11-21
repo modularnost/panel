@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -8,6 +9,31 @@ import (
 	"testing"
 	"time"
 )
+
+func TestLastDeployments(t *testing.T) {
+	db, err := Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	_, err = db.Exec(`INSERT INTO deploy_events (service_name, stack_name, trigger_source, status, finished_at)
+		VALUES ('app_web', 'app', 'api', 'success', '2026-01-01 10:00:00'),
+		       ('', 'app', 'api', 'success', '2026-01-01 11:00:00'),
+		       ('', 'app', 'api', 'failed', '2026-01-01 12:00:00')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	times, err := db.LastDeployments(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest := times.ForService("app_web", "app"); latest == nil || latest.Hour() != 11 {
+		t.Fatalf("expected successful stack deployment, got %v", latest)
+	}
+	if latest := times.ForService("external_web", "external"); latest != nil {
+		t.Fatalf("expected unknown deployment time, got %v", latest)
+	}
+}
 
 func TestConcurrentUserChangesKeepAnAdmin(t *testing.T) {
 	db, err := Open(t.TempDir() + "/t.db")

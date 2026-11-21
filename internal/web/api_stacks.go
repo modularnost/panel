@@ -21,7 +21,9 @@ type apiStack struct {
 	Healthy      bool   `json:"healthy"`
 	// Managed means the panel holds the compose file, so the stack can be edited
 	// and redeployed from it.
-	Managed bool `json:"managed"`
+	Managed        bool       `json:"managed"`
+	LastDeployAt   *time.Time `json:"last_deploy_at,omitempty"`
+	SwarmUpdatedAt *time.Time `json:"swarm_updated_at,omitempty"`
 }
 
 type apiStackDetail struct {
@@ -36,10 +38,12 @@ type apiStackDetail struct {
 	Self     bool         `json:"self"`
 	Services []apiService `json:"services" nullable:"false"`
 	// Compose is for admins only: a compose file is access to the whole cluster.
-	Compose      string     `json:"compose,omitempty"`
-	RegistryHost string     `json:"registry_host,omitempty"`
-	UpdatedBy    string     `json:"updated_by,omitempty"`
-	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
+	Compose        string     `json:"compose,omitempty"`
+	RegistryHost   string     `json:"registry_host,omitempty"`
+	UpdatedBy      string     `json:"updated_by,omitempty"`
+	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
+	LastDeployAt   *time.Time `json:"last_deploy_at,omitempty"`
+	SwarmUpdatedAt *time.Time `json:"swarm_updated_at,omitempty"`
 }
 
 type apiDeploy struct {
@@ -93,6 +97,9 @@ func summarizeStacks(svcs []docker.Service) []apiStack {
 		st.Running += sv.Running
 		st.Desired += sv.Desired
 		st.Healthy = st.Healthy && sv.Healthy()
+		if !sv.UpdatedAt.IsZero() && (st.SwarmUpdatedAt == nil || sv.UpdatedAt.After(*st.SwarmUpdatedAt)) {
+			st.SwarmUpdatedAt = &sv.UpdatedAt
+		}
 	}
 	out := make([]apiStack, 0, len(byName))
 	for _, st := range byName {
@@ -124,8 +131,13 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
 		}
 		out := summarizeStacks(svcs)
+		deploys, err := s.DB.LastDeployments(ctx)
+		if err != nil {
+			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+		}
 		for i := range out {
 			_, out[i].Managed = s.DB.Stack(out[i].Name)
+			out[i].LastDeployAt = deploys.Stacks[out[i].Name]
 		}
 		return &stackListOutput{Body: out}, nil
 	})
@@ -142,9 +154,15 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 		}
 		var detail apiStackDetail
 		detail.Services = []apiService{}
+		deploys, err := s.DB.LastDeployments(ctx)
+		if err != nil {
+			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+		}
 		for _, sv := range svcs {
 			if sv.Stack == in.Name {
-				detail.Services = append(detail.Services, toAPIService(sv, false))
+				view := toAPIService(sv, false)
+				view.LastDeployAt = deploys.ForService(sv.Name, sv.Stack)
+				detail.Services = append(detail.Services, view)
 			}
 		}
 		stored, managed := s.DB.Stack(in.Name)
@@ -155,9 +173,11 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 			if st.Name == in.Name {
 				detail.ServiceCount, detail.Running = st.ServiceCount, st.Running
 				detail.Desired, detail.Healthy = st.Desired, st.Healthy
+				detail.SwarmUpdatedAt = st.SwarmUpdatedAt
 			}
 		}
 		detail.Name, detail.Managed = in.Name, managed
+		detail.LastDeployAt = deploys.Stacks[in.Name]
 		self, _ := s.Docker.Self(ctx)
 		detail.Self = self.Stack == in.Name
 		if managed {

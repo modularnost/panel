@@ -9,12 +9,15 @@ import { useUpdates } from "../updates";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
 import { useTableSort } from "../components/TableSort";
+import { ActivityTime } from "../components/ActivityTime";
 import type { Service } from "../api/generated";
 
 export function Services() {
   const me = useMe();
   const sort = useTableSort<Service>({
     name: (s) => s.name, stack: (s) => s.stack, image: (s) => s.image, replicas: (s) => s.running,
+    deploy: (s) => s.last_deploy_at ? Date.parse(s.last_deploy_at) : undefined,
+    updated: (s) => s.swarm_updated_at ? Date.parse(s.swarm_updated_at) : undefined,
   });
   const updates = useUpdates(atLeast(me.data?.role, "admin"));
   const newest = updates.data?.releases[0];
@@ -57,6 +60,8 @@ export function Services() {
               {sort.header("stack", "Stack")}
               {sort.header("image", "Image")}
               {sort.header("replicas", "Running replicas")}
+              {sort.header("deploy", "Last deploy")}
+              {sort.header("updated", "Swarm updated")}
             </tr>
           </thead>
           <tbody>
@@ -73,6 +78,8 @@ export function Services() {
                   </Chip>{" "}
                   <span className="muted">{s.mode}</span>
                 </td>
+                <td><ActivityTime value={s.last_deploy_at} /></td>
+                <td><ActivityTime value={s.swarm_updated_at} /></td>
               </tr>
             ))}
           </tbody>

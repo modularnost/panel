@@ -4,9 +4,11 @@ import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { Chip } from "../components/Chip";
+import { Icon } from "../components/Icon";
 import { Button } from "../components/Button";
 import { Table } from "../components/Table";
-import { useTableSort } from "../components/TableSort";
+import { sortRows, useTableSort } from "../components/TableSort";
+import { ActivityTime } from "../components/ActivityTime";
 import type { Stack } from "../api/generated";
 
 export function Stacks() {
@@ -14,6 +16,8 @@ export function Stacks() {
   const [expanded, setExpanded] = useState("");
   const sort = useTableSort<Stack>({
     name: (s) => s.name, services: (s) => s.service_count, replicas: (s) => s.running,
+    deploy: (s) => s.last_deploy_at ? Date.parse(s.last_deploy_at) : undefined,
+    updated: (s) => s.swarm_updated_at ? Date.parse(s.swarm_updated_at) : undefined,
   });
   const stacks = useQuery({
     queryKey: ["stacks"],
@@ -36,13 +40,15 @@ export function Stacks() {
       {stacks.data.length === 0 ? (
         <p className="muted">No stacks.</p>
       ) : (
-        <Table>
+        <Table className="stacks-table">
           <thead>
             <tr>
               {sort.header("name", "Stack")}
               {sort.header("services", "Services")}
               {sort.header("replicas", "Running replicas")}
               <th>Compose file</th>
+              {sort.header("deploy", "Last deploy")}
+              {sort.header("updated", "Latest service update")}
             </tr>
           </thead>
           <tbody>
@@ -50,12 +56,14 @@ export function Stacks() {
               <Fragment key={s.name}>
               <tr>
                 <td>
-                  <Button type="button" variant="text" aria-expanded={expanded === s.name}
-                    aria-label={`Services in ${s.name}`}
-                    onClick={() => setExpanded(expanded === s.name ? "" : s.name)}>
-                    <span aria-hidden="true">{expanded === s.name ? "▾" : "▸"}</span>
-                  </Button>{" "}
-                  <Link to={`/stacks/${s.name}`}>{s.name}</Link>
+                  <div className="stack-name">
+                    <Button type="button" variant="icon" aria-expanded={expanded === s.name}
+                      aria-label={`Services in ${s.name}`}
+                      onClick={() => setExpanded(expanded === s.name ? "" : s.name)}>
+                      <Icon name="chevron_right" size={18} />
+                    </Button>
+                    <Link to={`/stacks/${s.name}`}>{s.name}</Link>
+                  </div>
                 </td>
                 <td>{s.service_count}</td>
                 <td>
@@ -64,9 +72,11 @@ export function Stacks() {
                   </Chip>
                 </td>
                 <td className="muted">{s.managed ? "kept here" : "not kept"}</td>
+                <td><ActivityTime value={s.last_deploy_at} /></td>
+                <td><ActivityTime value={s.swarm_updated_at} /></td>
               </tr>
               {expanded === s.name && (
-                <tr><td colSpan={4}><ExpandedStack name={s.name} /></td></tr>
+                <tr><td colSpan={6}><ExpandedStack name={s.name} /></td></tr>
               )}
               </Fragment>
             ))}
@@ -88,17 +98,18 @@ function ExpandedStack({ name }: { name: string }) {
   if (!stack.data.services.length) return <p>No services.</p>;
 
   return (
-    <Table aria-label={`Services in ${name}`}>
-      <thead><tr><th scope="col">Service</th><th scope="col">Image</th><th scope="col">Replicas</th></tr></thead>
-      <tbody>
-        {stack.data.services.map((service) => (
-          <tr key={service.id}>
-            <td><Link to={`/services/${service.id}`}>{service.name}</Link></td>
-            <td className="mono">{service.image}</td>
-            <td><Chip tone={service.healthy ? "ok" : "bad"}>{service.running}/{service.desired}</Chip></td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
+    <ul className="stack-services" role="list" aria-label={`Services in ${name}`}>
+      {sortRows(stack.data.services, (service) => service.name, false).map((service) => (
+        <li key={service.id}>
+          <div>
+            <Link to={`/services/${service.id}`}>{service.name}</Link>
+            <div className="muted mono">{service.image}</div>
+          </div>
+          <span aria-label={`Running replicas: ${service.running} of ${service.desired}`} role="group">
+            <Chip tone={service.healthy ? "ok" : "bad"}>{service.running}/{service.desired}</Chip>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

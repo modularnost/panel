@@ -336,6 +336,76 @@ pre.notes {
   line-height: 0;
 }
 
+.sort-header > .btn,
+.sort-arrows,
+.stack-name,
+.stack-name > .btn {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sort-header > .btn {
+  gap: 4px;
+  line-height: normal;
+}
+
+.sort-arrows {
+  flex: none;
+}
+
+.sort-arrows > .icon {
+  opacity: 0.5;
+}
+
+.sort-header[aria-sort="descending"] .sort-arrows > .icon:first-child,
+.sort-header[aria-sort="ascending"] .sort-arrows > .icon:last-child {
+  opacity: 1;
+}
+
+.stack-name {
+  gap: 4px;
+}
+
+.stack-name > .btn {
+  flex: none;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.stack-name > a {
+  overflow-wrap: anywhere;
+}
+
+.stack-name > [aria-expanded="true"] > .icon {
+  transform: rotate(90deg);
+}
+
+.table:has(> .stacks-table) {
+  container-type: inline-size;
+}
+
+.stack-services {
+  box-sizing: border-box;
+  max-inline-size: min(32rem, calc(100cqi - 32px));
+  margin: 0;
+  padding-inline-start: 36px;
+  list-style: none;
+}
+
+.stack-services > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 4px;
+  overflow-wrap: anywhere;
+}
+
+.stack-services > li > span {
+  flex: none;
+}
+
 .btn:disabled {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
   color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
