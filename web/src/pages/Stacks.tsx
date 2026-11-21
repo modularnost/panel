@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { Fragment, useState } from "react";
 import { Link } from "react-router";
 import { api, call } from "../api/client";
 import { atLeast, useMe } from "../auth";
 import { Chip } from "../components/Chip";
+import { Button } from "../components/Button";
 import { Table } from "../components/Table";
 
 export function Stacks() {
   const me = useMe();
+  const [expanded, setExpanded] = useState("");
   const stacks = useQuery({
     queryKey: ["stacks"],
     queryFn: () => call(api.listStacks()),
@@ -38,8 +41,14 @@ export function Stacks() {
           </thead>
           <tbody>
             {stacks.data.map((s) => (
-              <tr key={s.name}>
+              <Fragment key={s.name}>
+              <tr>
                 <td>
+                  <Button type="button" variant="text" aria-expanded={expanded === s.name}
+                    aria-label={`Services in ${s.name}`}
+                    onClick={() => setExpanded(expanded === s.name ? "" : s.name)}>
+                    <span aria-hidden="true">{expanded === s.name ? "▾" : "▸"}</span>
+                  </Button>{" "}
                   <Link to={`/stacks/${s.name}`}>{s.name}</Link>
                 </td>
                 <td>{s.service_count}</td>
@@ -50,10 +59,40 @@ export function Stacks() {
                 </td>
                 <td className="muted">{s.managed ? "kept here" : "not kept"}</td>
               </tr>
+              {expanded === s.name && (
+                <tr><td colSpan={4}><ExpandedStack name={s.name} /></td></tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </Table>
       )}
     </>
+  );
+}
+
+function ExpandedStack({ name }: { name: string }) {
+  const stack = useQuery({
+    queryKey: ["stack", name],
+    queryFn: () => call(api.getStack(name)),
+    refetchInterval: 3000,
+  });
+  if (stack.isPending) return <p role="status">Loading services…</p>;
+  if (stack.isError) return <p className="error" role="alert">{stack.error.message}</p>;
+  if (!stack.data.services.length) return <p>No services.</p>;
+
+  return (
+    <Table aria-label={`Services in ${name}`}>
+      <thead><tr><th scope="col">Service</th><th scope="col">Image</th><th scope="col">Replicas</th></tr></thead>
+      <tbody>
+        {stack.data.services.map((service) => (
+          <tr key={service.id}>
+            <td><Link to={`/services/${service.id}`}>{service.name}</Link></td>
+            <td className="mono">{service.image}</td>
+            <td><Chip tone={service.healthy ? "ok" : "bad"}>{service.running}/{service.desired}</Chip></td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
