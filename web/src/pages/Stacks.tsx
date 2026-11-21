@@ -6,13 +6,19 @@ import { atLeast, useMe } from "../auth";
 import { Chip } from "../components/Chip";
 import { Button } from "../components/Button";
 import { Table } from "../components/Table";
+import { useTableSort } from "../components/TableSort";
+import type { Stack } from "../api/generated";
 
 export function Stacks() {
   const me = useMe();
   const [expanded, setExpanded] = useState("");
+  const sort = useTableSort<Stack>({
+    name: (s) => s.name, services: (s) => s.service_count, replicas: (s) => s.running,
+  });
   const stacks = useQuery({
     queryKey: ["stacks"],
     queryFn: () => call(api.listStacks()),
+    select: sort.rows,
     refetchInterval: 3000,
   });
 
@@ -33,9 +39,9 @@ export function Stacks() {
         <Table>
           <thead>
             <tr>
-              <th>Stack</th>
-              <th>Services</th>
-              <th>Replicas</th>
+              {sort.header("name", "Stack")}
+              {sort.header("services", "Services")}
+              {sort.header("replicas", "Running replicas")}
               <th>Compose file</th>
             </tr>
           </thead>
