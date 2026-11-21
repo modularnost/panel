@@ -7,9 +7,9 @@ import { Chip } from "../components/Chip";
 import { Icon } from "../components/Icon";
 import { Button } from "../components/Button";
 import { Table } from "../components/Table";
-import { useTableSort } from "../components/TableSort";
+import { sortRows, useTableSort } from "../components/TableSort";
 import { ActivityTime } from "../components/ActivityTime";
-import type { Service, Stack } from "../api/generated";
+import type { Stack } from "../api/generated";
 
 export function Stacks() {
   const me = useMe();
@@ -40,7 +40,7 @@ export function Stacks() {
       {stacks.data.length === 0 ? (
         <p className="muted">No stacks.</p>
       ) : (
-        <Table>
+        <Table className="stacks-table">
           <thead>
             <tr>
               {sort.header("name", "Stack")}
@@ -88,11 +88,6 @@ export function Stacks() {
 }
 
 function ExpandedStack({ name }: { name: string }) {
-  const sort = useTableSort<Service>({
-    name: (s) => s.name, image: (s) => s.image, replicas: (s) => s.running,
-    deploy: (s) => s.last_deploy_at ? Date.parse(s.last_deploy_at) : undefined,
-    updated: (s) => s.swarm_updated_at ? Date.parse(s.swarm_updated_at) : undefined,
-  });
   const stack = useQuery({
     queryKey: ["stack", name],
     queryFn: () => call(api.getStack(name)),
@@ -103,25 +98,18 @@ function ExpandedStack({ name }: { name: string }) {
   if (!stack.data.services.length) return <p>No services.</p>;
 
   return (
-    <Table aria-label={`Services in ${name}`}>
-      <thead><tr>
-        {sort.header("name", "Service")}
-        {sort.header("image", "Image")}
-        {sort.header("replicas", "Running replicas")}
-        {sort.header("deploy", "Last deploy")}
-        {sort.header("updated", "Swarm updated")}
-      </tr></thead>
-      <tbody>
-        {sort.rows(stack.data.services).map((service) => (
-          <tr key={service.id}>
-            <td><Link to={`/services/${service.id}`}>{service.name}</Link></td>
-            <td className="mono">{service.image}</td>
-            <td><Chip tone={service.healthy ? "ok" : "bad"}>{service.running}/{service.desired}</Chip></td>
-            <td><ActivityTime value={service.last_deploy_at} /></td>
-            <td><ActivityTime value={service.swarm_updated_at} /></td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
+    <ul className="stack-services" role="list" aria-label={`Services in ${name}`}>
+      {sortRows(stack.data.services, (service) => service.name, false).map((service) => (
+        <li key={service.id}>
+          <div>
+            <Link to={`/services/${service.id}`}>{service.name}</Link>
+            <div className="muted mono">{service.image}</div>
+          </div>
+          <span aria-label={`Running replicas: ${service.running} of ${service.desired}`} role="group">
+            <Chip tone={service.healthy ? "ok" : "bad"}>{service.running}/{service.desired}</Chip>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
