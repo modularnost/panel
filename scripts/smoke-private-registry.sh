@@ -98,7 +98,8 @@ registry_configured() {
 
 wait_for "registry login" registry_ready
 first=$(publish first)
-if cluster w1 image pull "$image" > "$tmp/pull.log" 2>&1 || ! grep -Eiq 'unauthorized|authentication required|denied' "$tmp/pull.log"; then
+if cluster w1 image pull "$image" > "$tmp/pull.log" 2>&1 ||
+	! grep -Eiq 'unauthorized|authentication required|no basic auth credentials|denied' "$tmp/pull.log"; then
 	echo "The clean worker did not get an authentication error" >&2
 	cat "$tmp/pull.log" >&2
 	rm -f "$tmp/pull.log"
