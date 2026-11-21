@@ -718,6 +718,10 @@
             },
             "type": "object"
           },
+          "last_deploy_at": {
+            "format": "date-time",
+            "type": "string"
+          },
           "mode": {
             "type": "string"
           },
@@ -730,6 +734,10 @@
             "type": "integer"
           },
           "stack": {
+            "type": "string"
+          },
+          "swarm_updated_at": {
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -755,6 +763,10 @@
           "healthy": {
             "type": "boolean"
           },
+          "last_deploy_at": {
+            "format": "date-time",
+            "type": "string"
+          },
           "managed": {
             "type": "boolean"
           },
@@ -769,6 +781,10 @@
           "service_count": {
             "format": "int64",
             "type": "integer"
+          },
+          "swarm_updated_at": {
+            "format": "date-time",
+            "type": "string"
           }
         },
         "required": [
@@ -813,6 +829,10 @@
           "healthy": {
             "type": "boolean"
           },
+          "last_deploy_at": {
+            "format": "date-time",
+            "type": "string"
+          },
           "managed": {
             "type": "boolean"
           },
@@ -839,6 +859,10 @@
               "$ref": "#/components/schemas/Service"
             },
             "type": "array"
+          },
+          "swarm_updated_at": {
+            "format": "date-time",
+            "type": "string"
           },
           "updated_at": {
             "format": "date-time",

@@ -8,6 +8,7 @@ import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
 import { useTableSort } from "../components/TableSort";
+import { ActivityTime } from "../components/ActivityTime";
 import type { Service } from "../api/generated";
 
 export function Stack() {
@@ -18,6 +19,8 @@ export function Stack() {
   const admin = atLeast(me.data?.role, "admin");
   const serviceSort = useTableSort<Service>({
     name: (s) => s.name, image: (s) => s.image, replicas: (s) => s.running,
+    deploy: (s) => s.last_deploy_at ? Date.parse(s.last_deploy_at) : undefined,
+    updated: (s) => s.swarm_updated_at ? Date.parse(s.swarm_updated_at) : undefined,
   });
 
   const stack = useQuery({
@@ -66,6 +69,10 @@ export function Stack() {
           {s.running}/{s.desired}
         </Chip>
       </h1>
+      <dl className="facts">
+        <dt>Last deploy</dt><dd><ActivityTime value={s.last_deploy_at} /></dd>
+        <dt>Latest service update</dt><dd><ActivityTime value={s.swarm_updated_at} /></dd>
+      </dl>
 
       <div className="actions">
         {atLeast(me.data?.role, "operator") && (
@@ -93,6 +100,8 @@ export function Stack() {
               {serviceSort.header("name", "Service")}
               {serviceSort.header("image", "Image")}
               {serviceSort.header("replicas", "Running replicas")}
+              {serviceSort.header("deploy", "Last deploy")}
+              {serviceSort.header("updated", "Swarm updated")}
             </tr>
           </thead>
           <tbody>
@@ -107,6 +116,8 @@ export function Stack() {
                     {svc.running}/{svc.desired}
                   </Chip>
                 </td>
+                <td><ActivityTime value={svc.last_deploy_at} /></td>
+                <td><ActivityTime value={svc.swarm_updated_at} /></td>
               </tr>
             ))}
           </tbody>

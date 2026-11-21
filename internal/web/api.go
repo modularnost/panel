@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"modularnost/internal/docker"
 	"modularnost/internal/store"
@@ -29,16 +30,18 @@ func apiNotFound(w http.ResponseWriter, _ *http.Request) {
 }
 
 type apiService struct {
-	ID      string            `json:"id"`
-	Name    string            `json:"name"`
-	Stack   string            `json:"stack,omitempty"`
-	Image   string            `json:"image"`
-	Digest  string            `json:"digest,omitempty"`
-	Mode    string            `json:"mode"`
-	Running uint64            `json:"running"`
-	Desired uint64            `json:"desired"`
-	Healthy bool              `json:"healthy"`
-	Labels  map[string]string `json:"labels,omitempty"`
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Stack          string            `json:"stack,omitempty"`
+	Image          string            `json:"image"`
+	Digest         string            `json:"digest,omitempty"`
+	Mode           string            `json:"mode"`
+	Running        uint64            `json:"running"`
+	Desired        uint64            `json:"desired"`
+	Healthy        bool              `json:"healthy"`
+	Labels         map[string]string `json:"labels,omitempty"`
+	LastDeployAt   *time.Time        `json:"last_deploy_at,omitempty"`
+	SwarmUpdatedAt *time.Time        `json:"swarm_updated_at,omitempty"`
 }
 
 // toAPIService leaves labels out of the list: there can be dozens per service,
@@ -50,6 +53,9 @@ func toAPIService(sv docker.Service, withLabels bool) apiService {
 	}
 	if withLabels {
 		out.Labels = sv.Labels
+	}
+	if !sv.UpdatedAt.IsZero() {
+		out.SwarmUpdatedAt = &sv.UpdatedAt
 	}
 	return out
 }

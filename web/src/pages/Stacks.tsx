@@ -7,13 +7,16 @@ import { Chip } from "../components/Chip";
 import { Button } from "../components/Button";
 import { Table } from "../components/Table";
 import { useTableSort } from "../components/TableSort";
-import type { Stack } from "../api/generated";
+import { ActivityTime } from "../components/ActivityTime";
+import type { Service, Stack } from "../api/generated";
 
 export function Stacks() {
   const me = useMe();
   const [expanded, setExpanded] = useState("");
   const sort = useTableSort<Stack>({
     name: (s) => s.name, services: (s) => s.service_count, replicas: (s) => s.running,
+    deploy: (s) => s.last_deploy_at ? Date.parse(s.last_deploy_at) : undefined,
+    updated: (s) => s.swarm_updated_at ? Date.parse(s.swarm_updated_at) : undefined,
   });
   const stacks = useQuery({
     queryKey: ["stacks"],
@@ -43,6 +46,8 @@ export function Stacks() {
               {sort.header("services", "Services")}
               {sort.header("replicas", "Running replicas")}
               <th>Compose file</th>
+              {sort.header("deploy", "Last deploy")}
+              {sort.header("updated", "Latest service update")}
             </tr>
           </thead>
           <tbody>
@@ -64,9 +69,11 @@ export function Stacks() {
                   </Chip>
                 </td>
                 <td className="muted">{s.managed ? "kept here" : "not kept"}</td>
+                <td><ActivityTime value={s.last_deploy_at} /></td>
+                <td><ActivityTime value={s.swarm_updated_at} /></td>
               </tr>
               {expanded === s.name && (
-                <tr><td colSpan={4}><ExpandedStack name={s.name} /></td></tr>
+                <tr><td colSpan={6}><ExpandedStack name={s.name} /></td></tr>
               )}
               </Fragment>
             ))}
@@ -78,6 +85,11 @@ export function Stacks() {
 }
 
 function ExpandedStack({ name }: { name: string }) {
+  const sort = useTableSort<Service>({
+    name: (s) => s.name, image: (s) => s.image, replicas: (s) => s.running,
+    deploy: (s) => s.last_deploy_at ? Date.parse(s.last_deploy_at) : undefined,
+    updated: (s) => s.swarm_updated_at ? Date.parse(s.swarm_updated_at) : undefined,
+  });
   const stack = useQuery({
     queryKey: ["stack", name],
     queryFn: () => call(api.getStack(name)),
@@ -89,13 +101,21 @@ function ExpandedStack({ name }: { name: string }) {
 
   return (
     <Table aria-label={`Services in ${name}`}>
-      <thead><tr><th scope="col">Service</th><th scope="col">Image</th><th scope="col">Replicas</th></tr></thead>
+      <thead><tr>
+        {sort.header("name", "Service")}
+        {sort.header("image", "Image")}
+        {sort.header("replicas", "Running replicas")}
+        {sort.header("deploy", "Last deploy")}
+        {sort.header("updated", "Swarm updated")}
+      </tr></thead>
       <tbody>
-        {stack.data.services.map((service) => (
+        {sort.rows(stack.data.services).map((service) => (
           <tr key={service.id}>
             <td><Link to={`/services/${service.id}`}>{service.name}</Link></td>
             <td className="mono">{service.image}</td>
             <td><Chip tone={service.healthy ? "ok" : "bad"}>{service.running}/{service.desired}</Chip></td>
+            <td><ActivityTime value={service.last_deploy_at} /></td>
+            <td><ActivityTime value={service.swarm_updated_at} /></td>
           </tr>
         ))}
       </tbody>

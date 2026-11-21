@@ -38,16 +38,17 @@ func (c *Client) Close() error { return c.api.Close() }
 
 // Service is the flat shape the UI needs. Live, never cached in the database.
 type Service struct {
-	ID      string
-	Name    string
-	Stack   string
-	Image   string // repo:tag without the digest
-	Digest  string // sha256:... when pinned
-	Running uint64
-	Desired uint64
-	Mode    string // replicated | global
-	Labels  map[string]string
-	Ports   []PublishedPort
+	ID        string
+	Name      string
+	Stack     string
+	Image     string // repo:tag without the digest
+	Digest    string // sha256:... when pinned
+	Running   uint64
+	Desired   uint64
+	Mode      string // replicated | global
+	Labels    map[string]string
+	Ports     []PublishedPort
+	UpdatedAt time.Time
 }
 
 // PublishedPort is a port a service opens on the nodes.
@@ -81,13 +82,14 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 	for _, s := range list {
 		img, digest := splitImage(s.Spec.TaskTemplate.ContainerSpec.Image)
 		svc := Service{
-			ID:     s.ID,
-			Name:   s.Spec.Name,
-			Stack:  s.Spec.Labels[stackLabel],
-			Image:  img,
-			Digest: digest,
-			Labels: s.Spec.Labels,
-			Mode:   "replicated",
+			ID:        s.ID,
+			Name:      s.Spec.Name,
+			Stack:     s.Spec.Labels[stackLabel],
+			Image:     img,
+			Digest:    digest,
+			Labels:    s.Spec.Labels,
+			UpdatedAt: s.UpdatedAt,
+			Mode:      "replicated",
 		}
 		if s.Spec.Mode.Global != nil {
 			svc.Mode = "global"
