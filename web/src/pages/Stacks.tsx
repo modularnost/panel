@@ -56,12 +56,14 @@ export function Stacks() {
               <Fragment key={s.name}>
               <tr>
                 <td>
-                  <Button type="button" variant="text" aria-expanded={expanded === s.name}
-                    aria-label={`Services in ${s.name}`}
-                    onClick={() => setExpanded(expanded === s.name ? "" : s.name)}>
-                    <Icon name={expanded === s.name ? "keyboard_arrow_down" : "chevron_right"} size={18} />
-                  </Button>{" "}
-                  <Link to={`/stacks/${s.name}`}>{s.name}</Link>
+                  <div className="stack-name">
+                    <Button type="button" variant="icon" aria-expanded={expanded === s.name}
+                      aria-label={`Services in ${s.name}`}
+                      onClick={() => setExpanded(expanded === s.name ? "" : s.name)}>
+                      <Icon name="chevron_right" size={18} />
+                    </Button>
+                    <Link to={`/stacks/${s.name}`}>{s.name}</Link>
+                  </div>
                 </td>
                 <td>{s.service_count}</td>
                 <td>

@@ -25,11 +25,14 @@ export function useTableSort<T extends { name: string }>(columns: Record<string,
     rows: (items: T[]) => sortRows(items, columns[sort.key], sort.descending),
     header: (key: string, label: string) => {
       const active = sort.key === key;
-      const icon = active ? (sort.descending ? "arrow_downward" : "arrow_upward") : "unfold_more";
       return (
-        <th scope="col" aria-sort={active ? (sort.descending ? "descending" : "ascending") : undefined}>
+        <th className="sort-header" scope="col" aria-sort={active ? (sort.descending ? "descending" : "ascending") : undefined}>
           <Button type="button" variant="text" onClick={() => setSort({ key, descending: active && !sort.descending })}>
-            {label} <Icon name={icon} size={18} />
+            <span>{label}</span>
+            <span className="sort-arrows">
+              <Icon name="arrow_downward" size={16} />
+              <Icon name="arrow_upward" size={16} />
+            </span>
           </Button>
         </th>
       );
