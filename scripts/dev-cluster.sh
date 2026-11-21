@@ -40,7 +40,7 @@ up() {
 		# The manager publishes the panel port: Swarm's routing mesh takes it
 		# from there to whichever node actually runs the panel.
 		ports=""
-		[ "$node" = mgr ] && ports="-p $PORT:8080"
+		[ "$node" = mgr ] && ports="-p 127.0.0.1:$PORT:8080"
 		# shellcheck disable=SC2086
 		docker run -d --privileged --name "$(n "$node")" --hostname "$(n "$node")" \
 			--network "$NET" $ports \
@@ -50,7 +50,13 @@ up() {
 
 	for node in $NODES; do
 		printf '==> waiting for %s ' "$(n "$node")"
-		until docker exec "$(n "$node")" docker info >/dev/null 2>&1; do printf .; sleep 1; done
+		attempts=0
+		until docker exec "$(n "$node")" docker info >/dev/null 2>&1; do
+			attempts=$((attempts + 1))
+			[ "$attempts" -lt 60 ] || { docker logs "$(n "$node")" >&2; return 1; }
+			printf .
+			sleep 1
+		done
 		echo " ok"
 	done
 
@@ -86,7 +92,7 @@ up() {
 }
 
 down() {
-	for node in $NODES; do docker rm -f "$(n "$node")" >/dev/null 2>&1 || true; done
+	for node in $NODES; do docker rm -f -v "$(n "$node")" >/dev/null 2>&1 || true; done
 	docker network rm "$NET" >/dev/null 2>&1 || true
 	echo "cluster removed"
 }

@@ -51,6 +51,27 @@ CI rejects a PR whose title does not match.
   `internal/store`. A migration is a new file; an applied one is never edited.
 - Interface text rules are in [docs/architecture.md](docs/architecture.md).
 
+## Verification
+
+Run the existing CI checks for the files you change. Use Go tests and the
+OpenAPI check for API changes. Use `bun run build` and `bun run test` from
+`web/` for interface changes.
+
+Changes to private registry deploys and their webhooks need a clean-worker
+check. From the panel root on Linux or WSL with Docker and privileged
+containers available, plus `curl`, `jq` and `openssl`, run:
+
+```sh
+sh scripts/smoke-private-registry.sh
+```
+
+The script starts its own three-node Swarm, an authenticated TLS registry and
+the panel. It checks that a worker without credentials cannot pull, then
+deploys through the panel and updates the same tag through a webhook. It
+reports task and service logs on failure and removes its lab containers and
+volumes on exit. Stop an existing dev lab first. Allow a free loopback port
+8090. The **Swarm smoke** workflow can also run on demand in Actions.
+
 ## Done means
 
 - CI is green.

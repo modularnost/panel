@@ -1,0 +1,20 @@
+name: Swarm smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/swarm-smoke.yml
+      - scripts/dev-cluster.sh
+      - scripts/smoke-private-registry.sh
+
+permissions:
+  contents: read
+
+jobs:
+  private-registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh scripts/smoke-private-registry.sh
