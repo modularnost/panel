@@ -7,6 +7,8 @@ import { Button } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
+import { useTableSort } from "../components/TableSort";
+import type { Service } from "../api/generated";
 
 export function Stack() {
   const { name = "" } = useParams();
@@ -14,6 +16,9 @@ export function Stack() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const admin = atLeast(me.data?.role, "admin");
+  const serviceSort = useTableSort<Service>({
+    name: (s) => s.name, image: (s) => s.image, replicas: (s) => s.running,
+  });
 
   const stack = useQuery({
     queryKey: ["stack", name],
@@ -85,13 +90,13 @@ export function Stack() {
         <Table>
           <thead>
             <tr>
-              <th>Service</th>
-              <th>Image</th>
-              <th>Replicas</th>
+              {serviceSort.header("name", "Service")}
+              {serviceSort.header("image", "Image")}
+              {serviceSort.header("replicas", "Running replicas")}
             </tr>
           </thead>
           <tbody>
-            {s.services.map((svc) => (
+            {serviceSort.rows(s.services).map((svc) => (
               <tr key={svc.id}>
                 <td>
                   <Link to={`/services/${svc.id}`}>{svc.name}</Link>

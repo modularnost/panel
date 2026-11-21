@@ -8,14 +8,20 @@ import { modulePath, slot, useModules } from "../modules";
 import { useUpdates } from "../updates";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
+import { useTableSort } from "../components/TableSort";
+import type { Service } from "../api/generated";
 
 export function Services() {
   const me = useMe();
+  const sort = useTableSort<Service>({
+    name: (s) => s.name, stack: (s) => s.stack, image: (s) => s.image, replicas: (s) => s.running,
+  });
   const updates = useUpdates(atLeast(me.data?.role, "admin"));
   const newest = updates.data?.releases[0];
   const services = useQuery({
     queryKey: ["services"],
     queryFn: () => call(api.listServices()),
+    select: sort.rows,
     refetchInterval: 3000,
   });
 
@@ -47,10 +53,10 @@ export function Services() {
         <Table>
           <thead>
             <tr>
-              <th>Service</th>
-              <th>Stack</th>
-              <th>Image</th>
-              <th>Replicas</th>
+              {sort.header("name", "Service")}
+              {sort.header("stack", "Stack")}
+              {sort.header("image", "Image")}
+              {sort.header("replicas", "Running replicas")}
             </tr>
           </thead>
           <tbody>
