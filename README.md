@@ -5,6 +5,10 @@ Docker Swarm. The core deploys Compose files and ready-made images, shows
 service status and logs, and handles redeploys. Install [modules](#modules)
 when you need extra features such as image builds or metrics history.
 
+![Services page showing Swarm stacks, container images, replica status, and deployment times](docs/screenshots/services.webp)
+
+*Services with sample Swarm data.*
+
 ## Installation
 
 - [New server](#new-server): install Docker, Swarm and Traefik with the panel.
@@ -276,6 +280,8 @@ at the registry when removing access.
 
 SQLite holds panel-owned data such as Compose files, deploy history, users,
 webhooks, firewall settings and encrypted registry credentials.
+
+![Service overview showing the image, redeploy action, and CPU, memory, and network usage for each replica](docs/screenshots/service-overview.webp)
 
 ## Metrics across nodes
 
