@@ -193,6 +193,8 @@ own network. For HTTPS terminated by a proxy, configure the same setting so
 the panel uses `X-Forwarded-Proto: https` to set secure session cookies.
 Do not put a range there that clients can reach the panel from.
 
+Expired sessions and API tokens are cleaned up at startup and every six hours.
+
 ### Webhooks
 
 Copy the URL when you create a webhook and send a `POST` to trigger it.

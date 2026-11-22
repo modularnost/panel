@@ -136,9 +136,10 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := db.PurgeExpiredTokens(); err != nil {
+	if err := db.PurgeExpiredTokens(ctx); err != nil {
 		log.Printf("purging expired tokens: %v", err)
 	}
+	go db.RunTokenCleanup(ctx, 6*time.Hour)
 	if err := bootstrapAdmin(db); err != nil {
 		log.Fatalf("first admin: %v", err)
 	}
