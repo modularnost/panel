@@ -124,6 +124,8 @@ features want client state, and one API serves scripts and CI as well.
 - the SPA draws what modules contribute to its own screens (see ADR 7)
 - the API is written with Huma: `api/openapi.json` is generated from the
   handlers and committed, and the TypeScript types are generated from it
+- API failures include an error code. For Docker, SQLite and other backend
+  failures, check the panel logs for details.
 - state-changing requests accept only `application/json`, which a plain HTML
   form cannot send: that is the CSRF guard
 

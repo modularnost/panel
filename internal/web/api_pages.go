@@ -52,7 +52,7 @@ func (s *Server) uiPage(ctx context.Context, name, p string) (modules.Module, st
 		return m, u, "", problem(http.StatusNotFound, "not_found", "no such module")
 	}
 	if !m.OK() {
-		return m, u, "", problem(http.StatusBadGateway, "module_unavailable", "module unavailable: "+m.Err)
+		return m, u, "", problem(http.StatusBadGateway, "module_unavailable", "module unavailable")
 	}
 	p = path.Clean("/" + p)
 	if _, ok := m.UIPage(p); !ok {
@@ -79,7 +79,7 @@ func (s *Server) registerPages(api huma.API, viewer huma.Middlewares) {
 		}
 		doc, err := s.Modules.FetchPage(ctx, m, p, in.Query, modules.Viewer{Username: u.Username, Role: u.Role})
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "module_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "module_error", err)
 		}
 		return &pageOutput{CacheControl: "no-store", Body: apiDocument{UI: doc.UI, Blocks: doc.Blocks}}, nil
 	})
@@ -104,7 +104,7 @@ func (s *Server) registerPages(api huma.API, viewer huma.Middlewares) {
 		}
 		msg, err := s.Modules.Act(ctx, m, action, in.Body.Values, modules.Viewer{Username: u.Username, Role: u.Role})
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "module_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "module_error", err)
 		}
 		return &actionOutput{Body: apiActionResult{Message: msg}}, nil
 	})

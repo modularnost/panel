@@ -369,8 +369,8 @@ func TestToAPIModules(t *testing.T) {
 	if len(got) != 2 || !got[0].OK || got[0].Contributions[0].Title != "Metrics" || got[0].Permissions[0] != "stats:read" {
 		t.Fatalf("working module: %+v", got)
 	}
-	if got[1].OK || got[1].Error != "connection refused" || got[1].Contributions == nil || got[1].Permissions == nil {
-		t.Fatalf("broken module must keep its error and still list empty arrays, not null: %+v", got[1])
+	if got[1].OK || got[1].Error != "could not load the module manifest" || got[1].Contributions == nil || got[1].Permissions == nil {
+		t.Fatalf("broken module must show a safe error and empty arrays: %+v", got[1])
 	}
 }
 

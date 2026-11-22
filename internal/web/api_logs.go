@@ -45,7 +45,7 @@ func (s *Server) registerLogs(api huma.API, viewer huma.Middlewares) {
 		}
 		tasks, err := s.Docker.Tasks(ctx, sv.ID)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		return &taskListOutput{Body: toAPITasks(tasks)}, nil
 	})
@@ -78,7 +78,7 @@ func (s *Server) registerLogs(api huma.API, viewer huma.Middlewares) {
 		}
 		lines, err := s.Docker.Logs(ctx, sv.ID, in.Task, in.Tail)
 		if err != nil {
-			fail("docker_error", err.Error())
+			fail("docker_error", backendMessage("docker_error", err))
 			return
 		}
 		for line := range lines {

@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	neturl "net/url"
@@ -36,7 +37,8 @@ func Routes(secret, node string, dk *docker.Client) http.Handler {
 		}
 		stats, err := dk.Stats(r.Context(), r.FormValue("service"))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
+			log.Printf("agent: collect stats: %v", err)
+			http.Error(w, "could not load metrics", http.StatusBadGateway)
 			return
 		}
 		for i := range stats {
@@ -98,7 +100,8 @@ func (c *Collector) Stats(ctx context.Context, service string) ([]docker.TaskSta
 			defer mu.Unlock()
 			if err != nil {
 				// An unreachable node becomes a row, not a failed page.
-				out = append(out, docker.TaskStats{Node: addr, Err: err.Error()})
+				log.Printf("agent: collect stats from %s: %v", addr, err)
+				out = append(out, docker.TaskStats{Node: addr, Err: "could not load metrics"})
 				return
 			}
 			out = append(out, stats...)

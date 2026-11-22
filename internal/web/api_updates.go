@@ -35,7 +35,10 @@ type updatesOutput struct{ Body apiUpdates }
 func toAPIUpdates(st updates.Status, stackFile bool) apiUpdates {
 	out := apiUpdates{
 		Current: st.Current, ReleaseBuild: st.ReleaseBuild, Enabled: st.Enabled,
-		Error: st.Error, StackFile: stackFile, Releases: make([]apiRelease, 0, len(st.Newer)),
+		StackFile: stackFile, Releases: make([]apiRelease, 0, len(st.Newer)),
+	}
+	if st.Error != "" {
+		out.Error = "could not check for updates"
 	}
 	if !st.CheckedAt.IsZero() {
 		out.CheckedAt = &st.CheckedAt
@@ -69,7 +72,7 @@ func (s *Server) registerUpdates(api huma.API) {
 	}, func(ctx context.Context, _ *struct{}) (*updatesOutput, error) {
 		if s.Updates != nil {
 			if err := s.Updates.Refresh(ctx); err != nil {
-				return nil, problem(http.StatusBadGateway, "updates_unavailable", err.Error())
+				return nil, backendProblem(http.StatusBadGateway, "updates_unavailable", err)
 			}
 		}
 		return &updatesOutput{Body: toAPIUpdates(s.updateStatus(), s.hasStackFile())}, nil

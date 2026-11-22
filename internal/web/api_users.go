@@ -49,7 +49,7 @@ func (s *Server) registerUsers(api huma.API) {
 	}, func(_ context.Context, _ *struct{}) (*userListOutput, error) {
 		users, err := s.DB.Users()
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		out := make([]apiUser, 0, len(users))
 		for _, u := range users {
@@ -64,7 +64,7 @@ func (s *Server) registerUsers(api huma.API) {
 	}, func(_ context.Context, _ *struct{}) (*tokenListOutput, error) {
 		tokens, err := s.DB.Tokens()
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &tokenListOutput{Body: toAPITokens(tokens)}, nil
 	})

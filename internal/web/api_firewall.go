@@ -110,7 +110,7 @@ func (s *Server) firewallSpec(w http.ResponseWriter, r *http.Request) {
 	spec, err := s.currentFirewallSpec(r.Context())
 	if err != nil {
 		// The node keeps what it has: an error is not an empty list.
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		fail(w, err)
 		return
 	}
 	writeJSON(w, spec)
@@ -204,7 +204,7 @@ func (s *Server) registerFirewall(api huma.API) {
 	}, func(ctx context.Context, _ *struct{}) (*firewallPeersOutput, error) {
 		peers, err := s.DB.FirewallPeers()
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		out := make([]apiFirewallPeer, 0, len(peers))
 		for _, p := range peers {
@@ -229,7 +229,7 @@ func (s *Server) registerFirewall(api huma.API) {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "that address cannot be another server")
 		}
 		if err := s.DB.AddFirewallPeer(a.String()); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &struct{ Body apiFirewallPeer }{apiFirewallPeer{a.String(), time.Now()}}, nil
 	})
@@ -242,7 +242,7 @@ func (s *Server) registerFirewall(api huma.API) {
 		Address string `query:"address" required:"true"`
 	}) (*struct{}, error) {
 		if err := s.DB.DeleteFirewallPeer(in.Address); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})
@@ -323,7 +323,7 @@ func (s *Server) registerFirewallPorts(api huma.API, admin huma.Middlewares) {
 	}, func(ctx context.Context, _ *struct{}) (*firewallPortsOutput, error) {
 		out, err := s.firewallPorts(ctx)
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &firewallPortsOutput{Body: out}, nil
 	})
@@ -338,7 +338,7 @@ func (s *Server) registerFirewallPorts(api huma.API, admin huma.Middlewares) {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "that port belongs to the swarm and is open to the cluster's nodes already")
 		}
 		if err := s.DB.AddFirewallPort(store.FirewallPort{Port: b.Port, Proto: b.Proto, Note: b.Note}); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &struct{ Body apiFirewallPort }{apiFirewallPort{Port: b.Port, Proto: b.Proto, Note: b.Note}}, nil
 	})
@@ -352,7 +352,7 @@ func (s *Server) registerFirewallPorts(api huma.API, admin huma.Middlewares) {
 		Proto string `query:"proto" required:"true" enum:"tcp,udp"`
 	}) (*struct{}, error) {
 		if err := s.DB.DeleteFirewallPort(in.Port, in.Proto); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})

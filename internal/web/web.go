@@ -12,6 +12,8 @@ import (
 	"log"
 	"net/http"
 	"net/netip"
+	"net/url"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -114,7 +116,37 @@ func (s *Server) Routes() http.Handler {
 }
 
 func fail(w http.ResponseWriter, err error) {
-	http.Error(w, err.Error(), http.StatusBadGateway)
+	http.Error(w, backendMessage("docker_error", err), http.StatusBadGateway)
+}
+
+func backendMessage(code string, err error) string {
+	var exit *exec.ExitError
+	var request *url.Error
+	if errors.As(err, &exit) {
+		// CLI output can include values from the submitted Compose file.
+		err = exit
+	} else if errors.As(err, &request) {
+		err = fmt.Errorf("%s: %w", request.Op, request.Err)
+	}
+	log.Printf("%s: %v", code, err)
+	switch code {
+	case "docker_unavailable":
+		return "Docker is unavailable"
+	case "docker_error":
+		return "Docker operation failed"
+	case "metrics_unavailable":
+		return "could not load metrics"
+	case "deploy_failed":
+		return "deployment failed"
+	case "module_error":
+		return "module request failed"
+	case "updates_unavailable":
+		return "could not check for updates"
+	case "backup_failed":
+		return "could not back up the database"
+	default:
+		return "internal server error"
+	}
 }
 
 // logWarnings: Swarm warnings are not errors, the deploy happened.
@@ -253,8 +285,7 @@ func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
 	finish(d.OldDigest, d.NewDigest, err)
 	if err != nil {
 		// Never log the secret, only the webhook id.
-		log.Printf("webhook %d: %v", hook.ID, err)
-		http.Error(w, "deploy failed", http.StatusBadGateway)
+		http.Error(w, backendMessage("deploy_failed", fmt.Errorf("webhook %d: %w", hook.ID, err)), http.StatusBadGateway)
 		return
 	}
 	w.Write([]byte("ok\n"))
