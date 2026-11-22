@@ -63,6 +63,8 @@ func (s *Server) registerLogs(api huma.API, viewer huma.Middlewares) {
 		Task string `query:"task" doc:"A replica id from the tasks list; empty for all replicas"`
 		Tail int    `query:"tail" default:"200" minimum:"1" maximum:"5000" doc:"Lines of history first"`
 	}, send sse.Sender) {
+		ctx, cancel := s.streamContext(ctx)
+		defer cancel()
 		fail := func(code, msg string) {
 			_ = send.Data(apiProblem{Detail: problemBody{Code: code, Message: msg}})
 		}

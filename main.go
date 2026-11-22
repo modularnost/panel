@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/hex"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"modularnost/internal/agent"
@@ -100,6 +101,9 @@ func main() {
 		return
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	dk, err := docker.New()
 	if err != nil {
 		log.Fatalf("docker: %v", err)
@@ -110,7 +114,7 @@ func main() {
 	if os.Getenv("PANEL_MODE") == "agent" {
 		node := os.Getenv("PANEL_NODE")
 		if node == "" {
-			if node, err = dk.NodeName(context.Background()); err != nil {
+			if node, err = dk.NodeName(ctx); err != nil {
 				log.Fatalf("node name: %v", err)
 			}
 		}
@@ -120,7 +124,10 @@ func main() {
 		}
 		addr := env("PANEL_ADDR", ":8080")
 		log.Printf("modularnost %s: agent for node %q listening on %s", version, node, addr)
-		log.Fatal(agent.Serve(addr, secret, node, dk))
+		if err := listenHTTP(ctx, addr, agent.Routes(secret, node, dk)); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	db, err := store.Open(env("PANEL_DB", "modularnost.db"))
@@ -142,10 +149,10 @@ func main() {
 	web.Version = version
 	registry := modules.NewRegistry(dk, secret)
 	// Gives modules their token without waiting for someone to open a page.
-	go registry.Refresh(context.Background())
+	go registry.Refresh(ctx)
 
 	checker := updates.New(version, os.Getenv("PANEL_UPDATE_CHECK") != "off")
-	go checker.Run(context.Background(), 6*time.Hour)
+	go checker.Run(ctx, 6*time.Hour)
 
 	if path := os.Getenv("PANEL_STACK_FILE"); path != "" {
 		go syncStackFile(dk, path)
@@ -181,6 +188,7 @@ func main() {
 		Updates:      checker,
 		AgentService: os.Getenv("PANEL_AGENT_SERVICE"),
 		StackFile:    os.Getenv("PANEL_STACK_FILE"),
+		Shutdown:     ctx,
 
 		TrustedProxies: proxies,
 		Metrics:        agent.NewCollector(os.Getenv("PANEL_AGENT_SERVICE"), env("PANEL_AGENT_PORT", "8080"), secret, dk),
@@ -200,5 +208,7 @@ func main() {
 		}
 	}
 	log.Printf("modularnost %s listening on %s", version, addr)
-	log.Fatal(http.ListenAndServe(addr, srv.Routes()))
+	if err := listenHTTP(ctx, addr, srv.Routes()); err != nil {
+		log.Fatal(err)
+	}
 }

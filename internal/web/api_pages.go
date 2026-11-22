@@ -119,6 +119,8 @@ func (s *Server) registerPages(api huma.API, viewer huma.Middlewares) {
 		Name string `path:"name"`
 		Path string `query:"path" required:"true" doc:"The contribution's path"`
 	}, send sse.Sender) {
+		ctx, cancel := s.streamContext(ctx)
+		defer cancel()
 		m, _, p, err := s.uiPage(ctx, in.Name, in.Path)
 		if err != nil {
 			if pr, ok := err.(*apiProblem); ok {
