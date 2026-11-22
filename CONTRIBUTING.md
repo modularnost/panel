@@ -92,6 +92,11 @@ Only the maintainer tags. `v0.Y.0` brings features or breaking changes,
 `v0.Y.Z` only fixes; `1.0.0` comes when the module contract, the schema and the
 upgrade path are fixed and tried on a multi-node cluster.
 
+Before publishing, CI scans the amd64 and arm64 images from a runner-local
+registry. Fixable high and critical findings block publication. Changes to
+that policy require review. CI copies the scanned digest and its manifests
+to GHCR only after both scans pass.
+
 Before a tag:
 
 1. `main` is green and `edge` runs on a test server.
