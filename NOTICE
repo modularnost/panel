@@ -8,7 +8,7 @@ licenses in THIRD-PARTY.md. The notices below are carried over from
 dependencies whose licenses require it.
 
 -------------------------------------------------------------------------------
-github.com/docker/docker (Apache-2.0)
+github.com/moby/moby/api and github.com/moby/moby/client (Apache-2.0)
 
 Docker
 Copyright 2012-2017 Docker, Inc.

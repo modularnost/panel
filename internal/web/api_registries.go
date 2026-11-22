@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/docker/docker/api/types/registry"
+	"github.com/moby/moby/api/pkg/authconfig"
+	"github.com/moby/moby/api/types/registry"
 
 	"modularnost/internal/docker"
 	"modularnost/internal/store"
@@ -132,5 +133,5 @@ func (s *Server) encodeRegistryAuth(host, image string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return registry.EncodeAuthConfig(*auth)
+	return authconfig.Encode(*auth)
 }

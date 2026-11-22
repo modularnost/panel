@@ -1,13 +1,46 @@
 package docker
 
 import (
+	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/swarm"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/swarm"
 )
+
+func TestServicesNegotiatesDockerAPIVersion(t *testing.T) {
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/_ping":
+			w.Header().Set("API-Version", "1.40")
+		case "/v1.40/services":
+			_, _ = io.WriteString(w, `[{"ID":"web-id","Spec":{"Name":"demo_web","TaskTemplate":{"ContainerSpec":{"Image":"nginx:1.28"}}}}]`)
+		case "/v1.40/tasks":
+			_, _ = io.WriteString(w, `[]`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer daemon.Close()
+	t.Setenv("DOCKER_HOST", daemon.URL)
+	t.Setenv("DOCKER_API_VERSION", "")
+	t.Setenv("DOCKER_TLS_VERIFY", "")
+	t.Setenv("DOCKER_CERT_PATH", "")
+	c, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	services, err := c.Services(context.Background())
+	if err != nil || len(services) != 1 || services[0].Name != "demo_web" || services[0].Image != "nginx:1.28" {
+		t.Fatalf("services = %+v, err = %v", services, err)
+	}
+}
 
 func TestPickNetwork(t *testing.T) {
 	all := []string{"traefik-public", "ingress", "panel_default"}

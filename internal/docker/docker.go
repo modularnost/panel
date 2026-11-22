@@ -15,11 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 const stackLabel = "com.docker.stack.namespace"
@@ -27,7 +26,7 @@ const stackLabel = "com.docker.stack.namespace"
 type Client struct{ api *client.Client }
 
 func New() (*Client, error) {
-	c, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	c, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -67,19 +66,19 @@ func splitImage(img string) (name, digest string) {
 }
 
 func (c *Client) Services(ctx context.Context) ([]Service, error) {
-	list, err := c.api.ServiceList(ctx, swarm.ServiceListOptions{})
+	list, err := c.api.ServiceList(ctx, client.ServiceListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	tasks, err := c.api.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(
-		filters.Arg("desired-state", string(swarm.TaskStateRunning)),
-	)})
+	tasks, err := c.api.TaskList(ctx, client.TaskListOptions{
+		Filters: make(client.Filters).Add("desired-state", string(swarm.TaskStateRunning)),
+	})
 	if err != nil {
 		return nil, err
 	}
-	running, scheduled := runningTasks(tasks), scheduledTasks(tasks)
-	out := make([]Service, 0, len(list))
-	for _, s := range list {
+	running, scheduled := runningTasks(tasks.Items), scheduledTasks(tasks.Items)
+	out := make([]Service, 0, len(list.Items))
+	for _, s := range list.Items {
 		img, digest := splitImage(s.Spec.TaskTemplate.ContainerSpec.Image)
 		svc := Service{
 			ID:        s.ID,
@@ -137,13 +136,14 @@ func runningTasks(tasks []swarm.Task) map[string]uint64 {
 }
 
 func (c *Client) service(ctx context.Context, nameOrID string) (swarm.Service, error) {
-	s, _, err := c.api.ServiceInspectWithRaw(ctx, nameOrID, swarm.ServiceInspectOptions{})
-	return s, err
+	res, err := c.api.ServiceInspect(ctx, nameOrID, client.ServiceInspectOptions{})
+	return res.Service, err
 }
 
 func (c *Client) stackServices(ctx context.Context, stack string) ([]swarm.Service, error) {
-	f := filters.NewArgs(filters.Arg("label", stackLabel+"="+stack))
-	return c.api.ServiceList(ctx, swarm.ServiceListOptions{Filters: f})
+	f := make(client.Filters).Add("label", stackLabel+"="+stack)
+	res, err := c.api.ServiceList(ctx, client.ServiceListOptions{Filters: f})
+	return res.Items, err
 }
 
 // Deploy is the outcome of a redeploy, recorded in the deploy history.
@@ -176,7 +176,7 @@ func (c *Client) RollOut(ctx context.Context, nameOrID, tag string) (Deploy, err
 	return c.moveToTag(ctx, nameOrID, tag, swarm.UpdateOrderStartFirst)
 }
 
-func (c *Client) moveToTag(ctx context.Context, nameOrID, tag, order string) (Deploy, error) {
+func (c *Client) moveToTag(ctx context.Context, nameOrID, tag string, order swarm.UpdateOrder) (Deploy, error) {
 	return c.updateSpec(ctx, nameOrID, nil, func(spec *swarm.ServiceSpec, img string) {
 		spec.TaskTemplate.ContainerSpec.Image = ImageRepo(img) + ":" + tag
 		spec.UpdateConfig = &swarm.UpdateConfig{
@@ -216,14 +216,14 @@ func (c *Client) updateSpec(ctx context.Context, nameOrID string, auth RegistryA
 		spec := s.Spec
 		change(&spec, img)
 
-		options := swarm.ServiceUpdateOptions{QueryRegistry: true}
+		options := client.ServiceUpdateOptions{Version: s.Version, Spec: spec, QueryRegistry: true}
 		if auth != nil {
 			options.EncodedRegistryAuth, err = auth(spec.TaskTemplate.ContainerSpec.Image, spec.Labels)
 			if err != nil {
 				return d, err
 			}
 		}
-		resp, err := c.api.ServiceUpdate(ctx, s.ID, s.Version, spec, options)
+		resp, err := c.api.ServiceUpdate(ctx, s.ID, options)
 		if err != nil {
 			if strings.Contains(err.Error(), "out of sequence") && attempt < 2 {
 				time.Sleep(300 * time.Millisecond)
@@ -257,7 +257,7 @@ func (c *Client) SetLabels(ctx context.Context, nameOrID string, labels map[stri
 			spec.Labels[k] = v
 		}
 	}
-	_, err = c.api.ServiceUpdate(ctx, s.ID, s.Version, spec, swarm.ServiceUpdateOptions{})
+	_, err = c.api.ServiceUpdate(ctx, s.ID, client.ServiceUpdateOptions{Version: s.Version, Spec: spec})
 	return err
 }
 
@@ -345,8 +345,9 @@ func lastFailure(tasks []swarm.Task) string {
 }
 
 func (c *Client) tasks(ctx context.Context, serviceID string) ([]swarm.Task, error) {
-	f := filters.NewArgs(filters.Arg("service", serviceID))
-	return c.api.TaskList(ctx, swarm.TaskListOptions{Filters: f})
+	f := make(client.Filters).Add("service", serviceID)
+	res, err := c.api.TaskList(ctx, client.TaskListOptions{Filters: f})
+	return res.Items, err
 }
 
 // Tasks returns live replicas only — those are what the log filter offers.
@@ -383,7 +384,7 @@ func (c *Client) slotMap(ctx context.Context, serviceID string) (map[string]int,
 // Logs streams a service's logs, or one replica's when taskID is set.
 // The returned channel closes when ctx is cancelled or the stream ends.
 func (c *Client) Logs(ctx context.Context, serviceID, taskID string, tail int) (<-chan string, error) {
-	opts := container.LogsOptions{
+	opts := client.ServiceLogsOptions{
 		ShowStdout: true, ShowStderr: true, Follow: true,
 		Timestamps: true, Tail: strconv.Itoa(tail),
 		// For whole-service logs, Details is the only way to tell which replica a
@@ -402,7 +403,7 @@ func (c *Client) Logs(ctx context.Context, serviceID, taskID string, tail int) (
 		err error
 	)
 	if taskID != "" {
-		rc, err = c.api.TaskLogs(ctx, taskID, opts)
+		rc, err = c.api.TaskLogs(ctx, taskID, client.TaskLogsOptions(opts))
 	} else {
 		rc, err = c.api.ServiceLogs(ctx, serviceID, opts)
 	}
@@ -453,11 +454,11 @@ type TaskStats struct {
 // Swarm API: workers cannot list services or tasks, and task containers carry
 // what is needed as labels. A service name narrows the sweep.
 func (c *Client) Stats(ctx context.Context, service string) ([]TaskStats, error) {
-	f := filters.NewArgs(filters.Arg("label", "com.docker.swarm.task.id"))
+	f := make(client.Filters).Add("label", "com.docker.swarm.task.id")
 	if service != "" {
 		f.Add("label", "com.docker.swarm.service.name="+service)
 	}
-	list, err := c.api.ContainerList(ctx, container.ListOptions{Filters: f})
+	list, err := c.api.ContainerList(ctx, client.ContainerListOptions{Filters: f})
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +468,7 @@ func (c *Client) Stats(ctx context.Context, service string) ([]TaskStats, error)
 		wg  sync.WaitGroup
 		out []TaskStats
 	)
-	for _, ct := range list {
+	for _, ct := range list.Items {
 		wg.Add(1)
 		go func(id string, labels map[string]string) {
 			defer wg.Done()
@@ -514,17 +515,17 @@ func SortStats(out []TaskStats) {
 }
 
 func (c *Client) NodeName(ctx context.Context) (string, error) {
-	info, err := c.api.Info(ctx)
+	info, err := c.api.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return "", err
 	}
-	return info.Name, nil
+	return info.Info.Name, nil
 }
 
 // containerStats reads two samples in a row: CPU percent comes from the delta,
 // and a single sample is not enough for it (its precpu block is empty).
 func (c *Client) containerStats(ctx context.Context, id string, st *TaskStats) error {
-	resp, err := c.api.ContainerStats(ctx, id, true)
+	resp, err := c.api.ContainerStats(ctx, id, client.ContainerStatsOptions{Stream: true})
 	if err != nil {
 		return err
 	}

@@ -6,8 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 // Self is what the panel knows about its own deployment: a new module needs
@@ -27,10 +26,11 @@ func (c *Client) Self(ctx context.Context) (Self, error) {
 	if err != nil {
 		return s, err
 	}
-	ct, err := c.api.ContainerInspect(ctx, host)
+	res, err := c.api.ContainerInspect(ctx, host, client.ContainerInspectOptions{})
 	if err != nil {
 		return s, err
 	}
+	ct := res.Container
 	s.Service = ct.Config.Labels["com.docker.swarm.service.name"]
 	s.Stack = ct.Config.Labels["com.docker.stack.namespace"]
 	s.Image, _, _ = strings.Cut(ct.Config.Image, "@")
@@ -67,14 +67,14 @@ func pickNetwork(names []string, explicit, stack string) string {
 
 // OverlayNetworks lists the networks a module could be attached to.
 func (c *Client) OverlayNetworks(ctx context.Context) ([]string, error) {
-	list, err := c.api.NetworkList(ctx, network.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("driver", "overlay")),
+	list, err := c.api.NetworkList(ctx, client.NetworkListOptions{
+		Filters: make(client.Filters).Add("driver", "overlay"),
 	})
 	if err != nil {
 		return nil, err
 	}
 	var out []string
-	for _, n := range list {
+	for _, n := range list.Items {
 		if n.Name == "ingress" {
 			continue
 		}
