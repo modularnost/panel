@@ -263,10 +263,6 @@ func TestAPIWebhooksAreAdminOnly(t *testing.T) {
 	if _, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
-	hook, err := db.CreateWebhook(store.Webhook{ServiceName: "web", ActionType: "force_update"})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	if status, _ := send(t, c, "GET", base+"/api/v1/webhooks", "", ""); status != 401 {
 		t.Fatalf("anonymous: %d", status)
@@ -279,6 +275,17 @@ func TestAPIWebhooksAreAdminOnly(t *testing.T) {
 	if status, body := send(t, c, "POST", base+"/api/v1/auth/login", "application/json", `{"username":"root","password":"root-pass-1"}`); status != 200 {
 		t.Fatalf("admin sign in: %d %v", status, body)
 	}
+	status, created := send(t, c, "POST", base+"/api/v1/webhooks", "application/json", `{"action":"force_update","service":"web"}`)
+	path, _ := created["path"].(string)
+	id, _ := created["id"].(float64)
+	token, ok := strings.CutPrefix(path, "/hook/")
+	if status != 201 || !ok || token == "" || id == 0 {
+		t.Fatalf("create webhook: status %d, valid path %v", status, ok && token != "")
+	}
+	hook, err := db.WebhookByToken(token)
+	if err != nil || hook.ID != int64(id) {
+		t.Fatalf("created webhook URL must resolve to its ID: %v", err)
+	}
 	resp, err := c.Get(base + "/api/v1/webhooks")
 	if err != nil {
 		t.Fatal(err)
@@ -288,8 +295,11 @@ func TestAPIWebhooksAreAdminOnly(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != 200 || len(list) != 1 || list[0]["path"] != "/hook/"+hook.SecretToken || list[0]["action"] != "force_update" {
-		t.Fatalf("%d %v", resp.StatusCode, list)
+	if resp.StatusCode != 200 || len(list) != 1 || list[0]["action"] != "force_update" {
+		t.Fatalf("list webhooks: status %d, count %d", resp.StatusCode, len(list))
+	}
+	if _, exposed := list[0]["path"]; exposed {
+		t.Fatal("list must not return the webhook path")
 	}
 }
 

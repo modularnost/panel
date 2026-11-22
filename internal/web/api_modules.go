@@ -57,38 +57,36 @@ func toAPIModules(in []modules.Module) []apiModule {
 	return out
 }
 
-type apiWebhook struct {
-	ID      int64  `json:"id"`
-	Service string `json:"service,omitempty"`
-	Stack   string `json:"stack,omitempty"`
-	Action  string `json:"action" enum:"force_update,stack_redeploy"`
-	// Path carries the secret: whoever has it can trigger the redeploy, so
-	// webhooks are listed for admins only.
-	Path          string     `json:"path"`
+type Webhook struct {
+	ID            int64      `json:"id"`
+	Service       string     `json:"service,omitempty"`
+	Stack         string     `json:"stack,omitempty"`
+	Action        string     `json:"action" enum:"force_update,stack_redeploy"`
 	CreatedAt     time.Time  `json:"created_at"`
 	LastTriggered *time.Time `json:"last_triggered_at,omitempty"`
 }
 
-func toAPIWebhooks(in []store.Webhook) []apiWebhook {
-	out := make([]apiWebhook, 0, len(in))
+func toAPIWebhooks(in []store.Webhook) []Webhook {
+	out := make([]Webhook, 0, len(in))
 	for _, w := range in {
-		h := apiWebhook{
-			ID: w.ID, Service: w.ServiceName, Stack: w.StackName, Action: w.ActionType,
-			Path: "/hook/" + w.SecretToken, CreatedAt: w.CreatedAt,
-		}
-		if w.LastTriggered.Valid {
-			h.LastTriggered = &w.LastTriggered.Time
-		}
-		out = append(out, h)
+		out = append(out, toAPIWebhook(w))
 	}
 	return out
+}
+
+func toAPIWebhook(w store.Webhook) Webhook {
+	h := Webhook{ID: w.ID, Service: w.ServiceName, Stack: w.StackName, Action: w.ActionType, CreatedAt: w.CreatedAt}
+	if w.LastTriggered.Valid {
+		h.LastTriggered = &w.LastTriggered.Time
+	}
+	return h
 }
 
 type moduleListOutput struct {
 	Body []apiModule `nullable:"false"`
 }
 type webhookListOutput struct {
-	Body []apiWebhook `nullable:"false"`
+	Body []Webhook `nullable:"false"`
 }
 
 func (s *Server) registerModules(api huma.API, viewer huma.Middlewares) {

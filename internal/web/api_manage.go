@@ -32,7 +32,15 @@ type apiModuleInstalled struct {
 	Service string `json:"service"`
 }
 
-type webhookOutput struct{ Body apiWebhook }
+type apiWebhookCreated struct {
+	Webhook
+	Path string `json:"path" doc:"Contains the secret and is shown only at creation"`
+}
+
+type webhookOutput struct {
+	CacheControl string `header:"Cache-Control"`
+	Body         apiWebhookCreated
+}
 type moduleInstalledOutput struct{ Body apiModuleInstalled }
 
 func (s *Server) registerManage(api huma.API) {
@@ -56,7 +64,10 @@ func (s *Server) registerManage(api huma.API) {
 		if err != nil {
 			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
 		}
-		return &webhookOutput{Body: toAPIWebhooks([]store.Webhook{hook})[0]}, nil
+		return &webhookOutput{
+			CacheControl: "no-store",
+			Body:         apiWebhookCreated{Webhook: toAPIWebhook(hook), Path: "/hook/" + hook.SecretToken},
+		}, nil
 	})
 
 	huma.Register(api, huma.Operation{

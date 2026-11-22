@@ -22,6 +22,29 @@ type attempts struct {
 	last  time.Time
 }
 
+const webhookRequestsPerMinute = 60
+
+type webhookLimiter struct {
+	mu     sync.Mutex
+	reset  time.Time
+	counts map[string]int
+}
+
+func (l *webhookLimiter) take(ip string, now time.Time) time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !now.Before(l.reset) {
+		l.reset = now.Truncate(time.Minute).Add(time.Minute)
+		l.counts = make(map[string]int)
+	}
+	count := l.counts[ip]
+	if count >= webhookRequestsPerMinute || (count == 0 && len(l.counts) >= maxTracked) {
+		return l.reset.Sub(now)
+	}
+	l.counts[ip] = count + 1
+	return 0
+}
+
 // loginLimiter slows password guessing down with a pause that doubles per
 // failure. Never a lockout: a pause an attacker can trigger for a name is one
 // short enough not to matter to its owner. State is in memory; a restart

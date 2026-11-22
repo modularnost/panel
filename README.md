@@ -192,6 +192,15 @@ comes from an address in `PANEL_TRUSTED_PROXIES`; the installer sets it to its
 own network. Unset, the header is ignored. Do not put a range there that
 clients can reach the panel from.
 
+### Webhooks
+
+Copy the URL when you create a webhook and send a `POST` to trigger it.
+The panel stores a hash and returns the secret path only at creation.
+Existing webhook URLs keep working after upgrade. Older database backups and
+proxy access logs can contain usable URLs, so protect those files and replace
+any webhook whose URL was exposed. The hook endpoint allows 60 requests per
+minute per client IP and returns `429` with `Retry-After` above that limit.
+
 ### Private registry images
 
 In **Settings → Registries**, save a pull token for the registry hostname

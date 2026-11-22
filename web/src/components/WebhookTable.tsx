@@ -18,7 +18,6 @@ export function WebhookTable({ hooks, busy, onDelete }: Props) {
       <thead>
         <tr>
           <th>Redeploys</th>
-          <th>Call</th>
           <th>Last used</th>
           <th />
         </tr>
@@ -27,7 +26,6 @@ export function WebhookTable({ hooks, busy, onDelete }: Props) {
         {hooks.map((h) => (
           <tr key={h.id}>
             <td>{h.action === "force_update" ? `service ${h.service}` : `stack ${h.stack}`}</td>
-            <td className="mono">POST {h.path}</td>
             <td>{h.last_triggered_at ? new Date(h.last_triggered_at).toLocaleString() : "never"}</td>
             <td>
               <Button

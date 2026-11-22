@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"modularnost/internal/agent"
 	"modularnost/internal/docker"
@@ -56,6 +57,7 @@ type Server struct {
 	// means none, and a client is whoever connected.
 	TrustedProxies []netip.Prefix
 	logins         loginLimiter
+	hookRequests   webhookLimiter
 }
 
 func (s *Server) Routes() http.Handler {
@@ -206,6 +208,11 @@ func traefikLabels(service, host, port, entrypoint, resolver string) map[string]
 // hook is the entry point for CI and registries: the secret is in the path, the
 // body is ignored.
 func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
+	if wait := s.hookRequests.take(clientIP(r, s.TrustedProxies), time.Now()); wait > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(wait)))
+		http.Error(w, "too many webhook requests", http.StatusTooManyRequests)
+		return
+	}
 	hook, err := s.DB.WebhookByToken(r.PathValue("token"))
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
