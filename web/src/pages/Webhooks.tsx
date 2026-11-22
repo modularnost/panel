@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { WebhookTable } from "../components/WebhookTable";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
@@ -35,10 +36,13 @@ export function Webhooks() {
   const options = kind === "service" ? (services.data ?? []).map((s) => s.name) : (stacks.data ?? []).map((s) => s.name);
 
   if (hooks.isPending) return <p>Loading…</p>;
-  if (hooks.isError) return <p className="error">{hooks.error.message}</p>;
+  if (hooks.isError && (hooks.data === undefined || !retryableQueryError(hooks.error))) {
+    return <p className="error">{hooks.error.message}</p>;
+  }
 
   return (
     <>
+      <RefreshWarning error={hooks.error} />
       <h1>Webhooks</h1>
       <WebhookTable hooks={hooks.data} busy={remove.isPending} onDelete={(id) => remove.mutate(id)} />
       {remove.isError && <p className="error">{remove.error.message}</p>}

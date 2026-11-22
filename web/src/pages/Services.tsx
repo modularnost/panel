@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { LinkButton } from "../components/Button";
 import { Banner } from "../components/Banner";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { atLeast, useMe } from "../auth";
 import { modulePath, slot, useModules } from "../modules";
 import { useUpdates } from "../updates";
@@ -32,7 +33,9 @@ export function Services() {
   const actions = slot(modules.data, "services.action", me.data?.role);
 
   if (services.isPending) return <p>Loading…</p>;
-  if (services.isError) return <p className="error">{services.error.message}</p>;
+  if (services.isError && (services.data === undefined || !retryableQueryError(services.error))) {
+    return <p className="error">{services.error.message}</p>;
+  }
 
   return (
     <>
@@ -41,6 +44,7 @@ export function Services() {
           {newest.tag} is available. <Link to="/settings">What changed</Link>
         </Banner>
       )}
+      <RefreshWarning error={services.error} />
       <h1>Services</h1>
       {actions.length > 0 && (
         <p className="actions">

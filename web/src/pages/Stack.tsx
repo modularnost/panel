@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { atLeast, useMe } from "../auth";
 import { ComposeEditor } from "../components/ComposeEditor";
 import { Button } from "../components/Button";
@@ -45,7 +46,9 @@ export function Stack() {
   });
 
   if (stack.isPending) return <p>Loading…</p>;
-  if (stack.isError) return <p className="error">{stack.error.message}</p>;
+  if (stack.isError && (stack.data === undefined || !retryableQueryError(stack.error))) {
+    return <p className="error">{stack.error.message}</p>;
+  }
   const s = stack.data;
 
   const confirmRemove = async () => {
@@ -63,6 +66,7 @@ export function Stack() {
       <p className="muted">
         <Link to="/stacks">Stacks</Link>
       </p>
+      <RefreshWarning error={stack.error} />
       <h1>
         {s.name}{" "}
         <Chip tone={s.healthy ? "ok" : "bad"}>

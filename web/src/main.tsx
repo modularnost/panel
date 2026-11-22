@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./App";
-import { ApiError } from "./api/client";
+import { retryableQueryError } from "./api/client";
 import { applyTheme } from "./theme";
 import "./styles.css";
 
@@ -13,7 +13,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       // Not being signed in will not get better by asking again.
-      retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 2,
+      retry: (count, error) => retryableQueryError(error) && count < 2,
     },
   },
 });

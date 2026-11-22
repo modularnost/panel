@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useOutletContext, useParams } from "react-router";
-import { api, call } from "../../api/client";
+import { api, call, retryableQueryError } from "../../api/client";
+import { RefreshWarning } from "../../components/RefreshWarning";
 import type { Service } from "../../api/generated";
 import { atLeast, useMe } from "../../auth";
 import { useModules, serviceTabs } from "../../modules";
@@ -25,7 +26,9 @@ export function ServiceLayout() {
   const modules = useModules();
 
   if (service.isPending) return <p>Loading…</p>;
-  if (service.isError) return <p className="error">{service.error.message}</p>;
+  if (service.isError && (service.data === undefined || !retryableQueryError(service.error))) {
+    return <p className="error">{service.error.message}</p>;
+  }
   const s = service.data;
 
   return (
@@ -33,6 +36,7 @@ export function ServiceLayout() {
       <p className="muted">
         <Link to="/">Services</Link>
       </p>
+      <RefreshWarning error={service.error} />
       <h1>
         {s.name}{" "}
         <Chip tone={s.healthy ? "ok" : "bad"}>

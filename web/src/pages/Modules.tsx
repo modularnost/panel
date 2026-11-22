@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { atLeast, useMe } from "../auth";
 import { modulePath } from "../modules";
 import { Button } from "../components/Button";
@@ -29,10 +30,13 @@ export function Modules() {
     m.contributions.find((c) => c.slot === "nav" && atLeast(me.data?.role, c.role as "viewer" | "operator" | "admin"));
 
   if (modules.isPending) return <p>Loading…</p>;
-  if (modules.isError) return <p className="error">{modules.error.message}</p>;
+  if (modules.isError && (modules.data === undefined || !retryableQueryError(modules.error))) {
+    return <p className="error">{modules.error.message}</p>;
+  }
 
   return (
     <>
+      <RefreshWarning error={modules.error} />
       <h1>Modules</h1>
       {admin && (
         <p>

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { call, api } from "../api/client";
+import { call, api, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { formatTime } from "../format";
 import { installCommand, useUpdates, waitForVersion } from "../updates";
 import { Button } from "../components/Button";
@@ -39,12 +40,15 @@ export function Updates() {
   });
 
   if (updates.isPending) return <p>Loading…</p>;
-  if (updates.isError) return <p className="error">{updates.error.message}</p>;
+  if (updates.isError && (updates.data === undefined || !retryableQueryError(updates.error))) {
+    return <p className="error">{updates.error.message}</p>;
+  }
   const u = updates.data;
   const newest = u.releases[0];
 
   return (
     <>
+      <RefreshWarning error={updates.error} />
       <h2>Updates</h2>
       <p>
         Running <span className="mono">{u.current}</span>
