@@ -37,7 +37,7 @@ type traefikOutput struct{ Body apiTraefik }
 func (s *Server) apiFindService(ctx context.Context, id string) (docker.Service, error) {
 	svcs, err := s.Docker.Services(ctx)
 	if err != nil {
-		return docker.Service{}, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+		return docker.Service{}, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 	}
 	for _, sv := range svcs {
 		if sv.ID == id || sv.Name == id {
@@ -68,7 +68,7 @@ func (s *Server) registerServiceActions(api huma.API) {
 		finish(d.OldDigest, d.NewDigest, err)
 		logWarnings(d)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		out := apiRedeploy{Service: sv.Name, OldDigest: d.OldDigest, NewDigest: d.NewDigest, Warnings: []string{}}
 		out.Warnings = append(out.Warnings, d.Warnings...)
@@ -86,7 +86,7 @@ func (s *Server) registerServiceActions(api huma.API) {
 			return nil, err
 		}
 		if err := s.Docker.RemoveService(ctx, sv.ID); err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		return nil, nil
 	})
@@ -125,7 +125,7 @@ func (s *Server) registerServiceActions(api huma.API) {
 		}
 		labels := traefikLabels(sv.Name, in.Body.Host, port, in.Body.Entrypoint, in.Body.CertResolver)
 		if err := s.Docker.SetLabels(ctx, sv.ID, labels); err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		return &traefikOutput{Body: in.Body}, nil
 	})

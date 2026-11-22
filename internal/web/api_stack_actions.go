@@ -88,11 +88,11 @@ func (s *Server) registerStackActions(api huma.API) {
 		out, err := s.Docker.DeployStack(ctx, in.Name, in.Body.Compose, auth)
 		finish("", "", err)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "deploy_failed", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "deploy_failed", err)
 		}
 		// Only a file that actually deployed is kept.
 		if err := s.DB.SaveStack(in.Name, in.Body.Compose, me.Username, host); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &stackResultOutput{Body: apiStackResult{Name: in.Name, Output: out}}, nil
 	})
@@ -124,7 +124,7 @@ func (s *Server) registerStackActions(api huma.API) {
 		}
 		finish("", "", err)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "deploy_failed", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "deploy_failed", err)
 		}
 		return &stackResultOutput{Body: apiStackResult{Name: in.Name, Output: out}}, nil
 	})
@@ -139,7 +139,7 @@ func (s *Server) registerStackActions(api huma.API) {
 		defer s.lockStack(in.Name)()
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		live := false
 		for _, sv := range svcs {
@@ -151,11 +151,11 @@ func (s *Server) registerStackActions(api huma.API) {
 		}
 		if live {
 			if err := s.Docker.RemoveStack(ctx, in.Name); err != nil {
-				return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+				return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 			}
 		}
 		if err := s.DB.DeleteStack(in.Name); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})

@@ -67,7 +67,7 @@ func (s *Server) registerUserActions(api huma.API) {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				return nil, problem(http.StatusConflict, "username_taken", "that username is taken")
 			}
-			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &userOutput{Body: toAPIUser(u)}, nil
 	})
@@ -91,13 +91,13 @@ func (s *Server) registerUserActions(api huma.API) {
 				if errors.Is(err, store.ErrLastAdmin) {
 					return nil, problem(http.StatusConflict, "last_admin", err.Error())
 				}
-				return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
+				return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 			}
 			u.Role = in.Body.Role
 		}
 		if in.Body.Password != "" {
 			if err := s.changePassword(u.ID, in.Body.Password); err != nil {
-				return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
+				return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 			}
 		}
 		return &userOutput{Body: toAPIUser(u)}, nil
@@ -117,7 +117,7 @@ func (s *Server) registerUserActions(api huma.API) {
 			if errors.Is(err, store.ErrLastAdmin) {
 				return nil, problem(http.StatusConflict, "last_admin", err.Error())
 			}
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})
@@ -134,7 +134,7 @@ func (s *Server) registerUserActions(api huma.API) {
 		ttl := time.Duration(b.Days) * 24 * time.Hour
 		token, id, err := s.DB.CreateToken(b.UserID, b.Name, b.Role, ttl)
 		if err != nil {
-			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		out := apiTokenCreated{Token: token, ID: id, UserID: b.UserID, Name: b.Name, Role: b.Role}
 		if ttl > 0 {
@@ -153,7 +153,7 @@ func (s *Server) registerUserActions(api huma.API) {
 	}) (*struct{}, error) {
 		tokens, err := s.DB.Tokens()
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		found := false
 		for _, t := range tokens {
@@ -163,7 +163,7 @@ func (s *Server) registerUserActions(api huma.API) {
 			return nil, problem(http.StatusNotFound, "not_found", "no such token")
 		}
 		if err := s.DB.DeleteToken(in.ID); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})

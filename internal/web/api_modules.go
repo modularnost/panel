@@ -41,8 +41,16 @@ func toAPIModules(in []modules.Module) []apiModule {
 			}
 		}
 		mod := apiModule{
-			Name: m.Name, Version: m.Version, Service: m.Service, OK: m.OK(), State: state, Error: m.Err,
+			Name: m.Name, Version: m.Version, Service: m.Service, OK: m.OK(), State: state,
 			Contributions: []apiContribution{}, Permissions: []string{},
+		}
+		switch state {
+		case modules.StateStarting:
+			mod.Error = m.Err
+		case modules.StateFailed:
+			mod.Error = "module tasks failed"
+		case modules.StateError:
+			mod.Error = "could not load the module manifest"
 		}
 		for _, c := range m.Manifest.Contributions {
 			match := c.Match
@@ -98,7 +106,7 @@ func (s *Server) registerModules(api huma.API, viewer huma.Middlewares) {
 	}, func(ctx context.Context, _ *struct{}) (*moduleListOutput, error) {
 		mods, err := s.Modules.List(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		return &moduleListOutput{Body: toAPIModules(mods)}, nil
 	})
@@ -109,7 +117,7 @@ func (s *Server) registerModules(api huma.API, viewer huma.Middlewares) {
 	}, func(ctx context.Context, _ *struct{}) (*webhookListOutput, error) {
 		hooks, err := s.DB.Webhooks()
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &webhookListOutput{Body: toAPIWebhooks(hooks)}, nil
 	})
@@ -122,13 +130,13 @@ func (s *Server) registerModules(api huma.API, viewer huma.Middlewares) {
 	}) (*webhookListOutput, error) {
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		for _, sv := range svcs {
 			if sv.ID == in.ID || sv.Name == in.ID {
 				hooks, err := s.DB.WebhooksFor(sv.Name, sv.Stack)
 				if err != nil {
-					return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+					return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 				}
 				return &webhookListOutput{Body: toAPIWebhooks(hooks)}, nil
 			}

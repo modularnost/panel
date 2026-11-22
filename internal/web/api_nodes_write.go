@@ -58,7 +58,7 @@ func (s *Server) registerNodeActions(api huma.API) {
 	}) (*nodeOutput, error) {
 		nodes, err := s.Docker.Nodes(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		var node *docker.Node
 		for i := range nodes {
@@ -73,7 +73,7 @@ func (s *Server) registerNodeActions(api huma.API) {
 			return nil, problem(http.StatusConflict, "last_manager", err.Error())
 		}
 		if err := s.Docker.SetAvailability(ctx, node.ID, in.Body.Availability); err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		node.Availability = in.Body.Availability
 		return &nodeOutput{Body: s.apiNodes([]docker.Node{*node})[0]}, nil
@@ -85,11 +85,11 @@ func (s *Server) registerNodeActions(api huma.API) {
 		Middlewares: admin, Security: signedIn,
 	}, func(ctx context.Context, in *struct{ Body apiJoinRotate }) (*joinOutput, error) {
 		if err := s.Docker.RotateJoinToken(ctx, in.Body.Role); err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		info, err := s.Docker.JoinInfo(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		return &joinOutput{Body: apiJoin{Role: in.Body.Role, Address: info.Address, Command: info.JoinCommand(in.Body.Role)}}, nil
 	})

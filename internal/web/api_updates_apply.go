@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -57,7 +58,7 @@ func (s *Server) registerUpdateApply(api huma.API) {
 
 		backup, err := s.backupDatabase(tag)
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "backup_failed", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "backup_failed", err)
 		}
 		image := strings.TrimPrefix(tag, "v")
 		me, _ := ctx.Value(ctxKey{}).(store.User)
@@ -69,7 +70,7 @@ func (s *Server) registerUpdateApply(api huma.API) {
 			finish(d.OldDigest, d.NewDigest, err)
 			logWarnings(d)
 			if err != nil {
-				return nil, problem(http.StatusBadGateway, "docker_error", "agent service: "+err.Error())
+				return nil, backendProblem(http.StatusBadGateway, "docker_error", fmt.Errorf("agent service: %w", err))
 			}
 		}
 

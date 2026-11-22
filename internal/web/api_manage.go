@@ -62,7 +62,7 @@ func (s *Server) registerManage(api huma.API) {
 			ServiceName: b.Service, StackName: b.Stack, ActionType: b.Action,
 		})
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &webhookOutput{
 			CacheControl: "no-store",
@@ -78,7 +78,7 @@ func (s *Server) registerManage(api huma.API) {
 	}) (*struct{}, error) {
 		hooks, err := s.DB.Webhooks()
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		found := false
 		for _, h := range hooks {
@@ -88,7 +88,7 @@ func (s *Server) registerManage(api huma.API) {
 			return nil, problem(http.StatusNotFound, "not_found", "no such webhook")
 		}
 		if err := s.DB.DeleteWebhook(in.ID); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})
@@ -111,7 +111,7 @@ func (s *Server) registerManage(api huma.API) {
 			return nil, err
 		}
 		if err := s.deployModule(ctx, m, b.RegistryHost, auth); err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		service := m.Service
 		if service == "" {
@@ -132,7 +132,7 @@ func (s *Server) registerManage(api huma.API) {
 			return nil, problem(http.StatusNotFound, "not_found", "no such module")
 		}
 		if err := s.Docker.RemoveService(ctx, m.Service); err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_error", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		s.Modules.Forget()
 		return nil, nil

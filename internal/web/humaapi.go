@@ -33,6 +33,10 @@ func problem(status int, code, msg string) error {
 	return &apiProblem{status: status, Detail: problemBody{Code: code, Message: msg}}
 }
 
+func backendProblem(status int, code string, err error) error {
+	return problem(status, code, backendMessage(code, err))
+}
+
 func init() {
 	// Errors the framework raises itself (validation, malformed JSON).
 	huma.NewError = func(status int, msg string, _ ...error) huma.StatusError {
@@ -144,12 +148,12 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 			return nil, problem(http.StatusUnauthorized, "invalid_credentials", err.Error())
 		}
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		s.loginSucceeded(r, in.Body.Username)
 		c, err := s.sessionCookie(r, u.ID)
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &loginOutput{SetCookie: *c, Body: toAPIUser(u)}, nil
 	})
@@ -160,7 +164,7 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	}, func(ctx context.Context, _ *struct{}) (*logoutOutput, error) {
 		r, _ := ctx.Value(reqKey{}).(*http.Request)
 		if err := s.revokeSession(r); err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		c := s.sessionCookieAttrs(r)
 		c.MaxAge = -1
@@ -181,12 +185,12 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	}, func(ctx context.Context, _ *struct{}) (*serviceListOutput, error) {
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		out := make([]apiService, 0, len(svcs))
 		deploys, err := s.DB.LastDeployments(ctx)
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		for _, sv := range svcs {
 			view := toAPIService(sv, false)
@@ -204,13 +208,13 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	}) (*serviceOutput, error) {
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		for _, sv := range svcs {
 			if sv.ID == in.ID || sv.Name == in.ID {
 				deploys, err := s.DB.LastDeployments(ctx)
 				if err != nil {
-					return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+					return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 				}
 				view := toAPIService(sv, true)
 				view.LastDeployAt = deploys.ForService(sv.Name, sv.Stack)

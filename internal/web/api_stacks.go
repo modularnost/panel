@@ -64,7 +64,10 @@ func toAPIDeploy(e store.DeployEvent) apiDeploy {
 	d := apiDeploy{
 		ID: e.ID, Service: e.ServiceName, Stack: e.StackName, Source: e.Source,
 		TriggeredBy: e.TriggeredBy, OldDigest: e.OldDigest, NewDigest: e.NewDigest,
-		Status: e.Status, Error: e.ErrorMessage, StartedAt: e.StartedAt,
+		Status: e.Status, StartedAt: e.StartedAt,
+	}
+	if e.Status == "failed" {
+		d.Error = "deployment failed"
 	}
 	if e.FinishedAt.Valid {
 		d.FinishedAt = &e.FinishedAt.Time
@@ -128,12 +131,12 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 	}, func(ctx context.Context, _ *struct{}) (*stackListOutput, error) {
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		out := summarizeStacks(svcs)
 		deploys, err := s.DB.LastDeployments(ctx)
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		for i := range out {
 			_, out[i].Managed = s.DB.Stack(out[i].Name)
@@ -150,13 +153,13 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 	}) (*stackOutput, error) {
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		var detail apiStackDetail
 		detail.Services = []apiService{}
 		deploys, err := s.DB.LastDeployments(ctx)
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		for _, sv := range svcs {
 			if sv.Stack == in.Name {
@@ -198,7 +201,7 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 	}, func(ctx context.Context, in *limitInput) (*deployListOutput, error) {
 		events, err := s.DB.RecentDeploys(in.Limit)
 		if err != nil {
-			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &deployListOutput{Body: toAPIDeploys(events)}, nil
 	})
@@ -212,13 +215,13 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 	}) (*deployListOutput, error) {
 		svcs, err := s.Docker.Services(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		for _, sv := range svcs {
 			if sv.ID == in.ID || sv.Name == in.ID {
 				events, err := s.DB.DeploysFor(sv.Name, sv.Stack, in.Limit)
 				if err != nil {
-					return nil, problem(http.StatusInternalServerError, "internal", err.Error())
+					return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 				}
 				return &deployListOutput{Body: toAPIDeploys(events)}, nil
 			}

@@ -89,7 +89,7 @@ func (s *Server) registerCluster(api huma.API, viewer huma.Middlewares) {
 	}) (*statsOutput, error) {
 		stats, err := s.Metrics.Stats(ctx, in.Service)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "metrics_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "metrics_unavailable", err)
 		}
 		return &statsOutput{Body: toAPITaskStats(stats)}, nil
 	})
@@ -100,7 +100,7 @@ func (s *Server) registerCluster(api huma.API, viewer huma.Middlewares) {
 	}, func(ctx context.Context, _ *struct{}) (*nodeListOutput, error) {
 		nodes, err := s.Docker.Nodes(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		return &nodeListOutput{Body: s.apiNodes(nodes)}, nil
 	})
@@ -113,7 +113,7 @@ func (s *Server) registerCluster(api huma.API, viewer huma.Middlewares) {
 	}) (*joinOutput, error) {
 		info, err := s.Docker.JoinInfo(ctx)
 		if err != nil {
-			return nil, problem(http.StatusBadGateway, "docker_unavailable", err.Error())
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 		}
 		return &joinOutput{Body: apiJoin{Role: in.Role, Address: info.Address, Command: info.JoinCommand(in.Role)}}, nil
 	})

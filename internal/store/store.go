@@ -203,7 +203,7 @@ func (d *DB) StartDeploy(e DeployEvent) (finish func(oldDigest, newDigest string
 	return func(oldDigest, newDigest string, err error) {
 		status, msg := "success", ""
 		if err != nil {
-			status, msg = "failed", err.Error()
+			status, msg = "failed", "deployment failed"
 		}
 		_, e := d.Exec(`UPDATE deploy_events SET status=?, old_image_digest=?, new_image_digest=?,
 			error_message=?, finished_at=CURRENT_TIMESTAMP WHERE id=?`,

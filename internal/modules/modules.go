@@ -245,6 +245,9 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 				failure, _ = r.dk.LastFailure(ctx, sv.ID)
 			}
 			m.State, m.Err = classify(sv.Running, sv.Desired, failure, err)
+			if m.State != StateStarting {
+				log.Printf("module %s: %s", name, m.Err)
+			}
 		} else {
 			m.State = StateReady
 			if m.Version == "" {
