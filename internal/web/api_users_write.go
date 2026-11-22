@@ -128,8 +128,12 @@ func (s *Server) registerUserActions(api huma.API) {
 		Middlewares: admin, Security: signedIn,
 	}, func(_ context.Context, in *struct{ Body apiTokenCreate }) (*tokenCreatedOutput, error) {
 		b := in.Body
-		if _, ok := s.userByID(b.UserID); !ok {
+		user, ok := s.userByID(b.UserID)
+		if !ok {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "no such user")
+		}
+		if b.Role != "" && !store.AtLeast(user.Role, b.Role) {
+			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "token role cannot exceed the user's role")
 		}
 		ttl := time.Duration(b.Days) * 24 * time.Hour
 		token, id, err := s.DB.CreateToken(b.UserID, b.Name, b.Role, ttl)

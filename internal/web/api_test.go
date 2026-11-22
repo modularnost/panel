@@ -743,6 +743,14 @@ func TestAPITokenValueIsShownOnce(t *testing.T) {
 	if status, _ := send(t, c, "POST", base+"/api/v1/tokens", j, `{"user_id":9999,"name":"x"}`); status != 422 {
 		t.Errorf("a token for nobody: %d", status)
 	}
+	viewer, err := db.CreateUser("reader", "reader-pass-1", store.RoleViewer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = `{"user_id":` + strconv.FormatInt(viewer.ID, 10) + `,"name":"deploy","role":"operator"}`
+	if status, _ := send(t, c, "POST", base+"/api/v1/tokens", j, body); status != 422 {
+		t.Errorf("a role above the token owner's role: %d", status)
+	}
 }
 
 func TestAPICreatesSameNamedTokensWithTheirOwnIDs(t *testing.T) {
