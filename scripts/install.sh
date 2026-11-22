@@ -4,6 +4,7 @@
 #
 #   sh install.sh                                       asks for domain and email
 #   DOMAIN=panel.example.com EMAIL=you@example.com sh install.sh   asks nothing
+#   PANEL_INSTALL_MODE=existing-swarm sh install.sh      direct LAN/VPN access
 #
 # Safe to re-run: an existing swarm, network or stack is reused, not recreated.
 # Leave EMAIL empty to skip TLS and serve plain HTTP — for an internal network
@@ -29,6 +30,7 @@ CONFIG=${PANEL_CONFIG:-/etc/modularnost}
 ADVERTISE=${ADVERTISE_ADDR:-}
 FIREWALL=${FIREWALL:-on}
 FIREWALL_ALLOW=${FIREWALL_ALLOW:-}
+MODE=${PANEL_INSTALL_MODE:-standalone}
 LOG=${PANEL_INSTALL_LOG:-/var/log/modularnost-install.log}
 TOTAL=5
 N=0
@@ -59,6 +61,54 @@ run() {
 [ "$(id -u)" = 0 ] || die "run as root"
 command -v curl >/dev/null 2>&1 || die "curl is required"
 : >"$LOG"
+
+case $MODE in
+standalone)
+	[ ! -f "$CONFIG/existing-swarm" ] ||
+		die "this installation uses PANEL_INSTALL_MODE=existing-swarm"
+	;;
+existing-swarm)
+	TOTAL=3
+	SCHEME=http
+	PORT=${PANEL_PORT:-8080}
+	case $PORT in
+		''|0*|*[!0-9]*) die "PANEL_PORT must be a number from 1 to 65535" ;;
+	esac
+	[ "${#PORT}" -le 5 ] && [ "$PORT" -le 65535 ] || die "PANEL_PORT must be a number from 1 to 65535"
+	case $STACK in
+		''|[!a-zA-Z0-9]*|*[!a-zA-Z0-9_.-]*) die "PANEL_STACK must be a valid Swarm name" ;;
+	esac
+	command -v docker >/dev/null 2>&1 || die "Docker must already be installed"
+	step "Checking the Swarm manager"
+	NODE_ID=$(docker info --format '{{.Swarm.NodeID}}' 2>>"$LOG") ||
+		die "could not reach the Docker daemon"
+	[ -n "$NODE_ID" ] && [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = true ] ||
+		die "run on an existing Swarm manager"
+	ADDRESS=$(docker node inspect "$NODE_ID" --format '{{.Status.Addr}}')
+	[ -n "$ADDRESS" ] || die "could not determine the manager address"
+	case $ADDRESS in *:*) ADDRESS="[$ADDRESS]" ;; esac
+	if [ -f "$CONFIG/existing-swarm" ]; then
+		[ "$(cat "$CONFIG/existing-swarm")" = "$STACK $NODE_ID" ] ||
+			die "use the original stack name and manager for this installation"
+	elif [ -e "$CONFIG/stack.yml" ] || [ -e "$CONFIG/secret" ]; then
+		die "$CONFIG is already used by another installation"
+	fi
+	STACKS=$(docker stack ls --format '{{.Name}}') || die "could not list Swarm stacks"
+	if printf '%s\n' "$STACKS" | grep -Fxq "$STACK"; then
+		[ -f "$CONFIG/existing-swarm" ] &&
+			[ "$(docker service inspect "${STACK}_panel" --format '{{index .Spec.Labels "modularnost.install.mode"}}' 2>>"$LOG")" = "$MODE" ] ||
+			die "stack $STACK already exists; choose another PANEL_STACK"
+	fi
+	printf '  Stack     %s\n  Address   http://%s:%s (trusted LAN or VPN only)\n' "$STACK" "$ADDRESS" "$PORT"
+	NET=default
+	NET_SUBNETS=
+	FIREWALL=off
+	FW_NOTE="unchanged"
+	;;
+*) die "PANEL_INSTALL_MODE must be standalone or existing-swarm" ;;
+esac
+
+if [ "$MODE" = standalone ]; then
 
 # Read from the terminal, not stdin: under `curl ... | sh` stdin is the script.
 # No terminal (CI, a pipe with no tty) means the variables must be set already.
@@ -174,11 +224,15 @@ fi
 # Traefik reaches the panel from this network, so its address is the one whose
 # X-Forwarded-For the panel may believe; nothing outside the network is trusted.
 NET_SUBNETS=$(docker network inspect "$NET" --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}' | tr -s ' ' ',' | sed 's/,$//')
+fi
 
 # --- Secrets ---
 # The module secret must survive a re-run: the agents authenticate with it.
 mkdir -p "$CONFIG"
 chmod 700 "$CONFIG"
+if [ "$MODE" = existing-swarm ]; then
+	printf '%s %s\n' "$STACK" "$NODE_ID" >"$CONFIG/existing-swarm"
+fi
 if [ ! -f "$CONFIG/secret" ]; then
 	head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' >"$CONFIG/secret"
 	chmod 600 "$CONFIG/secret"
@@ -195,9 +249,9 @@ fi
 # that running this script again does not open what has appeared since.
 FW_SSH=
 FW_KEEP=
-FW_NOTE=
+FW_NOTE=${FW_NOTE:-}
 if [ "$FIREWALL" = off ]; then
-	FW_NOTE="FIREWALL=off: the host's firewall is left as it was"
+	FW_NOTE=${FW_NOTE:-"FIREWALL=off: the host's firewall is left as it was"}
 elif ! command -v ss >/dev/null 2>&1; then
 	FIREWALL=off
 	FW_NOTE="no ss on this host, so the firewall was not set up (FIREWALL=off)"
@@ -276,6 +330,11 @@ else
     name: host"
 fi
 
+PANEL_PORTS=
+PANEL_PLACEMENT='[node.role == manager]'
+PUBLICATION=
+ACME_VOLUME=
+if [ "$MODE" = standalone ]; then
 cat >"$CONFIG/stack.yml" <<COMPOSE
 services:
   traefik:
@@ -299,7 +358,30 @@ $ACME_ARGS
     deploy:
       placement:
         constraints: [node.role == manager]
+COMPOSE
+PUBLICATION="      labels:
+        - traefik.enable=true
+        - traefik.http.routers.panel.rule=Host(\`$DOMAIN\`)
+        - traefik.http.routers.panel.entrypoints=$ENTRYPOINT
+$TLS_LABELS
+        - traefik.http.services.panel.loadbalancer.server.port=8080"
+NETWORKS="networks:
+  $NET:
+    external: true
+$FW_NETWORK"
+ACME_VOLUME="  acme:"
+else
+	printf 'services:\n' >"$CONFIG/stack.yml"
+	PANEL_PORTS="    ports:
+      - {target: 8080, published: $PORT, mode: host}"
+	PANEL_PLACEMENT="[node.id == $NODE_ID]"
+	PUBLICATION="      labels:
+        - traefik.enable=false
+        - modularnost.install.mode=$MODE"
+	NETWORKS=
+fi
 
+cat >>"$CONFIG/stack.yml" <<COMPOSE
   panel:
     image: $IMAGE
     environment:
@@ -316,16 +398,12 @@ $FW_PANEL_ENV
       # So that an update from the panel can keep this file in step.
       - $CONFIG:/config
     networks: [$NET]
+$PANEL_PORTS
     deploy:
       replicas: 1
       placement:
-        constraints: [node.role == manager]
-      labels:
-        - traefik.enable=true
-        - traefik.http.routers.panel.rule=Host(\`$DOMAIN\`)
-        - traefik.http.routers.panel.entrypoints=$ENTRYPOINT
-$TLS_LABELS
-        - traefik.http.services.panel.loadbalancer.server.port=8080
+        constraints: $PANEL_PLACEMENT
+$PUBLICATION
 
   agent:
     image: $IMAGE
@@ -340,14 +418,11 @@ $TLS_LABELS
       mode: global
 $FW_SERVICE
 
-networks:
-  $NET:
-    external: true
-$FW_NETWORK
+$NETWORKS
 
 volumes:
   panel-data:
-  acme:
+$ACME_VOLUME
 COMPOSE
 chmod 600 "$CONFIG/stack.yml"
 
@@ -360,10 +435,23 @@ run docker stack deploy --detach=true -c "$CONFIG/stack.yml" "$STACK"
 # have been issued before the answer comes — which is what "ready" means here.
 # wait_for_panel polls for up to $1 tries, two seconds apart.
 wait_for_panel() {
+	tries=$1
 	i=0
-	while [ "$i" -lt "$1" ]; do
-		if curl -fsS --max-time 5 -o /dev/null --resolve "$DOMAIN:$PORT:127.0.0.1" \
-			"$SCHEME://$DOMAIN/healthz" >>"$LOG" 2>&1; then
+	while [ "$i" -lt "$tries" ]; do
+		if [ "$MODE" = existing-swarm ]; then
+			update_state=$(docker service inspect "${STACK}_panel" --format '{{with .UpdateStatus}}{{.State}}{{end}}' 2>>"$LOG") || update_state=unknown
+			if { [ -n "$update_state" ] && [ "$update_state" != completed ]; } ||
+				[ "$(docker service ls --filter "name=${STACK}_panel" --format '{{.Name}} {{.Replicas}}' 2>>"$LOG" |
+				awk -v name="${STACK}_panel" '$1 == name {print $2}')" != 1/1 ]; then
+				i=$((i + 1))
+				sleep 2
+				continue
+			fi
+			set -- "http://127.0.0.1:$PORT/healthz"
+		else
+			set -- --resolve "$DOMAIN:$PORT:127.0.0.1" "$SCHEME://$DOMAIN/healthz"
+		fi
+		if curl -fsS --max-time 5 -o /dev/null "$@" >>"$LOG" 2>&1; then
 			return 0
 		fi
 		i=$((i + 1))
@@ -420,7 +508,11 @@ fi
 # The stack is deployed and the password is already in its compose file, so a
 # timeout still shows it: the user would otherwise have a panel they cannot sign in to.
 summary() {
-	printf '  Address   %s%s://%s%s\n' "$BLUE" "$SCHEME" "$DOMAIN" "$OFF"
+	if [ "$MODE" = existing-swarm ]; then
+		printf '  Address   %shttp://%s:%s%s\n' "$BLUE" "$ADDRESS" "$PORT" "$OFF"
+	else
+		printf '  Address   %s%s://%s%s\n' "$BLUE" "$SCHEME" "$DOMAIN" "$OFF"
+	fi
 	if [ "$FIREWALL" = off ]; then
 		echo "  Firewall  ${FW_NOTE:-off}"
 	elif [ "$FW_STATE" = pending ]; then
@@ -449,10 +541,19 @@ summary() {
 	fi
 	echo
 	echo "  Logs      docker service logs ${STACK}_panel"
-	echo "  Remove    curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/uninstall.sh | sh"
+	if [ "$MODE" = existing-swarm ]; then
+		echo "  Remove    docker stack rm $STACK"
+	else
+		echo "  Remove    curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/uninstall.sh | sh"
+	fi
 }
 
 if [ "$READY" != yes ]; then
+	if [ "$MODE" = existing-swarm ]; then
+		docker service ps --no-trunc "${STACK}_panel" >&2 || true
+		summary >&2
+		die "the panel did not answer; see $LOG"
+	fi
 	echo >&2
 	echo "The panel did not answer. The last lines of Traefik's log:" >&2
 	docker service logs --tail 10 "${STACK}_traefik" 2>&1 | sed 's/^/    /' >&2 || true
