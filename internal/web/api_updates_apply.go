@@ -10,6 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"modularnost/internal/docker"
 	"modularnost/internal/store"
 )
 
@@ -56,11 +57,25 @@ func (s *Server) registerUpdateApply(api huma.API) {
 			}
 		}()
 
+		rollout, err := s.Docker.ServiceRollout(ctx, self.Service)
+		if err != nil {
+			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
+		}
+		if rollout.Active() {
+			return nil, problem(http.StatusConflict, "update_in_progress", "the Swarm service is already updating")
+		}
 		backup, err := s.backupDatabase(tag)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "backup_failed", err)
 		}
 		image := strings.TrimPrefix(tag, "v")
+		attempt := store.PanelUpdate{
+			Version: tag, Service: self.Service, Image: docker.ImageRepo(rollout.Image) + ":" + image,
+			OriginalImage: rollout.Image, Backup: backup, RequestedAt: time.Now(), PreviousStart: rollout.StartedAt,
+		}
+		if err := s.DB.SavePanelUpdate(ctx, attempt); err != nil {
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
+		}
 		me, _ := ctx.Value(ctxKey{}).(store.User)
 
 		// Agents first, and synchronously: a failure here leaves the panel alone.
@@ -70,6 +85,7 @@ func (s *Server) registerUpdateApply(api huma.API) {
 			finish(d.OldDigest, d.NewDigest, err)
 			logWarnings(d)
 			if err != nil {
+				s.failPanelUpdate(attempt)
 				return nil, backendProblem(http.StatusBadGateway, "docker_error", fmt.Errorf("agent service: %w", err))
 			}
 		}
@@ -83,11 +99,19 @@ func (s *Server) registerUpdateApply(api huma.API) {
 			finish(d.OldDigest, d.NewDigest, err)
 			logWarnings(d)
 			if err != nil {
+				s.failPanelUpdate(attempt)
 				log.Printf("update to %s: %v", tag, err)
 			}
 		}()
 		return &updateStartedOutput{Body: apiUpdateStarted{Version: tag, Image: image, Backup: backup}}, nil
 	})
+}
+
+func (s *Server) failPanelUpdate(attempt store.PanelUpdate) {
+	attempt.Failed = true
+	if err := s.DB.SavePanelUpdate(context.Background(), attempt); err != nil {
+		log.Printf("record update result: %v", err)
+	}
 }
 
 // backupDatabase copies the database next to itself before a new version can

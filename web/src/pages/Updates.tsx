@@ -1,29 +1,38 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { call, api, retryableQueryError } from "../api/client";
 import { RefreshWarning } from "../components/RefreshWarning";
 import { formatTime } from "../format";
-import { installCommand, useUpdates, waitForVersion } from "../updates";
+import { installCommand, updateInProgress, useUpdates } from "../updates";
 import { Button } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 
-type Progress = "idle" | "waiting" | "late";
+const rolloutMessages = {
+  requested: "Update requested. Waiting for Swarm.",
+  updating: "Swarm is replacing the panel task.",
+  completed: "Update completed. The new version is running.",
+  failed: "The update could not be submitted. Check the panel logs.",
+  paused: "Swarm paused the update. Check the panel service tasks.",
+  rolling_back: "Swarm is rolling back the update.",
+  rollback_paused: "Swarm paused the rollback. Check the panel service tasks and the database backup.",
+  rolled_back: "Swarm rolled back the service. Check the database before retrying.",
+  unknown: "The update result could not be confirmed. Check the panel service tasks.",
+};
 
 export function Updates() {
   const queryClient = useQueryClient();
-  const updates = useUpdates(true);
-  const [progress, setProgress] = useState<Progress>("idle");
+  const updates = useUpdates(true, true);
+  const initialVersion = useRef<string | undefined>(undefined);
+  const current = updates.data?.current;
+  useEffect(() => {
+    if (current === undefined) return;
+    if (initialVersion.current !== undefined && initialVersion.current !== current) window.location.reload();
+    initialVersion.current = current;
+  }, [current]);
   const apply = useMutation({
     mutationFn: (version: string) => call(api.applyUpdate({ version })),
-    onSuccess: async (started) => {
-      setProgress("waiting");
-      if (await waitForVersion(started.version)) {
-        window.location.reload();
-      } else {
-        setProgress("late");
-      }
-    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["updates"] }),
   });
   const { confirm } = useDialogs();
   const update = async (tag: string) => {
@@ -45,6 +54,7 @@ export function Updates() {
   }
   const u = updates.data;
   const newest = u.releases[0];
+  const last = u.last_update;
 
   return (
     <>
@@ -66,31 +76,27 @@ export function Updates() {
         <p className="muted">This is not a release build, so there is nothing to update to from here.</p>
       )}
       {u.enabled && u.release_build && !newest && !u.error && <p>You are on the latest release.</p>}
+      <div role="status">
+        {last && <p><strong>{last.version}</strong> · {rolloutMessages[last.state]}</p>}
+      </div>
+      {last?.backup && (
+        <p className="muted">
+          Database backup on the panel volume: <span className="mono">{last.backup}</span>
+        </p>
+      )}
+      {apply.isError && <p className="error">{apply.error.message}</p>}
 
       {newest && (
         <>
           <p>
-            <Button onClick={() => update(newest.tag)} disabled={apply.isPending || progress !== "idle"}>
+            <Button onClick={() => update(newest.tag)} disabled={apply.isPending || updateInProgress(last?.state)}>
               Update to {newest.tag}
             </Button>
           </p>
-          {apply.isError && <p className="error">{apply.error.message}</p>}
-          {apply.isSuccess && (
-            <p className="muted">
-              A copy of the database is at <span className="mono">{apply.data.backup}</span> on the panel's volume.
-            </p>
-          )}
           {!u.stack_file && (
             <p className="muted">
               The installer's stack file is not mounted into the panel, so it will still name the old image after the
               update: run the installer once to add the mount.
-            </p>
-          )}
-          {progress === "waiting" && <p>Updating… this page reloads when {newest.tag} answers.</p>}
-          {progress === "late" && (
-            <p className="error">
-              {newest.tag} did not answer within three minutes. Swarm rolls a failing update back on its own; look at{" "}
-              <span className="mono">docker service ps --no-trunc</span> for the panel service.
             </p>
           )}
           <p className="muted">Or on the manager:</p>
