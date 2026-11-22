@@ -14,7 +14,8 @@ when you need extra features such as image builds or metrics history.
 ### New server
 
 One command on a fresh Ubuntu/Debian host with a domain pointed at it. It
-installs Docker, initialises a one-node swarm, and brings up Traefik with a
+installs Docker from Docker's signed APT repository, initialises a one-node
+swarm, and brings up Traefik with a
 Let's Encrypt certificate and the panel behind it:
 
 ```sh
