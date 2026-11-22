@@ -22,7 +22,8 @@ module contract changes.
 
 | Module | Repository | Image | Requires | Permissions | Status |
 | --- | --- | --- | --- | --- | --- |
-| metrics v0.2.0 | [modularnost/metrics_module](https://github.com/modularnost/metrics_module) | `ghcr.io/modularnost/metrics-module:0.2.0` | panel >= v0.3.0 | `stats:read` | verified |
+| Metrics | [modularnost/metrics_module](https://github.com/modularnost/metrics_module) | `ghcr.io/modularnost/metrics-module:edge` (rolling) | panel with contract 3 | `stats:read` | community |
+| Builder | [modularnost/builder_module](https://github.com/modularnost/builder_module) | Build from source | panel with contract 3, `service:create`, and the `code` block | `service:read`, `service:create` | community |
 
 ## Adding your module
 
@@ -38,9 +39,8 @@ Keep the description to one line. This is an index, not a showcase.
 
 ## `community` vs `verified`
 
-Every new entry is **community**: listed, not endorsed. Nobody has read the
-code, and installing it means giving that module the permissions it asks for
-plus a UI reachable by any `operator`.
+Every new entry starts as **community**. The manifest sets its permissions
+and the minimum role for each UI contribution.
 
 **verified** is for a module maintained by Modularnost or whose source has been
 reviewed by its maintainers. Use a release tag; use an image digest for

@@ -1,17 +1,17 @@
 # modularnost
 
-A web panel for Docker Swarm: one binary with the UI embedded, SQLite.
+Modularnost is a web panel for deploying and operating stacks and services in
+Docker Swarm. The core deploys Compose files and ready-made images, shows
+service status and logs, and handles redeploys. Install [modules](#modules)
+when you need extra features such as image builds or metrics history.
 
-For people who already build images in CI and want a UI on top of a running
-cluster — check status, redeploy a service, edit Traefik labels, read logs.
+## Installation
 
-**Not** a PaaS: it doesn't build images, doesn't deploy databases in one click,
-and doesn't support plain Docker without Swarm. Metrics and graphs belong in
-Grafana or in a module, not in the core.
+- [New server](#new-server): install Docker, Swarm and Traefik with the panel.
+- [Existing Swarm](#existing-swarm): deploy the panel as a separate stack and
+  use your existing reverse proxy.
 
-Status: works, but the API and DB schema may still change.
-
-## Installing on a server
+### New server
 
 One command on a fresh Ubuntu/Debian host with a domain pointed at it. It
 installs Docker, initialises a one-node swarm, and brings up Traefik with a
@@ -35,11 +35,8 @@ curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/inst
   DOMAIN=panel.example.com EMAIL=you@example.com sh
 ```
 
-Re-running it updates the panel and leaves your users alone: an existing swarm,
-network or stack is reused. The generated compose file and the module secret
-live in `/etc/modularnost`. An installation made before the panel could update
-itself needs this one re-run: it adds the mount the panel uses to keep that file
-in step with an update.
+Re-running it reuses the Swarm, network and stack. The generated Compose file
+and keys live in `/etc/modularnost`.
 
 | Variable | Default | |
 | --- | --- | --- |
@@ -101,28 +98,34 @@ sudo sh scripts/uninstall.sh            # keeps the database and certificates
 sudo sh scripts/uninstall.sh --purge    # deletes them too
 ```
 
-## Running it
+### Existing Swarm
 
-Requires Go 1.26+ and Docker with Swarm active (`docker swarm init` — even on a
-single node). Tested on Docker 28.3.
-
-```sh
-go run .
-```
-
-The first admin's password comes from `PANEL_ADMIN_PASSWORD`; without it one is
-generated and printed to the log once.
-
-On Swarm — [stack.yml](stack.yml) already pins the panel to a manager node and
-mounts a volume for the database:
+Deploy [stack.yml](stack.yml) as a new stack from a manager or through
+Portainer. Set `PANEL_ADMIN_PASSWORD` and a shared `PANEL_MODULE_SECRET`.
+From a manager, run:
 
 ```sh
-PANEL_ADMIN_PASSWORD=<password> PANEL_MODULE_SECRET=<secret> \
-  docker stack deploy -c stack.yml panel
+export PANEL_ADMIN_PASSWORD PANEL_MODULE_SECRET
+docker stack deploy -c stack.yml panel
 ```
 
-That pulls `ghcr.io/modularnost/panel:latest` — the last release, built for
-amd64 and arm64.
+If you use an existing Traefik, remove the panel's `8080:8080` port mapping,
+attach the panel to Traefik's overlay network and add a router for the panel's
+hostname targeting container port `8080`. Keep the panel and agents on their
+shared stack network. Set `PANEL_AGENT_SERVICE` to `<stack-name>_agent` if
+the stack is named anything other than `panel`.
+
+On a cluster with multiple managers, pin the panel to the manager that holds
+its SQLite volume. To update a stack managed outside the panel, change the
+image tag for the panel and agents in that stack's Compose and redeploy it.
+Back up the database volume first. The panel's **Updates** page changes the
+running services and can rewrite the installer-managed Compose when
+`PANEL_STACK_FILE` is mounted. It cannot rewrite the Compose stored in
+Portainer.
+
+### Image tags and settings
+
+The default image is `ghcr.io/modularnost/panel:latest` for amd64 and arm64.
 
 | Tag | |
 | --- | --- |
@@ -143,11 +146,8 @@ On a multi-node cluster the image must come from a registry every node can
 reach — a locally built one exists only on the machine that built it, and the
 agent will not start anywhere else.
 
-That brings up the panel on a manager plus one metrics agent per node.
-
-The panel needs `/var/run/docker.sock` (read-only) on a manager node. Never
-expose that socket directly — the panel is the authenticated layer in front of
-it.
+The panel needs `/var/run/docker.sock` on a manager. A read-only mount
+still permits Docker API calls. Keep the socket private.
 
 | Variable | Default | |
 | --- | --- | --- |
@@ -197,22 +197,22 @@ at the registry when removing access.
   Traefik labels and webhooks.
 - **Update** — force-update that re-pulls the image from the registry, so a CI
   push is enough to roll a service forward.
-- **Redeploy stack** — the same across every service in a stack.
+- **Stacks** — deploy, edit and redeploy saved Compose files. Browse services
+  in existing stacks and see the last deployment recorded by the panel and
+  the latest Swarm service update.
 - **Logs** — SSE stream, filter by replica, pause. Lines from different
   replicas are tagged with their slot: `[1]`, `[2]`.
 - **Traefik** — a form instead of hand-editing labels. The panel only writes
   labels; Traefik picks them up on its own.
 - **Webhooks** — `POST /hook/<secret>` from CI.
-- **Create** — deploy a stack from a compose file (stored, so it can be edited
-  and redeployed).
 - **Deploy history** — the one thing Swarm itself doesn't keep.
 - **Resources** — current CPU and memory of every replica, cluster-wide and per
   service. Current numbers only: history, graphs and alerts belong in Grafana or
   in a module.
 - **Roles and tokens** — see below.
 
-SQLite holds only webhooks, deploy history, users, tokens and compose files.
-Everything else lives in Swarm and is queried directly.
+SQLite holds panel-owned data such as Compose files, deploy history, users,
+webhooks, firewall settings and encrypted registry credentials.
 
 ## Metrics across nodes
 
@@ -230,10 +230,8 @@ that reports its node and nothing else. The panel finds every replica through
 Leave `PANEL_AGENT_SERVICE` unset on a single node and the panel reads its own
 socket, exactly as before — no agent to deploy.
 
-The agent is the panel's own code, not a module: `docker.sock` never leaves our
-binary (see ADR 3 in [docs/architecture.md](docs/architecture.md)). It is
-read-only, listens only
-inside the overlay network, and requires the shared-secret token.
+The built-in agent reads local Docker stats. Its endpoint stays on the
+overlay network and requires a token derived from the shared secret.
 
 ## Roles
 
@@ -241,8 +239,9 @@ inside the overlay network, and requires the shared-secret token.
 | --- | --- | --- | --- |
 | services, logs, history | ✔ | ✔ | ✔ |
 | update a service, redeploy a stack | | ✔ | ✔ |
-| module UIs | | ✔ | ✔ |
 | Traefik, webhooks, users, tokens | | | ✔ |
+
+Module access depends on each contribution's minimum role.
 
 CI tokens are created on the Users page and sent as
 `Authorization: Bearer <token>`. A token's role can only be weaker than its
@@ -279,17 +278,8 @@ A module answers `GET /manifest`:
  "permissions":["service:read","service:update"]}
 ```
 
-Modules get no access to `docker.sock` — they ask the core instead:
-
-| | permission |
-| --- | --- |
-| `GET /internal/services` | `service:read` |
-| `GET /internal/stats` | `stats:read` |
-| `POST /internal/services/{name}/update` | `service:update` |
-
-The core sends `X-Panel-Module` and `X-Panel-Token` (an HMAC of the module
-name) with every proxied request; the module presents those headers back. The
-permission must be declared in the manifest, otherwise the call gets a 403.
+Modules call the core with the permissions declared in their manifests.
+They have no direct access to the Docker socket.
 
 Writing one: [docs/modules.md](docs/modules.md). What exists:
 [docs/catalog.md](docs/catalog.md). The bundled examples double as skeletons to
@@ -317,10 +307,10 @@ an uptime check or a load balancer should ask.
 
 Layout: [internal/docker](internal/docker) — the only place that touches the
 Docker API; [internal/store](internal/store) — SQLite and versioned migrations;
-[internal/web](internal/web) — handlers and HTML templates;
+[internal/web](internal/web) — HTTP handlers and the embedded UI entry point;
 [internal/modules](internal/modules) — module discovery.
 
-Project boundaries, the decisions behind them and the order of work live in
+Project scope and design decisions live in
 [docs/architecture.md](docs/architecture.md); how to contribute is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
