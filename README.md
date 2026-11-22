@@ -164,6 +164,16 @@ stack's environment.
 | `edge` | the last commit on `main`; for trying a fix before it is released |
 | `sha-abc1234` | one exact commit |
 
+New images include an SPDX SBOM for each platform. To retrieve the inventory
+for a published image, pass its digest reference to Buildx:
+
+```sh
+docker buildx imagetools inspect 'ghcr.io/modularnost/panel@sha256:<digest>' \
+  --format '{{json (index .SBOM "linux/amd64").SPDX}}'
+```
+
+Use `linux/arm64` for the ARM image.
+
 To run your own build instead:
 
 ```sh
