@@ -9,7 +9,10 @@
   <a href="#modules">Modules</a>
 </p>
 
-![Stacks page with an expanded storefront stack showing its services, images, and running replicas](docs/screenshots/stacks.webp)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/stacks-dark.webp">
+  <img src="docs/screenshots/stacks.webp" alt="Stacks page with an expanded storefront stack showing its services, images, and running replicas">
+</picture>
 
 *Stacks with sample Swarm data.*
 
