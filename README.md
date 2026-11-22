@@ -189,8 +189,9 @@ wrong passwords the wait doubles, up to a minute, and the answer is `429` with
 `Retry-After`. Behind a proxy the panel sees the proxy's address for every
 client, so it reads the client from `X-Forwarded-For` only when the request
 comes from an address in `PANEL_TRUSTED_PROXIES`; the installer sets it to its
-own network. Unset, the header is ignored. Do not put a range there that
-clients can reach the panel from.
+own network. For HTTPS terminated by a proxy, configure the same setting so
+the panel uses `X-Forwarded-Proto: https` to set secure session cookies.
+Do not put a range there that clients can reach the panel from.
 
 ### Webhooks
 

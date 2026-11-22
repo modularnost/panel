@@ -162,7 +162,9 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 		if err := s.revokeSession(r); err != nil {
 			return nil, problem(http.StatusInternalServerError, "internal", err.Error())
 		}
-		return &logoutOutput{SetCookie: *clearedCookie()}, nil
+		c := s.sessionCookieAttrs(r)
+		c.MaxAge = -1
+		return &logoutOutput{SetCookie: *c}, nil
 	})
 
 	huma.Register(api, huma.Operation{

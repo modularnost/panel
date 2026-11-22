@@ -56,17 +56,21 @@ func (s *Server) sessionCookie(r *http.Request, userID int64) (*http.Cookie, err
 	if err != nil {
 		return nil, err
 	}
+	c := s.sessionCookieAttrs(r)
+	c.Value = token
+	c.Expires = time.Now().Add(sessionTTL)
+	return c, nil
+}
+
+func (s *Server) sessionCookieAttrs(r *http.Request) *http.Cookie {
 	return &http.Cookie{
 		Name:     sessionCookie,
-		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		// TLS ends at the proxy, so the panel itself usually sees plain HTTP.
-		Secure: r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
-		// Lax blocks cross-site POSTs, so no separate CSRF tokens are needed.
+		Secure: r.TLS != nil || (isTrusted(peerAddr(r.RemoteAddr), s.TrustedProxies) &&
+			r.Header.Get("X-Forwarded-Proto") == "https"),
 		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(sessionTTL),
-	}, nil
+	}
 }
 
 func (s *Server) revokeSession(r *http.Request) error {
@@ -74,10 +78,6 @@ func (s *Server) revokeSession(r *http.Request) error {
 		return s.DB.DeleteTokenByValue(c.Value)
 	}
 	return nil
-}
-
-func clearedCookie() *http.Cookie {
-	return &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1}
 }
 
 // changePassword also ends the user's sessions: a password that was stolen
