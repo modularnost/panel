@@ -150,6 +150,12 @@ Portainer.
 path of the pre-update database copy. If Swarm rolls the service back,
 check whether the database needs restoring before retrying.
 
+After a successful self-update, the panel keeps the current rollback copy
+and the two most recent older copies from confirmed updates. It prunes older
+copies it created in the `<database>.update-backups` directory. Backups made
+by earlier panel versions next to the database can be reviewed and removed
+manually.
+
 ### Image tags and settings
 
 The installer defaults to `ghcr.io/modularnost/panel:latest`. The manual

@@ -21,10 +21,10 @@ func (c *Client) ServiceRollout(ctx context.Context, name string) (Rollout, erro
 	}
 	var out Rollout
 	if spec := svc.Spec.TaskTemplate.ContainerSpec; spec != nil {
-		out.Image, _ = splitImage(spec.Image)
+		out.Image = spec.Image
 	}
 	if old := svc.PreviousSpec; old != nil && old.TaskTemplate.ContainerSpec != nil {
-		out.PreviousImage, _ = splitImage(old.TaskTemplate.ContainerSpec.Image)
+		out.PreviousImage = old.TaskTemplate.ContainerSpec.Image
 	}
 	if status := svc.UpdateStatus; status != nil {
 		out.State = status.State
