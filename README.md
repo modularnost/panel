@@ -1,9 +1,16 @@
-# modularnost
+<p align="center">
+  <img src="docs/logo.png" alt="" width="64" height="64">
+</p>
+<h1 align="center">modularnost</h1>
+<p align="center">A web panel for deploying and operating Docker Swarm stacks.</p>
+<p align="center">
+  <a href="#installation">Install</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#modules">Modules</a>
+</p>
 
-Modularnost is a web panel for deploying and operating stacks and services in
-Docker Swarm. The core deploys Compose files and ready-made images, shows
-service status and logs, and handles redeploys. Install [modules](#modules)
-when you need extra features such as image builds or metrics history.
+[![Expanded storefront stack with its services, images, and running replicas](docs/screenshots/stacks-dark.webp)](docs/screenshots/stacks-dark.webp#gh-dark-mode-only)
+[![Expanded storefront stack with its services, images, and running replicas](docs/screenshots/stacks.webp)](docs/screenshots/stacks.webp#gh-light-mode-only)
 
 ## Installation
 
@@ -276,6 +283,12 @@ at the registry when removing access.
 
 SQLite holds panel-owned data such as Compose files, deploy history, users,
 webhooks, firewall settings and encrypted registry credentials.
+
+### Screenshots
+
+![Service overview showing the image, redeploy action, and CPU, memory, and network usage for each replica](docs/screenshots/service-overview.webp)
+
+![Live logs for replica 2 of the storefront API, with a history selector and pause control](docs/screenshots/service-logs.webp)
 
 ## Metrics across nodes
 
