@@ -3,7 +3,7 @@ version: "3.8"
 services:
   panel:
     # Published by CI; override with PANEL_IMAGE to run a locally built one.
-    image: ${PANEL_IMAGE:-ghcr.io/modularnost/panel:latest}
+    image: ${PANEL_IMAGE:-ghcr.io/modularnost/panel:0.7.0@sha256:ca93c6f4a0a3b5cb583fe8567d0a73f9c859e5d1d9633840885f188e225c6974}
     environment:
       PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?set PANEL_ADMIN_PASSWORD}
       # Shared with the agents below; must be a fixed value, not the per-start default.
@@ -27,7 +27,7 @@ services:
   # socket, never reachable from outside the overlay network. ":ro" only stops
   # writes to the socket file, not API calls: treat the agent as root-equivalent.
   agent:
-    image: ${PANEL_IMAGE:-ghcr.io/modularnost/panel:latest}
+    image: ${PANEL_IMAGE:-ghcr.io/modularnost/panel:0.7.0@sha256:ca93c6f4a0a3b5cb583fe8567d0a73f9c859e5d1d9633840885f188e225c6974}
     environment:
       PANEL_MODE: agent
       PANEL_MODULE_SECRET: ${PANEL_MODULE_SECRET:?set PANEL_MODULE_SECRET}
