@@ -315,7 +315,7 @@ func TestAPIUsersAndTokensNeverExposeSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secret, err := db.CreateToken(root.ID, "ci", store.RoleOperator, 0)
+	secret, _, err := db.CreateToken(root.ID, "ci", store.RoleOperator, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,7 +609,7 @@ func TestPasswordChangeEndsSessionsButKeepsTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ci, err := db.CreateToken(root.ID, "ci", "", 0)
+	ci, _, err := db.CreateToken(root.ID, "ci", "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -677,6 +677,48 @@ func TestAPITokenValueIsShownOnce(t *testing.T) {
 	}
 	if status, _ := send(t, c, "POST", base+"/api/v1/tokens", j, `{"user_id":9999,"name":"x"}`); status != 422 {
 		t.Errorf("a token for nobody: %d", status)
+	}
+}
+
+func TestAPICreatesSameNamedTokensWithTheirOwnIDs(t *testing.T) {
+	c, base, db := apiServer(t)
+	const j = "application/json"
+	root, err := db.CreateUser("root", "root-pass-1", store.RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, c, "POST", base+"/api/v1/auth/login", j, `{"username":"root","password":"root-pass-1"}`); status != 200 {
+		t.Fatalf("sign in: %d", status)
+	}
+
+	body := `{"user_id":` + strconv.FormatInt(root.ID, 10) + `,"name":"deploy","role":"operator","days":30}`
+	var created [8]apiTokenCreated
+	t.Run("create concurrently", func(t *testing.T) {
+		for i := range created {
+			t.Run(strconv.Itoa(i), func(t *testing.T) {
+				t.Parallel()
+				status, res := send(t, c, "POST", base+"/api/v1/tokens", j, body)
+				id, _ := res["id"].(float64)
+				value, _ := res["token"].(string)
+				if status != 201 || id == 0 || value == "" {
+					t.Fatalf("create token: status %d, id %v", status, id)
+				}
+				created[i] = apiTokenCreated{ID: int64(id), Token: value}
+			})
+		}
+	})
+	if t.Failed() {
+		return
+	}
+
+	for _, token := range created {
+		url := base + "/api/v1/tokens/" + strconv.FormatInt(token.ID, 10)
+		if status, _ := send(t, c, "DELETE", url, j, ""); status != 204 {
+			t.Fatalf("revoke token %d: %d", token.ID, status)
+		}
+		if _, err := db.UserByToken(token.Token); !errors.Is(err, store.ErrNoUser) {
+			t.Fatalf("revoking ID %d did not revoke its token: %v", token.ID, err)
+		}
 	}
 }
 

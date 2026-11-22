@@ -28,11 +28,11 @@ func TestRegistryCredentialsAreWriteOnlyAndScoped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	adminToken, err := db.CreateToken(admin.ID, "test-admin", "", 0)
+	adminToken, _, err := db.CreateToken(admin.ID, "test-admin", "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	viewerToken, err := db.CreateToken(admin.ID, "test-viewer", store.RoleViewer, 0)
+	viewerToken, _, err := db.CreateToken(admin.ID, "test-viewer", store.RoleViewer, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

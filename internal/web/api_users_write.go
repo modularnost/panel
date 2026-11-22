@@ -132,21 +132,14 @@ func (s *Server) registerUserActions(api huma.API) {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "no such user")
 		}
 		ttl := time.Duration(b.Days) * 24 * time.Hour
-		token, err := s.DB.CreateToken(b.UserID, b.Name, b.Role, ttl)
+		token, id, err := s.DB.CreateToken(b.UserID, b.Name, b.Role, ttl)
 		if err != nil {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
 		}
-		out := apiTokenCreated{Token: token, UserID: b.UserID, Name: b.Name, Role: b.Role}
+		out := apiTokenCreated{Token: token, ID: id, UserID: b.UserID, Name: b.Name, Role: b.Role}
 		if ttl > 0 {
 			exp := time.Now().Add(ttl)
 			out.ExpiresAt = &exp
-		}
-		if tokens, err := s.DB.Tokens(); err == nil {
-			for _, t := range tokens {
-				if t.UserID == b.UserID && t.Name == b.Name {
-					out.ID = t.ID
-				}
-			}
 		}
 		return &tokenCreatedOutput{Body: out}, nil
 	})

@@ -172,20 +172,20 @@ func TestRolesAndTokens(t *testing.T) {
 	}
 
 	// A token with its own role cannot outrank its user.
-	weak, err := db.CreateToken(op.ID, "ci", RoleViewer, 0)
+	weak, _, err := db.CreateToken(op.ID, "ci", RoleViewer, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if u, _ := db.UserByToken(weak); u.Role != RoleViewer {
 		t.Fatalf("token role was not applied: %q", u.Role)
 	}
-	strong, _ := db.CreateToken(op.ID, "ci2", RoleAdmin, 0)
+	strong, _, _ := db.CreateToken(op.ID, "ci2", RoleAdmin, 0)
 	if u, _ := db.UserByToken(strong); u.Role != RoleOperator {
 		t.Fatalf("token escalated rights to %q", u.Role)
 	}
 
 	// An expired token gets nobody in.
-	dead, _ := db.CreateToken(op.ID, "old", "", -time.Hour)
+	dead, _, _ := db.CreateToken(op.ID, "old", "", -time.Hour)
 	if _, err := db.UserByToken(dead); err == nil {
 		t.Fatal("expired token accepted")
 	}
@@ -212,8 +212,8 @@ func TestRevokeSessionsKeepsNamedTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, _ := db.CreateToken(u.ID, "", "", time.Hour)
-	named, _ := db.CreateToken(u.ID, "ci", "", 0)
+	session, _, _ := db.CreateToken(u.ID, "", "", time.Hour)
+	named, _, _ := db.CreateToken(u.ID, "ci", "", 0)
 
 	if err := db.RevokeSessions(u.ID); err != nil {
 		t.Fatal(err)

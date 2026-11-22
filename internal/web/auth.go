@@ -52,7 +52,7 @@ func (s *Server) authorize(r *http.Request, need string) (store.User, int, strin
 }
 
 func (s *Server) sessionCookie(r *http.Request, userID int64) (*http.Cookie, error) {
-	token, err := s.DB.CreateToken(userID, "", "", sessionTTL)
+	token, _, err := s.DB.CreateToken(userID, "", "", sessionTTL)
 	if err != nil {
 		return nil, err
 	}
