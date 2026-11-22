@@ -151,7 +151,11 @@ check whether the database needs restoring before retrying.
 
 ### Image tags and settings
 
-The default image is `ghcr.io/modularnost/panel:latest` for amd64 and arm64.
+The installer defaults to `ghcr.io/modularnost/panel:latest`. The manual
+`stack.yml` pins both services to one release and its multi-platform digest.
+To update a manual stack, set `PANEL_IMAGE` to the chosen release image and
+redeploy. Keep that value for future redeploys. In Portainer, set it in the
+stack's environment.
 
 | Tag | |
 | --- | --- |
