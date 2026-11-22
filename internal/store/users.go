@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -221,7 +223,7 @@ func (d *DB) CreateToken(userID int64, name, role string, ttl time.Duration) (st
 	token := NewToken()
 	var expires any // nil = never expires
 	if ttl != 0 {
-		expires = time.Now().Add(ttl)
+		expires = time.Now().Add(ttl).UTC()
 	}
 	result, err := d.Exec(`INSERT INTO api_tokens (user_id, name, token_hash, role, expires_at) VALUES (?,?,?,?,?)`,
 		userID, name, hashToken(token), role, expires)
@@ -295,8 +297,68 @@ func (d *DB) Tokens() ([]Token, error) {
 	return out, rows.Err()
 }
 
-// PurgeExpiredTokens drops expired sessions; call it at startup.
-func (d *DB) PurgeExpiredTokens() error {
-	_, err := d.Exec(`DELETE FROM api_tokens WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP`)
-	return err
+func (d *DB) RunTokenCleanup(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := d.PurgeExpiredTokens(ctx); err != nil && ctx.Err() == nil {
+				log.Printf("purging expired tokens: %v", err)
+			}
+		}
+	}
+}
+
+func (d *DB) PurgeExpiredTokens(ctx context.Context) error {
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(ctx, `SELECT id, expires_at FROM api_tokens WHERE expires_at IS NOT NULL`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	now := time.Now()
+	var expired []int64
+	for rows.Next() {
+		var id int64
+		var value any
+		if err := rows.Scan(&id, &value); err != nil {
+			return err
+		}
+		if expires := tokenExpiry(value); !expires.IsZero() && expires.Before(now) {
+			expired = append(expired, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range expired {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM api_tokens WHERE id=?`, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func tokenExpiry(value any) time.Time {
+	switch v := value.(type) {
+	case time.Time:
+		return v
+	case string:
+		// Legacy Go timestamps can contain a zone name SQLite's driver cannot parse.
+		parts := strings.Fields(v)
+		if len(parts) >= 3 {
+			expiry, _ := time.Parse("2006-01-02 15:04:05 -0700", strings.Join(parts[:3], " "))
+			return expiry
+		}
+	}
+	return time.Time{}
 }
