@@ -490,6 +490,16 @@
           "leader": {
             "type": "boolean"
           },
+          "memory_bytes": {
+            "description": "Total RAM reported by Swarm, in bytes",
+            "format": "int64",
+            "type": "integer"
+          },
+          "nano_cpus": {
+            "description": "Total CPU capacity reported by Swarm, in billionths of a CPU",
+            "format": "int64",
+            "type": "integer"
+          },
           "os": {
             "type": "string"
           },
