@@ -12,8 +12,6 @@
 [![Expanded storefront stack with its services, images, and running replicas](docs/screenshots/stacks-dark.webp)](docs/screenshots/stacks-dark.webp#gh-dark-mode-only)
 [![Expanded storefront stack with its services, images, and running replicas](docs/screenshots/stacks.webp)](docs/screenshots/stacks.webp#gh-light-mode-only)
 
-*Stacks with sample Swarm data.*
-
 ## Installation
 
 - [New server](#new-server): install Docker, Swarm and Traefik with the panel.
