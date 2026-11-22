@@ -213,20 +213,26 @@ func hashToken(token string) string {
 	return base64.RawStdEncoding.EncodeToString(sum[:])
 }
 
-// CreateToken returns the token itself — only its hash is stored, so there is
-// nothing to show a second time.
-func (d *DB) CreateToken(userID int64, name, role string, ttl time.Duration) (string, error) {
+// CreateToken returns the token value and its row ID. Only the hash is stored.
+func (d *DB) CreateToken(userID int64, name, role string, ttl time.Duration) (string, int64, error) {
 	if role != "" && !ValidRole(role) {
-		return "", fmt.Errorf("unknown role %q", role)
+		return "", 0, fmt.Errorf("unknown role %q", role)
 	}
 	token := NewToken()
 	var expires any // nil = never expires
 	if ttl != 0 {
 		expires = time.Now().Add(ttl)
 	}
-	_, err := d.Exec(`INSERT INTO api_tokens (user_id, name, token_hash, role, expires_at) VALUES (?,?,?,?,?)`,
+	result, err := d.Exec(`INSERT INTO api_tokens (user_id, name, token_hash, role, expires_at) VALUES (?,?,?,?,?)`,
 		userID, name, hashToken(token), role, expires)
-	return token, err
+	if err != nil {
+		return "", 0, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return "", 0, fmt.Errorf("read new token ID: %w", err)
+	}
+	return token, id, nil
 }
 
 // UserByToken returns the user carrying the token's effective role.
