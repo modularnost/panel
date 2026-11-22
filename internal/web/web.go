@@ -41,6 +41,7 @@ type Server struct {
 	fw       firewallStates
 	Pages    PageHub
 	Updates  *updates.Checker // nil: no release check
+	Shutdown context.Context  // cancellation closes event streams so other requests can drain
 	// Addr is the listen address; modules are told its port to reach the core.
 	Addr string
 
@@ -56,6 +57,18 @@ type Server struct {
 	// means none, and a client is whoever connected.
 	TrustedProxies []netip.Prefix
 	logins         loginLimiter
+}
+
+func (s *Server) streamContext(ctx context.Context) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	if s.Shutdown == nil {
+		return ctx, cancel
+	}
+	stop := context.AfterFunc(s.Shutdown, cancel)
+	return ctx, func() {
+		stop()
+		cancel()
+	}
 }
 
 func (s *Server) Routes() http.Handler {

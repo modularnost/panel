@@ -26,8 +26,7 @@ func Token(secret string) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// Serve runs the agent side: one endpoint, stats for this node only.
-func Serve(addr, secret, node string, dk *docker.Client) error {
+func Routes(secret, node string, dk *docker.Client) http.Handler {
 	want := Token(secret)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /stats", func(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +48,7 @@ func Serve(addr, secret, node string, dk *docker.Client) error {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
-	return http.ListenAndServe(addr, mux)
+	return mux
 }
 
 // Collector gathers stats from every agent, falling back to the local socket
