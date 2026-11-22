@@ -57,7 +57,7 @@ func (s *Server) registerUpdateRollback(api huma.API) {
 		if rollout.Active() {
 			return nil, problem(http.StatusConflict, "update_in_progress", "the Swarm service is already updating")
 		}
-		if rollout.Image == attempt.OriginalImage {
+		if matchesUpdateImage(rollout.Image, attempt.OriginalImage) {
 			return nil, problem(http.StatusUnprocessableEntity, "already_rolled_back",
 				"the service is already running the original image")
 		}

@@ -214,6 +214,7 @@ func main() {
 			log.Fatalf("registry key: %v", err)
 		}
 	}
+	go srv.RunUpdateBackupCleanup(ctx)
 	log.Printf("modularnost %s listening on %s", version, addr)
 	if err := listenHTTP(ctx, addr, srv.Routes()); err != nil {
 		log.Fatal(err)

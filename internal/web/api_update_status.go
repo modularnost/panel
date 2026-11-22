@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/moby/moby/api/types/swarm"
@@ -59,8 +60,8 @@ func rolloutState(update store.PanelUpdate, rollout docker.Rollout, running stri
 	switch rollout.State {
 	case swarm.UpdateStateRollbackStarted, swarm.UpdateStateRollbackPaused, swarm.UpdateStateRollbackCompleted:
 		// Swarm clears PreviousSpec once an automatic rollback completes.
-		restored := rollout.PreviousImage == "" && rollout.Image == update.OriginalImage
-		if rollout.Image != update.Image && rollout.PreviousImage != update.Image && !restored {
+		restored := rollout.PreviousImage == "" && matchesUpdateImage(rollout.Image, update.OriginalImage)
+		if !matchesUpdateImage(rollout.Image, update.Image) && !matchesUpdateImage(rollout.PreviousImage, update.Image) && !restored {
 			return "unknown"
 		}
 		switch rollout.State {
@@ -72,8 +73,8 @@ func rolloutState(update store.PanelUpdate, rollout docker.Rollout, running stri
 			return "rolled_back"
 		}
 	}
-	if rollout.Image != update.Image {
-		if rollout.Image == update.OriginalImage {
+	if !matchesUpdateImage(rollout.Image, update.Image) {
+		if matchesUpdateImage(rollout.Image, update.OriginalImage) {
 			switch rollout.State {
 			case swarm.UpdateStateUpdating:
 				return "rolling_back"
@@ -98,4 +99,14 @@ func rolloutState(update store.PanelUpdate, rollout docker.Rollout, running stri
 	default:
 		return "unknown"
 	}
+}
+
+func matchesUpdateImage(actual, recorded string) bool {
+	if recorded == "" {
+		return false
+	}
+	if !strings.Contains(recorded, "@") {
+		actual, _, _ = strings.Cut(actual, "@")
+	}
+	return actual == recorded
 }

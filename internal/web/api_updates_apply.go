@@ -102,7 +102,10 @@ func (s *Server) registerUpdateApply(api huma.API) {
 			}
 		}
 
-		backup, err := s.backupDatabase(tag)
+		if err := s.confirmPreviousUpdateBackup(ctx, self.Service, rollout); err != nil {
+			log.Printf("confirming update backup: %v", err)
+		}
+		backup, err := s.DB.CreateUpdateBackup(tag)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "backup_failed", err)
 		}
@@ -159,15 +162,4 @@ func (s *Server) failPanelUpdate(attempt store.PanelUpdate) {
 	if err := s.DB.SavePanelUpdate(context.Background(), attempt); err != nil {
 		log.Printf("record update result: %v", err)
 	}
-}
-
-// backupDatabase copies the database next to itself before a new version can
-// migrate it. An in-memory database has nothing to copy.
-func (s *Server) backupDatabase(tag string) (string, error) {
-	path, err := s.DB.Path()
-	if err != nil || path == "" {
-		return "", err
-	}
-	dest := path + ".before-" + tag + "-" + time.Now().UTC().Format("20060102T150405Z")
-	return dest, s.DB.Backup(dest)
 }
