@@ -117,6 +117,16 @@ func TestWebhookAndDeployRoundtrip(t *testing.T) {
 	if err != nil || w.SecretToken == "" {
 		t.Fatalf("create: %v, token=%q", err, w.SecretToken)
 	}
+	var stored string
+	if err := db.QueryRow("SELECT token_hash FROM webhooks WHERE id=?", w.ID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != hashToken(w.SecretToken) {
+		t.Fatal("webhook must store the hash of its token")
+	}
+	if _, err := db.WebhookByToken(stored); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("stored hash must not authenticate: %v", err)
+	}
 	got, err := db.WebhookByToken(w.SecretToken)
 	if err != nil || got.ServiceName != "app_web" {
 		t.Fatalf("by token: %v %+v", err, got)
@@ -284,8 +294,7 @@ func TestBackupIsAReadableCopy(t *testing.T) {
 	}
 }
 
-// A database from before the column was dropped keeps its webhooks.
-func TestDroppingImagePatternKeepsExistingWebhooks(t *testing.T) {
+func TestMigrationsKeepExistingWebhookURLs(t *testing.T) {
 	path := t.TempDir() + "/old.db"
 	old, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -315,8 +324,19 @@ func TestDroppingImagePatternKeepsExistingWebhooks(t *testing.T) {
 	}
 	defer db.Close()
 	hooks, err := db.Webhooks()
-	if err != nil || len(hooks) != 1 || hooks[0].SecretToken != "tok" || hooks[0].ServiceName != "app_web" {
+	if err != nil || len(hooks) != 1 || hooks[0].SecretToken != "" || hooks[0].ServiceName != "app_web" {
 		t.Fatalf("hooks=%+v err=%v", hooks, err)
+	}
+	hook, err := db.WebhookByToken("tok")
+	if err != nil || hook.ServiceName != "app_web" || hook.SecretToken != "" {
+		t.Fatalf("old URL does not resolve to the expected hook: %v", err)
+	}
+	var stored string
+	if err := db.QueryRow("SELECT token_hash FROM webhooks WHERE id=?", hook.ID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != hashToken("tok") {
+		t.Fatal("migration must hash the existing token")
 	}
 	if _, err := db.Exec(`SELECT image_pattern FROM webhooks`); err == nil {
 		t.Fatal("the column must be gone")

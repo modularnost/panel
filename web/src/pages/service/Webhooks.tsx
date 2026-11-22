@@ -6,6 +6,7 @@ import { WebhookTable } from "../../components/WebhookTable";
 import { useService } from "./Layout";
 import { Select } from "../../components/Select";
 import { Button } from "../../components/Button";
+import { CreatedWebhook } from "../../components/CreatedWebhook";
 
 export function ServiceWebhooks() {
   const s = useService();
@@ -55,6 +56,7 @@ export function ServiceWebhooks() {
         </Button>
       </div>
       {create.isError && <p className="error">{create.error.message}</p>}
+      {create.data && <CreatedWebhook path={create.data.path} onDone={create.reset} />}
     </>
   );
 }

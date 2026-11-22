@@ -5,6 +5,7 @@ import { RefreshWarning } from "../components/RefreshWarning";
 import { WebhookTable } from "../components/WebhookTable";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
+import { CreatedWebhook } from "../components/CreatedWebhook";
 
 export function Webhooks() {
   const queryClient = useQueryClient();
@@ -72,6 +73,7 @@ export function Webhooks() {
         </Button>
       </div>
       {create.isError && <p className="error">{create.error.message}</p>}
+      {create.data && <CreatedWebhook path={create.data.path} onDone={create.reset} />}
     </>
   );
 }

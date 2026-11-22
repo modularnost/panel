@@ -1310,9 +1310,6 @@
             "format": "date-time",
             "type": "string"
           },
-          "path": {
-            "type": "string"
-          },
           "service": {
             "type": "string"
           },
@@ -1323,7 +1320,6 @@
         "required": [
           "id",
           "action",
-          "path",
           "created_at"
         ],
         "type": "object"
@@ -1349,6 +1345,47 @@
         },
         "required": [
           "action"
+        ],
+        "type": "object"
+      },
+      "WebhookCreated": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "force_update",
+              "stack_redeploy"
+            ],
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "last_triggered_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "path": {
+            "description": "Contains the secret and is shown only at creation",
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "id",
+          "action",
+          "created_at"
         ],
         "type": "object"
       }
@@ -3770,11 +3807,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Webhook"
+                  "$ref": "#/components/schemas/WebhookCreated"
                 }
               }
             },
-            "description": "Created"
+            "description": "Created",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {

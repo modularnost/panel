@@ -5,17 +5,28 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
 	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
 )
 
 //go:embed migrations/*.sql
 var migrations embed.FS
+
+func init() {
+	sqlite.MustRegisterDeterministicScalarFunction("panel_hash_token", 1, func(_ *sqlite.FunctionContext, args []driver.Value) (driver.Value, error) {
+		token, ok := args[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("expected a text token")
+		}
+		return hashToken(token), nil
+	})
+}
 
 type DB struct{ *sql.DB }
 
@@ -109,8 +120,8 @@ func (d *DB) CreateWebhook(w Webhook) (Webhook, error) {
 	if w.SecretToken == "" {
 		w.SecretToken = NewToken()
 	}
-	res, err := d.Exec(`INSERT INTO webhooks (service_name, stack_name, secret_token, action_type)
-		VALUES (?,?,?,?)`, w.ServiceName, w.StackName, w.SecretToken, w.ActionType)
+	res, err := d.Exec(`INSERT INTO webhooks (service_name, stack_name, token_hash, action_type)
+		VALUES (?,?,?,?)`, w.ServiceName, w.StackName, hashToken(w.SecretToken), w.ActionType)
 	if err != nil {
 		return w, err
 	}
@@ -124,11 +135,11 @@ func (d *DB) DeleteWebhook(id int64) error {
 	return err
 }
 
-const webhookCols = `id, service_name, stack_name, secret_token, action_type, created_at, last_triggered_at`
+const webhookCols = `id, service_name, stack_name, action_type, created_at, last_triggered_at`
 
 func scanWebhook(s interface{ Scan(...any) error }) (Webhook, error) {
 	var w Webhook
-	err := s.Scan(&w.ID, &w.ServiceName, &w.StackName, &w.SecretToken, &w.ActionType,
+	err := s.Scan(&w.ID, &w.ServiceName, &w.StackName, &w.ActionType,
 		&w.CreatedAt, &w.LastTriggered)
 	return w, err
 }
@@ -160,7 +171,7 @@ func (d *DB) webhooks(where string, args []any) ([]Webhook, error) {
 }
 
 func (d *DB) WebhookByToken(token string) (Webhook, error) {
-	return scanWebhook(d.QueryRow(`SELECT `+webhookCols+` FROM webhooks WHERE secret_token=?`, token))
+	return scanWebhook(d.QueryRow(`SELECT `+webhookCols+` FROM webhooks WHERE token_hash=?`, hashToken(token)))
 }
 
 func (d *DB) TouchWebhook(id int64) error {
