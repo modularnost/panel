@@ -8,6 +8,17 @@ so write the part above that list by hand right after the tag is pushed, with
 
 Delete a section that has nothing to say. Do not leave it empty.
 
+CI signs the image index for each release tag using GitHub Actions OIDC.
+To verify an image, use its digest and the exact workflow identity for
+the release tag:
+
+```sh
+cosign verify \
+  --certificate-identity 'https://github.com/modularnost/panel/.github/workflows/ci.yml@refs/tags/vX.Y.Z' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  'ghcr.io/modularnost/panel@sha256:<digest>'
+```
+
 ```markdown
 ## Highlights
 
