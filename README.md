@@ -100,6 +100,26 @@ sudo sh scripts/uninstall.sh --purge    # deletes them too
 
 ### Existing Swarm
 
+For direct HTTP access over a trusted LAN or VPN, run on a manager as root:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modularnost/panel/main/scripts/install.sh |
+  PANEL_INSTALL_MODE=existing-swarm sh
+```
+
+The installer prints the address and initial password. It pins SQLite to
+this manager and publishes port `8080` on this node. Set `PANEL_PORT` to
+choose another port. The installer leaves existing stacks and firewall
+settings alone. Limit access to your LAN or VPN.
+
+Re-run the same command on the same manager to update. Use the original
+`PANEL_STACK`, `PANEL_CONFIG` and `PANEL_PORT` if you set them. If the stack
+name or configuration directory is occupied, choose a free one before the
+first install. To remove the stack and keep its data, run
+`docker stack rm <stack-name>`.
+
+#### Manual deployment or an existing reverse proxy
+
 Deploy [stack.yml](stack.yml) as a new stack from a manager or through
 Portainer. Set `PANEL_ADMIN_PASSWORD` and a shared `PANEL_MODULE_SECRET`.
 From a manager, run:
