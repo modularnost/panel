@@ -27,6 +27,7 @@ func Open(path string) (*DB, error) {
 	// One connection: SQLite has a single writer and the panel few clients.
 	db.SetMaxOpenConns(1)
 	if err := migrate(db); err != nil {
+		_ = db.Close()
 		return nil, err
 	}
 	return &DB{db}, nil
@@ -52,27 +53,40 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 	// embed.FS.ReadDir already returns entries sorted by name.
-	var version int
-	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
-		return err
-	}
 	for i, f := range files {
-		if i < version {
-			continue
-		}
 		name := f.Name()
-		sqlText, err := migrations.ReadFile("migrations/" + name)
-		if err != nil {
-			return err
-		}
-		if _, err := db.Exec(string(sqlText)); err != nil {
+		if err := applyMigration(db, name, i+1); err != nil {
 			return fmt.Errorf("migration %s: %w", name, err)
-		}
-		if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version=%d", i+1)); err != nil {
-			return err
 		}
 	}
 	return nil
+}
+
+func applyMigration(db *sql.DB, name string, nextVersion int) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var version int
+	if err := tx.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		return err
+	}
+	if version >= nextVersion {
+		return nil
+	}
+	sqlText, err := migrations.ReadFile("migrations/" + name)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(string(sqlText)); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version=%d", nextVersion)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 type Webhook struct {

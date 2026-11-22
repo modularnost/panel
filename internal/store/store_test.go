@@ -10,6 +10,34 @@ import (
 	"time"
 )
 
+func TestFailedMigrationRollsBackSchema(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+
+	_, err = db.Exec("CREATE TABLE stacks (registry_host TEXT); PRAGMA user_version=6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(db); err == nil || !strings.Contains(err.Error(), "0007_registries.sql") {
+		t.Fatalf("expected registry migration to fail on the duplicate column, got %v", err)
+	}
+
+	var tables, version int
+	if err := db.QueryRow("SELECT count(*) FROM sqlite_schema WHERE name='registries'").Scan(&tables); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if tables != 0 || version != 6 {
+		t.Fatalf("failed migration left %d registries tables and schema version %d", tables, version)
+	}
+}
+
 func TestLastDeployments(t *testing.T) {
 	db, err := Open(t.TempDir() + "/test.db")
 	if err != nil {
