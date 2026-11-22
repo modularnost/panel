@@ -288,6 +288,8 @@ webhooks, firewall settings and encrypted registry credentials.
 
 ![Service overview showing the image, redeploy action, and CPU, memory, and network usage for each replica](docs/screenshots/service-overview.webp)
 
+![Live logs for replica 2 of the storefront API, with a history selector and pause control](docs/screenshots/service-logs.webp)
+
 ## Metrics across nodes
 
 Docker has no cluster-wide stats API: a manager's socket only sees its own
