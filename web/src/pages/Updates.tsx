@@ -34,6 +34,10 @@ export function Updates() {
     mutationFn: (version: string) => call(api.applyUpdate({ version })),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["updates"] }),
   });
+  const rollback = useMutation({
+    mutationFn: () => call(api.rollbackUpdate()),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["updates"] }),
+  });
   const { confirm } = useDialogs();
   const update = async (tag: string) => {
     const ok = await confirm({
@@ -42,6 +46,14 @@ export function Updates() {
       action: "Update",
     });
     if (ok) apply.mutate(tag);
+  };
+  const rollbackToPrevious = async () => {
+    const ok = await confirm({
+      title: "Roll back to previous version?",
+      message: `The panel and agents will be restored to ${last?.original_image || "the previous image"}.`,
+      action: "Roll back",
+    });
+    if (ok) rollback.mutate();
   };
   const check = useMutation({
     mutationFn: () => call(api.checkUpdates()),
@@ -85,6 +97,17 @@ export function Updates() {
         </p>
       )}
       {apply.isError && <p className="error">{apply.error.message}</p>}
+      {rollback.isError && <p className="error">{rollback.error.message}</p>}
+      {last?.can_rollback && (
+        <p>
+          <Button
+            onClick={rollbackToPrevious}
+            disabled={rollback.isPending || apply.isPending || updateInProgress(last.state)}
+          >
+            {rollback.isPending ? "Rolling back…" : "Roll back to previous version"}
+          </Button>
+        </p>
+      )}
 
       {newest && (
         <>

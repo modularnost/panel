@@ -64,14 +64,52 @@ func (s *Server) registerUpdateApply(api huma.API) {
 		if rollout.Active() {
 			return nil, problem(http.StatusConflict, "update_in_progress", "the Swarm service is already updating")
 		}
+		image := strings.TrimPrefix(tag, "v")
+		panelTarget := docker.ImageRepo(rollout.Image) + ":" + image
+		auth, _ := s.serviceRegistryAuth(panelTarget, nil)
+		insp, err := s.Docker.DistributionInspect(ctx, panelTarget, auth)
+		if err != nil {
+			return nil, problem(http.StatusUnprocessableEntity, "image_not_found",
+				fmt.Sprintf("cannot verify image in registry: %v", err))
+		}
+		targetTag := image
+		if digest := string(insp.Descriptor.Digest); digest != "" {
+			targetTag = image + "@" + digest
+		}
+
+		var agentRollout docker.Rollout
+		var agentTag string
+		if s.AgentService != "" {
+			var err error
+			agentRollout, err = s.Docker.ServiceRollout(ctx, s.AgentService)
+			if err != nil {
+				return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
+			}
+			if agentRollout.Image != "" {
+				agentTarget := docker.ImageRepo(agentRollout.Image) + ":" + image
+				agentAuth, _ := s.serviceRegistryAuth(agentTarget, nil)
+				agentInsp, err := s.Docker.DistributionInspect(ctx, agentTarget, agentAuth)
+				if err != nil {
+					return nil, problem(http.StatusUnprocessableEntity, "image_not_found",
+						fmt.Sprintf("cannot verify agent image in registry: %v", err))
+				}
+				agentTag = image
+				if digest := string(agentInsp.Descriptor.Digest); digest != "" {
+					agentTag = image + "@" + digest
+				}
+			} else {
+				agentTag = targetTag
+			}
+		}
+
 		backup, err := s.backupDatabase(tag)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "backup_failed", err)
 		}
-		image := strings.TrimPrefix(tag, "v")
 		attempt := store.PanelUpdate{
-			Version: tag, Service: self.Service, Image: docker.ImageRepo(rollout.Image) + ":" + image,
-			OriginalImage: rollout.Image, Backup: backup, RequestedAt: time.Now(), PreviousStart: rollout.StartedAt,
+			Version: tag, Service: self.Service, Image: docker.ImageRepo(rollout.Image) + ":" + targetTag,
+			OriginalImage: rollout.Image, AgentOriginalImage: agentRollout.Image, Backup: backup,
+			RequestedAt: time.Now(), PreviousStart: rollout.StartedAt,
 		}
 		if err := s.DB.SavePanelUpdate(ctx, attempt); err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
@@ -81,7 +119,7 @@ func (s *Server) registerUpdateApply(api huma.API) {
 		// Agents first, and synchronously: a failure here leaves the panel alone.
 		if s.AgentService != "" {
 			finish, _ := s.DB.StartDeploy(store.DeployEvent{ServiceName: s.AgentService, Source: "update", TriggeredBy: me.Username})
-			d, err := s.Docker.UpdateImage(ctx, s.AgentService, image)
+			d, err := s.Docker.UpdateImage(ctx, s.AgentService, agentTag)
 			finish(d.OldDigest, d.NewDigest, err)
 			logWarnings(d)
 			if err != nil {
@@ -95,15 +133,24 @@ func (s *Server) registerUpdateApply(api huma.API) {
 			defer s.updating.Store(false)
 			time.Sleep(panelUpdateDelay)
 			finish, _ := s.DB.StartDeploy(store.DeployEvent{ServiceName: self.Service, Source: "update", TriggeredBy: me.Username})
-			d, err := s.Docker.UpdateImage(context.Background(), self.Service, image)
+			d, err := s.Docker.UpdateImage(context.Background(), self.Service, targetTag)
 			finish(d.OldDigest, d.NewDigest, err)
 			logWarnings(d)
 			if err != nil {
 				s.failPanelUpdate(attempt)
 				log.Printf("update to %s: %v", tag, err)
+				if s.AgentService != "" && agentRollout.Image != "" {
+					rbFinish, _ := s.DB.StartDeploy(store.DeployEvent{ServiceName: s.AgentService, Source: "rollback", TriggeredBy: "panel"})
+					rbDeploy, rbErr := s.Docker.Rollback(context.Background(), s.AgentService, agentRollout.Image)
+					rbFinish(rbDeploy.OldDigest, rbDeploy.NewDigest, rbErr)
+					logWarnings(rbDeploy)
+					if rbErr != nil {
+						log.Printf("rollback agent service %s: %v", s.AgentService, rbErr)
+					}
+				}
 			}
 		}()
-		return &updateStartedOutput{Body: apiUpdateStarted{Version: tag, Image: image, Backup: backup}}, nil
+		return &updateStartedOutput{Body: apiUpdateStarted{Version: tag, Image: targetTag, Backup: backup}}, nil
 	})
 }
 

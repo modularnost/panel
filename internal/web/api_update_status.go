@@ -12,9 +12,11 @@ import (
 )
 
 type apiUpdateAttempt struct {
-	Version string `json:"version"`
-	Backup  string `json:"backup,omitempty"`
-	State   string `json:"state" enum:"requested,updating,completed,failed,paused,rolling_back,rollback_paused,rolled_back,unknown"`
+	Version       string `json:"version"`
+	Backup        string `json:"backup,omitempty"`
+	State         string `json:"state" enum:"requested,updating,completed,failed,paused,rolling_back,rollback_paused,rolled_back,unknown"`
+	CanRollback   bool   `json:"can_rollback" doc:"True when the update can be rolled back to the previous image"`
+	OriginalImage string `json:"original_image,omitempty" doc:"The image the panel was running before this update"`
 }
 
 func (s *Server) lastUpdate(ctx context.Context, running string) (*apiUpdateAttempt, error) {
@@ -25,12 +27,25 @@ func (s *Server) lastUpdate(ctx context.Context, running string) (*apiUpdateAtte
 	if update == nil {
 		return nil, nil
 	}
-	out := &apiUpdateAttempt{Version: update.Version, Backup: update.Backup, State: "unknown"}
+	out := &apiUpdateAttempt{
+		Version:       update.Version,
+		Backup:        update.Backup,
+		OriginalImage: update.OriginalImage,
+		State:         "unknown",
+	}
 	if update.Failed {
 		out.State = "failed"
-	} else if rollout, err := s.Docker.ServiceRollout(ctx, update.Service); err == nil {
-		out.State = rolloutState(*update, rollout, running, time.Now())
+	} else if s.Docker != nil {
+		if rollout, err := s.Docker.ServiceRollout(ctx, update.Service); err == nil {
+			out.State = rolloutState(*update, rollout, running, time.Now())
+		}
 	}
+	out.CanRollback = update.OriginalImage != "" &&
+		!s.updating.Load() &&
+		out.State != "requested" &&
+		out.State != "updating" &&
+		out.State != "rolling_back" &&
+		out.State != "rolled_back"
 	return out, nil
 }
 
@@ -58,6 +73,16 @@ func rolloutState(update store.PanelUpdate, rollout docker.Rollout, running stri
 		}
 	}
 	if rollout.Image != update.Image {
+		if rollout.Image == update.OriginalImage {
+			switch rollout.State {
+			case swarm.UpdateStateUpdating:
+				return "rolling_back"
+			case swarm.UpdateStatePaused:
+				return "rollback_paused"
+			case swarm.UpdateStateCompleted:
+				return "rolled_back"
+			}
+		}
 		return "unknown"
 	}
 	switch rollout.State {

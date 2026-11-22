@@ -1159,6 +1159,14 @@
           "backup": {
             "type": "string"
           },
+          "can_rollback": {
+            "description": "True when the update can be rolled back to the previous image",
+            "type": "boolean"
+          },
+          "original_image": {
+            "description": "The image the panel was running before this update",
+            "type": "string"
+          },
           "state": {
             "enum": [
               "requested",
@@ -1179,7 +1187,25 @@
         },
         "required": [
           "version",
-          "state"
+          "state",
+          "can_rollback"
+        ],
+        "type": "object"
+      },
+      "UpdateRollbackStarted": {
+        "additionalProperties": false,
+        "properties": {
+          "backup": {
+            "description": "The database backup taken before the update",
+            "type": "string"
+          },
+          "image": {
+            "description": "The original image the panel service is rolled back to",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image"
         ],
         "type": "object"
       },
@@ -3605,6 +3631,42 @@
           }
         ],
         "summary": "Ask GitHub for releases now"
+      }
+    },
+    "/api/v1/updates/rollback": {
+      "post": {
+        "operationId": "rollback-update",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateRollbackStarted"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Roll back the panel and agents to the image running before the last update"
       }
     },
     "/api/v1/users": {

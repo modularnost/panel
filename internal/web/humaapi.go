@@ -238,5 +238,6 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	s.registerNodeActions(api)
 	s.registerUpdates(api)
 	s.registerUpdateApply(api)
+	s.registerUpdateRollback(api)
 	return api
 }

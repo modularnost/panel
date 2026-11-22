@@ -29,6 +29,9 @@ func TestPanelRolloutState(t *testing.T) {
 		{"paused", "paused", "v0.7.0", docker.Rollout{State: swarm.UpdateStatePaused, StartedAt: at, Image: image}, 0},
 		{"rolling back", "rolling_back", "v0.7.0", docker.Rollout{State: swarm.UpdateStateRollbackStarted, StartedAt: at, Image: oldImage, PreviousImage: image}, 0},
 		{"rolled back", "rolled_back", "v0.7.0", docker.Rollout{State: swarm.UpdateStateRollbackCompleted, StartedAt: at, Image: oldImage}, 0},
+		{"manual rolling back", "rolling_back", "v0.8.0", docker.Rollout{State: swarm.UpdateStateUpdating, StartedAt: at, Image: oldImage}, 0},
+		{"manual rollback paused", "rollback_paused", "v0.8.0", docker.Rollout{State: swarm.UpdateStatePaused, StartedAt: at, Image: oldImage}, 0},
+		{"manual rolled back", "rolled_back", "v0.7.0", docker.Rollout{State: swarm.UpdateStateCompleted, StartedAt: at, Image: oldImage}, 0},
 		{"unrelated rollout", "unknown", "v0.8.0", docker.Rollout{State: swarm.UpdateStateCompleted, StartedAt: at, Image: "registry/panel:edge"}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -56,5 +59,29 @@ func TestUpdatesIncludesFailedAttemptAndBackup(t *testing.T) {
 	attempt, _ := body["last_update"].(map[string]any)
 	if status != 200 || attempt["state"] != "failed" || attempt["backup"] != backup || attempt["version"] != "v0.8.0" {
 		t.Fatalf("updates: %d %v", status, body)
+	}
+}
+
+func TestUpdateRollbackRefusesUnauthorizedOrMissing(t *testing.T) {
+	client, url, db := apiServer(t)
+	const j = "application/json"
+	// Anonymous
+	if status, _ := send(t, client, "POST", url+"/api/v1/updates/rollback", j, ""); status != 401 {
+		t.Fatalf("anonymous: %d", status)
+	}
+	// Viewer
+	signIn(t, client, url)
+	if status, _ := send(t, client, "POST", url+"/api/v1/updates/rollback", j, ""); status != 403 {
+		t.Fatalf("viewer: %d", status)
+	}
+	// Admin with no previous update
+	if _, err := db.CreateUser("admin", "admin-pass-1", store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := send(t, client, "POST", url+"/api/v1/auth/login", j, `{"username":"admin","password":"admin-pass-1"}`); status != 200 {
+		t.Fatal("login admin")
+	}
+	if status, resp := send(t, client, "POST", url+"/api/v1/updates/rollback", j, ""); status != 422 {
+		t.Fatalf("admin with nothing to roll back: %d %v", status, resp)
 	}
 }
