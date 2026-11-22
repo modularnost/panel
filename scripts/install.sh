@@ -182,9 +182,49 @@ if command -v docker >/dev/null 2>&1; then
 	step "Docker is already installed"
 else
 	step "Installing Docker"
-	GET_DOCKER=$(mktemp)
-	run curl -fsSL https://get.docker.com -o "$GET_DOCKER"
-	run sh "$GET_DOCKER"
+	(
+		[ -r /etc/os-release ] || die "cannot detect the Linux distribution"
+		. /etc/os-release
+		case ${ID:-} in
+			debian) suite=${VERSION_CODENAME:-} ;;
+			ubuntu) suite=${UBUNTU_CODENAME:-${VERSION_CODENAME:-}} ;;
+			*) die "install Docker first on distributions other than Debian or Ubuntu" ;;
+		esac
+		case $suite in ''|*[!a-z0-9-]*) die "cannot detect the APT release codename" ;; esac
+		arch=$(dpkg --print-architecture)
+		repo="https://download.docker.com/linux/$ID"
+		keyring=/etc/apt/keyrings/docker.asc
+		sources=/etc/apt/sources.list.d/docker.sources
+		tmp=$(mktemp -d)
+		trap 'rm -f "$tmp/docker.asc" "$tmp/docker.sources"; rmdir "$tmp"' EXIT
+		cat >"$tmp/docker.sources" <<SOURCES
+Types: deb
+URIs: $repo
+Suites: $suite
+Components: stable
+Architectures: $arch
+Signed-By: $keyring
+SOURCES
+		[ ! -e /etc/apt/sources.list.d/docker.list ] ||
+			die "an existing Docker APT source was found; install Docker using that source first"
+		if [ -e "$sources" ] && ! cmp -s "$tmp/docker.sources" "$sources"; then
+			die "an existing Docker APT source differs; install Docker using that source first"
+		fi
+		if [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
+			run apt-get -o APT::Update::Error-Mode=any update
+			run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-remove ca-certificates
+		fi
+		run curl -fsSL --proto '=https' "$repo/gpg" -o "$tmp/docker.asc"
+		run install -d -m 0755 /etc/apt/keyrings
+		if [ -e "$keyring" ] && ! cmp -s "$tmp/docker.asc" "$keyring"; then
+			die "an existing Docker APT key differs; install Docker using the existing source first"
+		fi
+		run install -m 0644 "$tmp/docker.asc" "$keyring"
+		run install -m 0644 "$tmp/docker.sources" "$sources"
+		run apt-get -o APT::Update::Error-Mode=any update
+		run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-remove \
+			docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	)
 fi
 docker info >/dev/null 2>&1 || die "the Docker daemon is not running"
 
