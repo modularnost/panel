@@ -462,6 +462,7 @@ func (c *Client) Logs(ctx context.Context, serviceID, taskID string, tail int) (
 		defer rc.Close()
 		// The stream is multiplexed (stdout/stderr); demux it into a single pipe.
 		pr, pw := io.Pipe()
+		defer pr.Close()
 		go func() {
 			_, err := stdcopy.StdCopy(pw, pw, rc)
 			pw.CloseWithError(err)
