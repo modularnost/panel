@@ -1,4 +1,4 @@
-# modularnost
+# <img src="docs/logo.png" alt="" width="48" height="48" align="middle"> modularnost
 
 Modularnost is a web panel for deploying and operating stacks and services in
 Docker Swarm. The core deploys Compose files and ready-made images, shows
