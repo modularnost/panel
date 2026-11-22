@@ -57,7 +57,7 @@ jobs:
     # Pull requests only get built, never pushed: a fork must not be able to
     # publish an image under our name.
     if: github.event_name == 'push'
-    needs: test
+    needs: [test, web]
     runs-on: ubuntu-latest
     permissions:
       contents: write
