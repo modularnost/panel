@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, call } from "../../api/client";
+import { api, call, retryableQueryError } from "../../api/client";
 import { DeployTable } from "../../components/DeployTable";
+import { RefreshWarning } from "../../components/RefreshWarning";
 import { useService } from "./Layout";
 
 export function ServiceDeploys() {
@@ -12,6 +13,13 @@ export function ServiceDeploys() {
   });
 
   if (deploys.isPending) return <p>Loading…</p>;
-  if (deploys.isError) return <p className="error">{deploys.error.message}</p>;
-  return <DeployTable deploys={deploys.data} />;
+  if (deploys.isError && (deploys.data === undefined || !retryableQueryError(deploys.error))) {
+    return <p className="error">{deploys.error.message}</p>;
+  }
+  return (
+    <>
+      <RefreshWarning error={deploys.error} />
+      <DeployTable deploys={deploys.data} />
+    </>
+  );
 }

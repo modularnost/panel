@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
-import { ApiError, api, call } from "./api/client";
+import { ApiError, api, call, retryableQueryError } from "./api/client";
+import { RefreshWarning } from "./components/RefreshWarning";
 import { modulePath } from "./modules";
 import { atLeast, useMe } from "./auth";
 import { usePanelVersion, useUpdates } from "./updates";
@@ -61,7 +62,9 @@ function Shell() {
   if (me.error instanceof ApiError && me.error.status === 401) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
-  if (me.isError) return <p className="error">{me.error.message}</p>;
+  if (me.isError && (me.data === undefined || !retryableQueryError(me.error))) {
+    return <p className="error">{me.error.message}</p>;
+  }
 
   const logout = async () => {
     await call(api.logout());
@@ -148,6 +151,7 @@ function Shell() {
         </div>
       </aside>
       <main className="main">
+        <RefreshWarning error={me.error} />
         <Outlet />
       </main>
     </div>

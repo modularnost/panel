@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
-import { api, call } from "../../api/client";
+import { api, call, retryableQueryError } from "../../api/client";
+import { RefreshWarning } from "../../components/RefreshWarning";
 import { useService } from "./Layout";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
@@ -48,10 +49,13 @@ export function Traefik() {
   };
 
   if (current.isPending) return <p>Loading…</p>;
-  if (current.isError) return <p className="error">{current.error.message}</p>;
+  if (current.isError && (current.data === undefined || !retryableQueryError(current.error))) {
+    return <p className="error">{current.error.message}</p>;
+  }
 
   return (
     <form className="form" onSubmit={submit}>
+      <RefreshWarning error={current.error} />
       <TextField label="Host" value={host} onChange={setHost} placeholder="app.example.com" />
       <TextField label="Container port" value={port} onChange={setPort} inputMode="numeric" pattern="[0-9]*" placeholder="8080" />
       <TextField label="Entrypoint" value={entrypoint} onChange={setEntrypoint} placeholder="websecure" />

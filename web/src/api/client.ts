@@ -17,6 +17,11 @@ export class ApiError extends Error {
   }
 }
 
+export function retryableQueryError(error: unknown): boolean {
+  return error instanceof ApiError &&
+    (error.status === 0 || error.status === 408 || error.status === 429 || error.status >= 500);
+}
+
 // call turns what the generated client throws (the failed response, with the
 // parsed {error: {code, message}} in .error) into an ApiError.
 export async function call<T>(request: Promise<T>): Promise<T> {
@@ -24,6 +29,8 @@ export async function call<T>(request: Promise<T>): Promise<T> {
     return await request;
   } catch (e) {
     const failed = e as { status?: number; error?: Problem | null };
-    throw new ApiError(failed.status ?? 0, failed.error?.error.message ?? "request failed");
+    const status = failed.status ?? 0;
+    throw new ApiError(status, failed.error?.error?.message ??
+      (status === 0 ? "Could not reach the panel." : `Request failed (HTTP ${status}).`));
   }
 }

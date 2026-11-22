@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { formatBytes, memoryUse } from "../format";
 import { Table } from "../components/Table";
 
@@ -12,10 +13,13 @@ export function Resources() {
   });
 
   if (stats.isPending) return <p>Loading…</p>;
-  if (stats.isError) return <p className="error">{stats.error.message}</p>;
+  if (stats.isError && (stats.data === undefined || !retryableQueryError(stats.error))) {
+    return <p className="error">{stats.error.message}</p>;
+  }
 
   return (
     <>
+      <RefreshWarning error={stats.error} />
       <h1>Resources</h1>
       {stats.data.length === 0 ? (
         <p>Nothing is running.</p>

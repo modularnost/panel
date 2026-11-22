@@ -1,7 +1,8 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, useSearchParams } from "react-router";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { Banner } from "../components/Banner";
 import { Chip, type Tone } from "../components/Chip";
 import { Table } from "../components/Table";
@@ -50,11 +51,14 @@ export function UiPage({ module, path, context = "" }: { module: string; path: s
   }, [module, path, queryClient]);
 
   if (page.isPending) return <p>Loading…</p>;
-  if (page.isError) return <p className="error">{page.error.message}</p>;
+  if (page.isError && (page.data === undefined || !retryableQueryError(page.error))) {
+    return <p className="error">{page.error.message}</p>;
+  }
 
   return (
     <CursorProvider>
       <div className="ui-page">
+        <RefreshWarning error={page.error} />
         {groupStats(page.data.blocks as Block[]).map((b, i) =>
           Array.isArray(b) ? (
             <div className="stats" key={i}>

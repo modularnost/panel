@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
@@ -68,10 +69,13 @@ export function Nodes() {
   };
 
   if (nodes.isPending) return <p>Loading…</p>;
-  if (nodes.isError) return <p className="error">{nodes.error.message}</p>;
+  if (nodes.isError && (nodes.data === undefined || !retryableQueryError(nodes.error))) {
+    return <p className="error">{nodes.error.message}</p>;
+  }
 
   return (
     <>
+      <RefreshWarning error={nodes.error} />
       <h1>Nodes</h1>
       <Table>
         <thead>

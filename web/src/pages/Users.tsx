@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import type { User } from "../api/generated";
 import { Select } from "../components/Select";
 import { Button } from "../components/Button";
@@ -84,8 +85,12 @@ export function Users() {
   };
 
   if (users.isPending || tokens.isPending) return <p>Loading…</p>;
-  if (users.isError) return <p className="error">{users.error.message}</p>;
-  if (tokens.isError) return <p className="error">{tokens.error.message}</p>;
+  if (users.isError && (users.data === undefined || !retryableQueryError(users.error))) {
+    return <p className="error">{users.error.message}</p>;
+  }
+  if (tokens.isError && (tokens.data === undefined || !retryableQueryError(tokens.error))) {
+    return <p className="error">{tokens.error.message}</p>;
+  }
 
   const submitUser = (e: FormEvent) => {
     e.preventDefault();
@@ -98,7 +103,9 @@ export function Users() {
 
   return (
     <>
+      <RefreshWarning error={users.error} />
       <h1>Users</h1>
+      {!retryableQueryError(users.error) && <RefreshWarning error={tokens.error} />}
       <Table>
         <thead>
           <tr>

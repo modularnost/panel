@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { Link } from "react-router";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { atLeast, useMe } from "../auth";
 import { Chip } from "../components/Chip";
 import { Icon } from "../components/Icon";
@@ -27,10 +28,13 @@ export function Stacks() {
   });
 
   if (stacks.isPending) return <p>Loading…</p>;
-  if (stacks.isError) return <p className="error">{stacks.error.message}</p>;
+  if (stacks.isError && (stacks.data === undefined || !retryableQueryError(stacks.error))) {
+    return <p className="error">{stacks.error.message}</p>;
+  }
 
   return (
     <>
+      <RefreshWarning error={stacks.error} />
       <h1>Stacks</h1>
       {atLeast(me.data?.role, "admin") && (
         <p>
@@ -94,10 +98,16 @@ function ExpandedStack({ name }: { name: string }) {
     refetchInterval: 3000,
   });
   if (stack.isPending) return <p role="status">Loading services…</p>;
-  if (stack.isError) return <p className="error" role="alert">{stack.error.message}</p>;
-  if (!stack.data.services.length) return <p>No services.</p>;
+  if (stack.isError && (stack.data === undefined || !retryableQueryError(stack.error))) {
+    return <p className="error" role="alert">{stack.error.message}</p>;
+  }
+  if (!stack.data.services.length) {
+    return <><RefreshWarning error={stack.error} /><p>No services.</p></>;
+  }
 
   return (
+    <>
+    <RefreshWarning error={stack.error} />
     <ul className="stack-services" role="list" aria-label={`Services in ${name}`}>
       {sortRows(stack.data.services, (service) => service.name, false).map((service) => (
         <li key={service.id}>
@@ -111,5 +121,6 @@ function ExpandedStack({ name }: { name: string }) {
         </li>
       ))}
     </ul>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api, call } from "../api/client";
+import { api, call, retryableQueryError } from "../api/client";
+import { RefreshWarning } from "../components/RefreshWarning";
 import { Button } from "../components/Button";
 import { Chip } from "../components/Chip";
 import { useDialogs } from "../components/Dialogs";
@@ -37,11 +38,14 @@ export function Ports() {
   });
 
   if (ports.isPending) return <p>Loading…</p>;
-  if (ports.isError) return <p className="error">{ports.error.message}</p>;
+  if (ports.isError && (ports.data === undefined || !retryableQueryError(ports.error))) {
+    return <p className="error">{ports.error.message}</p>;
+  }
   const { allowed, published } = ports.data;
 
   return (
     <>
+      <RefreshWarning error={ports.error} />
       <h1>Ports</h1>
       <p className="muted">
         From the internet only SSH and the ports below answer. A service that publishes a port stays closed until the port is
