@@ -19,6 +19,8 @@ type Node struct {
 	Address      string
 	Engine       string
 	OS           string
+	NanoCPUs     int64
+	MemoryBytes  int64
 }
 
 func (n Node) Healthy() bool { return n.Status == "ready" && n.Availability == "active" }
@@ -39,6 +41,8 @@ func (c *Client) Nodes(ctx context.Context) ([]Node, error) {
 			Address:      n.Status.Addr,
 			Engine:       n.Description.Engine.EngineVersion,
 			OS:           n.Description.Platform.OS + "/" + n.Description.Platform.Architecture,
+			NanoCPUs:     n.Description.Resources.NanoCPUs,
+			MemoryBytes:  n.Description.Resources.MemoryBytes,
 		}
 		if n.ManagerStatus != nil {
 			node.Leader = n.ManagerStatus.Leader

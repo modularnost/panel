@@ -8,6 +8,7 @@ import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
 import { TextField } from "../components/TextField";
+import { formatBytes } from "../format";
 
 type Role = "worker" | "manager";
 
@@ -84,6 +85,7 @@ export function Nodes() {
             <th>Role</th>
             <th>Status</th>
             <th>Availability</th>
+            <th scope="col">Capacity</th>
             <th>Address</th>
             <th>Firewall</th>
             <th>Engine</th>
@@ -112,6 +114,10 @@ export function Nodes() {
                   <option value="pause">pause</option>
                   <option value="drain">drain</option>
                 </Select>
+              </td>
+              <td>
+                <div>{n.nano_cpus ? `${(n.nano_cpus / 1e9).toLocaleString()} vCPU` : "—"}</div>
+                <div>{n.memory_bytes ? `${formatBytes(n.memory_bytes)} RAM` : "—"}</div>
               </td>
               <td className="mono">{n.address ?? ""}</td>
               <td>

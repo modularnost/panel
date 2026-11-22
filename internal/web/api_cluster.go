@@ -47,6 +47,8 @@ type apiNode struct {
 	Address      string `json:"address,omitempty"`
 	Engine       string `json:"engine,omitempty"`
 	OS           string `json:"os,omitempty"`
+	NanoCPUs     int64  `json:"nano_cpus,omitempty" doc:"Total CPU capacity reported by Swarm, in billionths of a CPU"`
+	MemoryBytes  int64  `json:"memory_bytes,omitempty" doc:"Total RAM reported by Swarm, in bytes"`
 	Firewall     string `json:"firewall" enum:"applied,failed,unknown" doc:"Whether the node's firewall reported the current rules lately"`
 }
 
@@ -56,6 +58,7 @@ func toAPINodes(in []docker.Node) []apiNode {
 		out = append(out, apiNode{
 			ID: n.ID, Hostname: n.Hostname, Role: n.Role, Leader: n.Leader, Status: n.Status,
 			Availability: n.Availability, Address: n.Address, Engine: n.Engine, OS: n.OS,
+			NanoCPUs: n.NanoCPUs, MemoryBytes: n.MemoryBytes,
 		})
 	}
 	return out
