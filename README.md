@@ -9,10 +9,8 @@
   <a href="#modules">Modules</a>
 </p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/stacks-dark.webp">
-  <img src="docs/screenshots/stacks.webp" alt="Stacks page with an expanded storefront stack showing its services, images, and running replicas">
-</picture>
+[![Expanded storefront stack with its services, images, and running replicas](docs/screenshots/stacks-dark.webp)](docs/screenshots/stacks-dark.webp#gh-dark-mode-only)
+[![Expanded storefront stack with its services, images, and running replicas](docs/screenshots/stacks.webp)](docs/screenshots/stacks.webp#gh-light-mode-only)
 
 *Stacks with sample Swarm data.*
 
