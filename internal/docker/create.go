@@ -9,8 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/api/types/swarm"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // NewService is what the "run a service" form collects. Anything fancier than
@@ -60,7 +62,7 @@ func parsePorts(specs []string) ([]swarm.PortConfig, error) {
 			return nil, fmt.Errorf("port %q: bad target port", spec)
 		}
 		out = append(out, swarm.PortConfig{
-			Protocol:      swarm.PortConfigProtocol(proto),
+			Protocol:      network.IPProtocol(proto),
 			PublishedPort: uint32(pub),
 			TargetPort:    uint32(target),
 			PublishMode:   swarm.PortConfigPublishModeIngress,
@@ -101,7 +103,7 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 		Mode:         swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &n.Replicas}},
 		EndpointSpec: &swarm.EndpointSpec{Ports: ports},
 	}
-	resp, err := c.api.ServiceCreate(ctx, spec, swarm.ServiceCreateOptions{QueryRegistry: true, EncodedRegistryAuth: n.RegistryAuth})
+	resp, err := c.api.ServiceCreate(ctx, client.ServiceCreateOptions{Spec: spec, QueryRegistry: true, EncodedRegistryAuth: n.RegistryAuth})
 	if err != nil {
 		return "", err
 	}
@@ -154,7 +156,7 @@ func (c *Client) RemoveStack(ctx context.Context, name string) error {
 		return fmt.Errorf("stack %q not found", name)
 	}
 	for _, s := range list {
-		if err := c.api.ServiceRemove(ctx, s.ID); err != nil {
+		if _, err := c.api.ServiceRemove(ctx, s.ID, client.ServiceRemoveOptions{}); err != nil {
 			return fmt.Errorf("%s: %w", s.Spec.Name, err)
 		}
 	}
@@ -166,5 +168,6 @@ func (c *Client) RemoveService(ctx context.Context, nameOrID string) error {
 	if err != nil {
 		return err
 	}
-	return c.api.ServiceRemove(ctx, s.ID)
+	_, err = c.api.ServiceRemove(ctx, s.ID, client.ServiceRemoveOptions{})
+	return err
 }

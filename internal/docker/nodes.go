@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/swarm"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // Node is a cluster member as the panel shows it.
@@ -26,12 +27,12 @@ type Node struct {
 func (n Node) Healthy() bool { return n.Status == "ready" && n.Availability == "active" }
 
 func (c *Client) Nodes(ctx context.Context) ([]Node, error) {
-	list, err := c.api.NodeList(ctx, swarm.NodeListOptions{})
+	list, err := c.api.NodeList(ctx, client.NodeListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Node, 0, len(list))
-	for _, n := range list {
+	out := make([]Node, 0, len(list.Items))
+	for _, n := range list.Items {
 		node := Node{
 			ID:           n.ID,
 			Hostname:     n.Description.Hostname,
@@ -64,45 +65,46 @@ type JoinInfo struct {
 }
 
 func (c *Client) JoinInfo(ctx context.Context) (JoinInfo, error) {
-	sw, err := c.api.SwarmInspect(ctx)
+	sw, err := c.api.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		return JoinInfo{}, err
 	}
-	info, err := c.api.Info(ctx)
+	info, err := c.api.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return JoinInfo{}, err
 	}
 	addr := ""
-	if len(info.Swarm.RemoteManagers) > 0 {
-		addr = info.Swarm.RemoteManagers[0].Addr
+	if len(info.Info.Swarm.RemoteManagers) > 0 {
+		addr = info.Info.Swarm.RemoteManagers[0].Addr
 	}
-	if addr == "" && info.Swarm.NodeAddr != "" {
-		addr = info.Swarm.NodeAddr + ":2377"
+	if addr == "" && info.Info.Swarm.NodeAddr != "" {
+		addr = info.Info.Swarm.NodeAddr + ":2377"
 	}
 	return JoinInfo{
 		Address:      addr,
-		WorkerToken:  sw.JoinTokens.Worker,
-		ManagerToken: sw.JoinTokens.Manager,
+		WorkerToken:  sw.Swarm.JoinTokens.Worker,
+		ManagerToken: sw.Swarm.JoinTokens.Manager,
 	}, nil
 }
 
 // RotateJoinToken invalidates the old token for one role. Everything already in
 // the cluster stays; only future joins need the new one.
 func (c *Client) RotateJoinToken(ctx context.Context, role string) error {
-	sw, err := c.api.SwarmInspect(ctx)
+	sw, err := c.api.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		return err
 	}
-	var flags swarm.UpdateFlags
+	opts := client.SwarmUpdateOptions{Version: sw.Swarm.Version, Spec: sw.Swarm.Spec}
 	switch role {
 	case "worker":
-		flags.RotateWorkerToken = true
+		opts.RotateWorkerToken = true
 	case "manager":
-		flags.RotateManagerToken = true
+		opts.RotateManagerToken = true
 	default:
 		return fmt.Errorf("unknown role %q", role)
 	}
-	return c.api.SwarmUpdate(ctx, sw.Version, sw.Spec, flags)
+	_, err = c.api.SwarmUpdate(ctx, opts)
+	return err
 }
 
 // SetAvailability drains a node before maintenance, or brings it back.
@@ -112,13 +114,15 @@ func (c *Client) SetAvailability(ctx context.Context, id, availability string) e
 	default:
 		return fmt.Errorf("unknown availability %q", availability)
 	}
-	n, _, err := c.api.NodeInspectWithRaw(ctx, id)
+	res, err := c.api.NodeInspect(ctx, id, client.NodeInspectOptions{})
 	if err != nil {
 		return err
 	}
+	n := res.Node
 	spec := n.Spec
 	spec.Availability = swarm.NodeAvailability(availability)
-	return c.api.NodeUpdate(ctx, n.ID, n.Version, spec)
+	_, err = c.api.NodeUpdate(ctx, n.ID, client.NodeUpdateOptions{Version: n.Version, Spec: spec})
+	return err
 }
 
 // JoinCommand is what the user pastes on the new server.

@@ -100,6 +100,8 @@ sudo sh scripts/uninstall.sh --purge    # deletes them too
 
 ### Existing Swarm
 
+The Docker SDK requires Engine API 1.40 or later on managers and agents.
+
 For direct HTTP access over a trusted LAN or VPN, run on a manager as root:
 
 ```sh

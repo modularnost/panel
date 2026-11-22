@@ -17,7 +17,7 @@ with its own reverse proxy. See the [installation guide](../README.md#installati
 
 - **Language**: Go (the only backend language of the core; static build, single
   binary)
-- **Orchestration**: the Docker Swarm API via the `docker/docker` client SDK —
+- **Orchestration**: the Docker Swarm API via the `moby/moby/client` SDK —
   **Swarm only**, with no support for plain Docker/docker-compose as a separate
   backend (see the ADR below)
 - **Database**: SQLite (see the "Database" section)

@@ -11,7 +11,7 @@ scripts/licenses.sh
 
 ## Go modules compiled into the binary
 
-30 modules: 16 Apache-2.0, 7 BSD-3-Clause, 6 MIT, 1 BSD-2-Clause. No copyleft,
+30 modules: 17 Apache-2.0, 7 MIT, 6 BSD-3-Clause. No copyleft,
 nothing that restricts redistributing the binary or the image.
 
 | Module | Version | License |
@@ -20,22 +20,22 @@ nothing that restricts redistributing the binary or the image.
 | github.com/cespare/xxhash/v2 | v2.3.0 | MIT |
 | github.com/containerd/errdefs | v1.0.0 | Apache-2.0 |
 | github.com/containerd/errdefs/pkg | v0.3.0 | Apache-2.0 |
+| github.com/danielgtaylor/huma/v2 | v2.39.1 | MIT |
 | github.com/distribution/reference | v0.6.0 | Apache-2.0 |
-| github.com/docker/docker | v28.3.2+incompatible | Apache-2.0 (ships a NOTICE, carried in [NOTICE](NOTICE)) |
-| github.com/docker/go-connections | v0.5.0 | Apache-2.0 |
+| github.com/docker/go-connections | v0.8.2 | Apache-2.0 |
 | github.com/docker/go-units | v0.5.0 | Apache-2.0 |
 | github.com/dustin/go-humanize | v1.0.1 | MIT |
 | github.com/felixge/httpsnoop | v1.1.0 | MIT |
 | github.com/go-logr/logr | v1.4.4 | Apache-2.0 |
 | github.com/go-logr/stdr | v1.2.2 | Apache-2.0 |
-| github.com/gogo/protobuf | v1.3.2 | BSD-3-Clause |
 | github.com/mattn/go-isatty | v0.0.24 | MIT |
 | github.com/moby/docker-image-spec | v1.3.1 | Apache-2.0 |
+| github.com/moby/moby/api | v1.57.0 | Apache-2.0 |
+| github.com/moby/moby/client | v0.6.3 | Apache-2.0 |
 | github.com/ncruces/go-strftime | v1.0.0 | MIT |
 | github.com/opencontainers/go-digest | v1.0.0 | Apache-2.0 |
 | github.com/opencontainers/image-spec | v1.1.1 | Apache-2.0 |
-| github.com/pkg/errors | v0.9.1 | BSD-2-Clause |
-| github.com/remyoudompheng/bigfft | v0.0.0-20230129092748 | BSD-3-Clause |
+| github.com/remyoudompheng/bigfft | v0.0.0-20230129092748-24d4a6f8daec | BSD-3-Clause |
 | go.opentelemetry.io/auto/sdk | v1.2.1 | Apache-2.0 |
 | go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp | v0.70.0 | Apache-2.0 |
 | go.opentelemetry.io/otel | v1.45.0 | Apache-2.0 |

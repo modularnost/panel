@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/registry"
+	"github.com/moby/moby/api/pkg/authconfig"
 
 	"modularnost/internal/store"
 )
@@ -74,7 +74,7 @@ func TestRegistryCredentialsAreWriteOnlyAndScoped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	auth, err := registry.DecodeAuthConfig(encoded)
+	auth, err := authconfig.Decode(encoded)
 	if err != nil || auth.Password != "secret-pull-token" || auth.ServerAddress != host {
 		t.Fatal("expected saved credentials for the matching image")
 	}
