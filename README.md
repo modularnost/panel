@@ -195,6 +195,10 @@ Do not put a range there that clients can reach the panel from.
 
 Expired sessions and API tokens are cleaned up at startup and every six hours.
 
+The container health check uses `PANEL_ADDR` to reach `/healthz` in panel
+mode and `/health` in agent mode. The firewall has no HTTP listener, so
+the installer disables its health check.
+
 ### Webhooks
 
 Copy the URL when you create a webhook and send a `POST` to trigger it.

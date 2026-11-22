@@ -316,6 +316,8 @@ else
 	FW_SERVICE="
   firewall:
     image: $IMAGE
+    healthcheck:
+      disable: true
     environment:
       PANEL_MODE: firewall
       PANEL_MODULE_SECRET: \"$SECRET\"
