@@ -11,7 +11,7 @@ RUN bun run build
 
 # Build on the runner's own architecture and cross-compile, instead of emulating
 # the target one: Go does this natively and it keeps multi-arch builds fast.
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.11-alpine AS build
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 WORKDIR /src
