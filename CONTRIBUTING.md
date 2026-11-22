@@ -6,7 +6,7 @@ lists what the project deliberately does not do.
 ## Workflow
 
 ```
-issue → branch from main → PR → green CI → squash merge → edge → check on a VPS
+issue → branch from main → PR → green CI → squash merge → edge → check on a test server
 ```
 
 - Work starts from an issue. A typo or a docs fix may skip it.
@@ -82,9 +82,9 @@ volumes on exit. Stop an existing dev lab first. Allow a free loopback port
 
 ## Changing the architecture
 
-Open an issue first. A change to the decisions, the feature order or the
-non-goals reaches `main` only with the maintainer's explicit approval. For a
-large feature, the issue says what is built, what is not, and how it is checked.
+Open an issue first. Changes to architectural decisions or project scope
+require the maintainer's explicit approval. For a large feature, define
+its scope and verification in the issue.
 
 ## Releases
 
@@ -94,7 +94,7 @@ upgrade path are fixed and tried on a multi-node cluster.
 
 Before a tag:
 
-1. `main` is green and `edge` runs on the test VPS.
+1. `main` is green and `edge` runs on a test server.
 2. A clean install with `scripts/install.sh` works and prints the admin password.
 3. Upgrading an existing database from the previous release keeps its data.
 4. Sign-in, the service list, one module and one webhook work.

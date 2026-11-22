@@ -4,18 +4,14 @@ Why this project is shaped the way it is: the decisions, their reasons, and the
 things it deliberately will not do. Read this before proposing a feature — it
 answers most "why not just…" questions, and says which answers are settled.
 
-It is also the working brief for AI assistants (`AGENTS.md` points here).
+## Project scope
 
-## About the project
+The core provides the tools needed to deploy and operate stacks and services
+in Docker Swarm. Install modules when you need a separate workflow, such as
+building images or storing metrics history. The core runs without modules.
 
-A lightweight web panel for managing Docker Swarm clusters (1-N nodes),
-**deliberately narrow in scope**: not a PaaS, not a build system, not a
-multi-cloud tool. The target user already knows Docker Swarm, uses CI/CD
-(GitHub Actions and the like) to build images, and wants a small, predictable UI
-on top of existing infrastructure — few screens, each doing an obvious thing,
-with webhook-driven redeploys available out of the box.
-
-Open source is planned. Positioning: **Swarm-native, lightweight, modular**.
+The panel supports a new server with its own Traefik and an existing Swarm
+with its own reverse proxy. See the [installation guide](../README.md#installation).
 
 ## Technology stack
 
@@ -142,18 +138,10 @@ it never sees the user's session: the panel asks the module itself, server to
 server, and nothing the browser sent, cookies included, goes along. A module
 draws nothing in the browser, so it shares no origin with the panel.
 
-**The manifest is a versioned contract.**
+**The manifest uses contract 3.** See [the module contract](modules.md#the-contract)
+for an example and the complete schema.
 
-```json
-{"contract": 1, "name": "metrics", "version": "0.2.0",
- "contributions": [
-   {"slot": "nav",         "title": "Metrics", "path": "/",        "role": "viewer"},
-   {"slot": "service.tab", "title": "Metrics", "path": "/service", "role": "viewer",
-    "match": {"some.label": "value"}}],
- "permissions": ["stats:read"]}
-```
-
-- A contribution names a **slot**, a title, a path below `/modules/<name>`, a
+- A contribution names a **slot**, a title, a path on the module, a
   minimum role and, for a tab, labels the service must carry. The slots are
   `nav`, `service.tab` and `services.action`; the list grows as real modules
   need more.
@@ -195,18 +183,16 @@ dark scheme and phone layout, and with no module code in the browser.
   took the HTML proxy, `/static/` and the `render` field with it, and raised
   `contract` to 3.
 - **The document.** A `GET` on the contribution's path answers
-  `{"blocks": [...]}`; the role, the signed identity and the context are as in
+  `{"ui": 1, "blocks": [...]}`; the role, the signed identity and the context are as in
   ADR 7. The first vocabulary: text, stat, key-value list, table, meter, chart,
-  banner, link, button, form (text, select, switch), and a select that
+  banner, link, code, button, form (text, select, switch), and a select that
   re-requests the page with a query parameter, for the range of a chart. Text
   is only text: no HTML, styles or scripts. A link points inside the panel or to
   `https`. Size, block and point counts are limited. A block the panel does not
   know is shown as unsupported and the rest still draws, the same rule as an
   unknown slot.
-- **Charts are in the first version.** The panel draws line and area series
-  from the points the module sends; the module keeps the history (ADR 5, feature
-  7). The metrics module is the reason for all of this, and it is the first one
-  rewritten.
+- **Charts.** The panel draws the points a module sends. The module keeps the
+  history (ADR 5).
 - **Actions.** A button or form `POST`s to the module's `/action/*` with the
   signed headers and the role of that path. A destructive one asks first, in the
   panel's dialog.
@@ -223,9 +209,7 @@ data in the document. Module-supplied HTML, CSS or JavaScript in the panel's
 page (ADR 7). A vocabulary ahead of the modules: a block is added with a real
 module that needs it.
 
-**Open.** The exact block schemas, written with the contract in
-`docs/modules.md`. Row actions and paging in a table. How the stream
-authenticates, and how many open tabs it may hold. 
+See [the module contract](modules.md) for block schemas and change events.
 
 ### 9. A node firewall of our own (decided 2026-10-15)
 
@@ -272,198 +256,32 @@ The panel holds the cluster, so the host it starts on is not left that way.
 
 **Not chosen.** `ufw`. Listening on loopback: a worker has to reach 2377.
 Putting the rules in the panel or the agent: they would need the host's network.
-## Feature order (do not change without discussion)
+## Scope boundaries
 
-1. **Core MVP**:
-   - a list of stacks/services with status (replicas, health, image+tag) — read
-     straight from the Docker API, not stored in the database
-   - a Traefik labels screen: a form instead of editing labels by hand
-   - a webhook endpoint: accept an event from a registry/CI → `ServiceUpdate`
-     with a force pull, so pushing an image is enough to roll it out
-   - a "redeploy stack" button — a wrapper over `docker stack deploy`
-   - simple auth (basic auth or a single shared token), no full RBAC
-2. **Logs** (second priority, do not defer for long):
-   - stream `docker service logs` over SSE/WebSocket
-   - filter by task/replica (a Swarm service has several tasks)
-   - optionally: if the user turns out to run Loki, proxy queries to it instead
-     of reading docker logs directly, so logs survive a container restart
-3. **The module system**: discovery, manifests, a module catalogue (along the
-   lines of the Traefik plugin catalogue), CLI scaffolding for module authors.
-   Decided 2026-08-24 on how modules are distributed:
-   - the bundled examples stay in this repository — they are documentation,
-     tested against the current contract and fixed in the same commit when it
-     changes
-   - real modules live in their own repositories, with their own CI and image:
-     a module inside this repository is not a module, it is part of the panel
-   - the catalogue starts as `docs/catalog.md`, a table maintained by pull
-     request. A catalogue repository with a machine-readable index is worth it
-     only once there are several external modules — and only then should the
-     panel read it and offer to install an entry through `docker stack deploy`
-   - entries are `community` by default. `verified` means someone read the code
-     and the entry pins an image digest; a badge nobody backs is worse than no
-     badge
-4. **RBAC and multiple users**:
-   - a proper `users` table with roles (for example: admin / operator / viewer)
-   - separated actions: who may edit webhooks and Traefik labels, who may only
-     watch status and logs, who may redeploy
-   - binding roles to specific stacks/services (not just a global role), if a
-     real "different teams, different services" scenario appears
-   - api_tokens limited by role/scope, not only per user
-   - do not make it more complex than the start requires: 2-3 roles are enough,
-     and a full policy engine (Casbin and friends) only if a clear need appears
-5. **Creating services and stacks** (explicitly requested, implemented):
-   - a single service through the Swarm API (`ServiceCreate`): image, replicas,
-     ports, env, networks
-   - a stack through `docker stack deploy` from a pasted compose file. Compose is
-     a client-side format, not a daemon one, so the panel image ships
-     `docker-cli` instead of a re-implemented compose loader
-   - the compose file is kept in the `stacks` table: Swarm does not store it, and
-     without it a stack can neither be edited nor genuinely redeployed (only
-     force-updated)
-   - creating and removing are `admin` only: a compose file is effectively access
-     to the whole cluster
-6. **A one-command install for a fresh VPS** (proposed 2026-08-24, not started):
-   a script that takes a bare server to a working panel — `docker swarm init`,
-   an overlay network, Traefik with an ACME resolver, and the panel behind it on
-   a real domain with TLS. Points to settle when it is written:
-   - the panel stops publishing 8080 and gets Traefik labels of its own, so the
-     only ports a service of ours opens on the host are 80 and 443; what the
-     host as a whole answers on is the node firewall's business (ADR 9)
-   - ACME storage lives on a volume pinned to the same node as the SQLite file
-   - the script asks for a domain and an email, and nothing else; the admin
-     password is generated and printed once
-   - it must be safe to re-run: an existing swarm, network or stack is reused,
-     not recreated
-   - Traefik itself stays a normal stack the user owns — the panel still only
-     writes labels and never talks to its API (ADR 4)
-7. **A metrics history module** (proposed 2026-08-24, not started): the first
-   module that earns the contract — it needs storage and a lifecycle of its own,
-   which is exactly what the core must not grow. Scope it as CPU and memory per
-   service over a few days with a chart on the service card, not as a Grafana
-   clone with datasources, a query language and alerting.
-   - **Prerequisite, done 2026-08-25**: a module used to learn its token only
-     from the first proxied user request, so it could not poll on a schedule
-     with nobody watching. The manifest request now carries the token, and the
-     panel refreshes discovery on a timer, so every module has one within a TTL
-     of the core starting. Injecting it as an env var is no longer needed: a
-     token that arrives on every refresh survives a new PANEL_MODULE_SECRET,
-     which an injected one would not
-   - the hard part is retention, not charts: downsampling, a retention window,
-     and what happens to services that disappear. Sampling every 10s forever is
-     millions of rows a week on a modest cluster
-   - if several consumers start polling, teach the core to sample continuously
-     and serve the last snapshot: every /internal/stats call costs a second,
-     because CPU percent needs two readings for a delta
-8. **SPA and JSON API** (decided 2026-10-14, ADR 6): the API read before write,
-   then the frontend scaffold, then screens until parity, then the cutover and
-   removal of the HTML templates
-9. **Declarative module pages** (decided 2026-10-15, ADR 8): the contract,
-   the blocks, the module-to-panel change events, then the
-   metrics module rewritten as the first one
-10. Everything else (a build system, git integration for building images) is out
-   of the current scope — do not implement without an explicit request
-
-## Deliberate non-goals (anti-scope)
-
-- Do not turn the project into a PaaS: no git builds, no Nixpacks, no one-click
-  databases, no catalogues of hundreds of one-click services. A compose form and
-  a run-a-service form edit what the user wrote themselves — they do not build
-  anything for them. That is the line.
-- Do not drag in plain Docker as an alternative backend
-- Do not embed graphs/metrics in the core — those belong in Grafana or in a
-  separate module
-- Do not give modules direct access to `docker.sock`
-- Do not store in SQLite what already lives in Swarm (see ADR 2)
+- Docker Swarm is the deployment backend.
+- The core deploys ready-made images. Image builds and metrics history are
+  optional module features.
+- Modules run through the panel's HTTP contract and permissions. They have
+  no direct access to the Docker socket.
 
 ## Database (SQLite)
 
-Store only:
+SQLite stores panel-owned data: saved Compose, deploy history, webhooks,
+users and tokens, firewall rules, and encrypted registry credentials.
+Swarm remains the source for live state. The [migrations](../internal/store/migrations)
+define the schema.
 
-```sql
--- webhooks for automatic service updates
-webhooks (
-  id, service_name, stack_name,
-  secret_token, action_type,      -- 'force_update' | 'stack_redeploy'
-  created_at, last_triggered_at
-)
+Run one panel replica. If the database volume is local to a node, pin the
+panel there. Back up the volume before upgrading and the registry encryption
+key separately if you use saved credentials.
 
--- deploy history (the one thing Swarm itself does not keep)
-deploy_events (
-  id, service_name, stack_name,
-  trigger_source,                 -- 'webhook' | 'manual' | 'ui'
-  old_image_digest, new_image_digest,
-  status,                         -- 'pending' | 'success' | 'failed'
-  triggered_by,
-  started_at, finished_at,
-  error_message
-)
+## Development and releases
 
--- users/tokens (minimal, no complex RBAC at the start)
-users (id, username, password_hash, role, created_at)
-api_tokens (id, user_id, token_hash, expires_at)
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the workflow, verification, coding
+rules and release steps.
 
--- saved presets for the Traefik labels form
-traefik_presets (id, name, middleware_config_json)
+## Interface text
 
--- links to monitoring dashboards
-service_grafana_links (service_name, dashboard_url)
-
--- stack compose files: Swarm has none, `docker stack deploy` is a client-side
--- operation and the daemon only ever sees the resulting services
-stacks (name, compose, updated_by, updated_at)
-```
-
-If the panel ever migrates between Swarm nodes through placement, the SQLite
-file must be pinned to a specific node by a placement constraint or live on a
-shared volume. Consider moving to Postgres only if a real need for HA of the
-panel itself appears (several instances writing at once) — do not do it ahead of
-time "just in case".
-
-## Releases
-
-Pushing to `main` publishes `edge` and `sha-<commit>`. `latest` and the version
-tags come from a git tag: `git tag v0.1.0 && git push --tags`. That separation
-exists because the README tells people to deploy `latest` — it must mean a
-release someone chose to cut, not the last thing that happened to be pushed.
-
-The version compiled into the binary comes from `git describe --tags --always`,
-so `/healthz` answers `v0.1.0` on a release and `v0.1.0-4-gabc1234` in between.
-
-## Style and general rules
-
-- Before adding a new feature, check it against the "anti-scope" section above
-- All interaction with the Docker API goes through a single abstraction layer
-  (`internal/docker` or equivalent); do not smear SDK calls across handlers
-- Never log secrets (webhook tokens, `docker.sock` access)
-- All DB migrations are versioned files; never edit an already-applied migration
-  after the fact
-- When in doubt whether a feature belongs in the MVP, look at the priority list
-  above and ask rather than adding it "while we're here"
-
-### Comments
-
-Comment what is not obvious from the code, and nothing else. A comment earns its
-place when it explains **why** — a workaround, a constraint from Docker's API, a
-deliberate shortcut, a trap the next reader would otherwise fall into. Restating
-what the line already says is noise that rots on the next edit.
-
-Do not narrate: no `// loop over services`, no comment repeating a function name,
-no section banners for a five-line function. If a comment is needed to explain
-*what* code does, rename things or split the function first — that fixes the
-cause.
-
-### Interface text
-
-The same rule, harder. Explanatory paragraphs under a form usually mean the form
-is bad: a field that needs a sentence needs a better label, a placeholder, or a
-sensible default instead. An interface that has to be narrated does not work.
-
-Cut: descriptions of what a page obviously is, restatements of what a button
-does, tutorials on how the panel works internally.
-
-Keep: consequences the user cannot see and cannot undo (this deletes services
-not in the file; this token lets anyone join the cluster), and short answers to
-"why can I not do X here" — those save a support round-trip. One sentence, not a
-paragraph.
-
-Documentation belongs in `docs/`, not in the UI.
+Use short labels and sensible defaults. Explain consequences that are hard
+to infer, such as which services a deploy will remove. Put tutorials and
+background information in the documentation.

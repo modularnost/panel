@@ -25,20 +25,21 @@ with a form whose action asks the core to redeploy a service. Then:
 ```sh
 docker build -t my-module:latest .
 docker service create --name my_module \
-  --network panelnet \
+  --network "$PANEL_NETWORK" \
   --label panel.module=true \
   --label panel.module.name=my \
   --label panel.module.version=0.1.0 \
-  --env PANEL_CORE_URL=http://panel:8080 \
+  --env PANEL_CORE_URL="${PANEL_CORE_URL:-http://panel:8080}" \
   my-module:latest
 ```
 
+Set `PANEL_NETWORK` to the panel's overlay network before running the command.
+The installer uses `modularnost` by default. For a manually deployed stack,
+use its private overlay network and set `PANEL_CORE_URL` to the actual panel
+service address.
+
 The module shows up in the panel's menu within 15 seconds. If it doesn't, open
 the Modules page — the reason is printed there instead of the `ok` status.
-
-**The network is not optional.** The module must sit on the same overlay
-network as the panel (`panelnet` in the examples), or neither side can reach
-the other.
 
 ## The contract
 

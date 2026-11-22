@@ -10,8 +10,7 @@ Rules for assistants:
 - Work from an issue or an explicit request. Nothing "while we're here".
 - Always a branch and a PR. Never push to `main`, never merge, never change
   repository settings, rulesets or tokens, never create tags or releases.
-- Ask the maintainer before changing scope or architecture: the decisions, the
-  feature order, the non-goals.
+- Ask the maintainer before changing project scope or architectural decisions.
 - Ask for a merge only when CI is green.
 - No `Co-Authored-By` or "Generated with" lines in commits or PR descriptions.
 - Comments only for a reason the code cannot show, in at most three lines.
