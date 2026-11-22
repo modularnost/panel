@@ -96,6 +96,12 @@ func firewallMode(mode string) {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
+		if err := checkHealth(os.Getenv("PANEL_MODE"), env("PANEL_ADDR", ":8080")); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if mode := os.Getenv("PANEL_MODE"); mode == "firewall" || mode == "firewall-clear" {
 		firewallMode(mode)
 		return

@@ -31,4 +31,5 @@ COPY --from=build /panel /panel
 ENV PANEL_DB=/data/modularnost.db
 VOLUME /data
 EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=4s --start-period=20s --retries=3 CMD ["/panel", "healthcheck"]
 ENTRYPOINT ["/panel"]
