@@ -143,6 +143,10 @@ running services and can rewrite the installer-managed Compose when
 `PANEL_STACK_FILE` is mounted. It cannot rewrite the Compose stored in
 Portainer.
 
+**Updates** shows the latest self-update, its Swarm rollout status and the
+path of the pre-update database copy. If Swarm rolls the service back,
+check whether the database needs restoring before retrying.
+
 ### Image tags and settings
 
 The default image is `ghcr.io/modularnost/panel:latest` for amd64 and arm64.

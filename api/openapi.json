@@ -1153,6 +1153,36 @@
         ],
         "type": "object"
       },
+      "UpdateAttempt": {
+        "additionalProperties": false,
+        "properties": {
+          "backup": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "requested",
+              "updating",
+              "completed",
+              "failed",
+              "paused",
+              "rolling_back",
+              "rollback_paused",
+              "rolled_back",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "state"
+        ],
+        "type": "object"
+      },
       "UpdateStarted": {
         "additionalProperties": false,
         "properties": {
@@ -1192,6 +1222,9 @@
           "error": {
             "description": "Why the last check failed; releases are from the check before it",
             "type": "string"
+          },
+          "last_update": {
+            "$ref": "#/components/schemas/UpdateAttempt"
           },
           "release_build": {
             "description": "False for edge and dev builds, which never list releases",

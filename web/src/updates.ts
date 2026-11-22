@@ -3,11 +3,19 @@ import { api, call } from "./api/client";
 
 // The server caches the check for hours; asking every few minutes only notices
 // a manual "check now" done from another tab.
-export function useUpdates(enabled: boolean) {
+export function updateInProgress(state: string | undefined) {
+  return state === "requested" || state === "updating" || state === "rolling_back";
+}
+
+export function useUpdates(enabled: boolean, watch = false) {
   return useQuery({
     queryKey: ["updates"],
     queryFn: () => call(api.getUpdates()),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: ({ state }) => {
+      const update = state.data?.last_update?.state;
+      if (watch && updateInProgress(update)) return 3000;
+      return watch && update === "unknown" ? 15_000 : 5 * 60_000;
+    },
     enabled,
   });
 }
@@ -32,21 +40,4 @@ export function usePanelVersion() {
 // healthzVersion reads the version out of /healthz ("ok v0.2.0").
 export function healthzVersion(body: string): string {
   return body.trim().replace(/^ok\s+/, "");
-}
-
-// waitForVersion polls /healthz until the panel answers with version, which is
-// the update having finished; the panel is down for a moment while it swaps,
-// so a failed request only means "not yet". False after the timeout.
-export async function waitForVersion(version: string, timeoutMs = 3 * 60_000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 2000));
-    try {
-      const resp = await fetch("/healthz", { cache: "no-store" });
-      if (resp.ok && healthzVersion(await resp.text()) === version) return true;
-    } catch {
-      // The old process is gone and the new one is not up yet.
-    }
-  }
-  return false;
 }

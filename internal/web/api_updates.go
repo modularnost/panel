@@ -21,13 +21,14 @@ type apiRelease struct {
 }
 
 type apiUpdates struct {
-	Current      string       `json:"current"`
-	ReleaseBuild bool         `json:"release_build" doc:"False for edge and dev builds, which never list releases"`
-	Enabled      bool         `json:"enabled" doc:"False when PANEL_UPDATE_CHECK=off"`
-	CheckedAt    *time.Time   `json:"checked_at,omitempty" doc:"The last successful check; absent before the first one"`
-	Error        string       `json:"error,omitempty" doc:"Why the last check failed; releases are from the check before it"`
-	StackFile    bool         `json:"stack_file" doc:"True when the panel can keep its stack file in step with an update"`
-	Releases     []apiRelease `json:"releases" doc:"Releases newer than the running version, newest first" nullable:"false"`
+	Current      string            `json:"current"`
+	ReleaseBuild bool              `json:"release_build" doc:"False for edge and dev builds, which never list releases"`
+	Enabled      bool              `json:"enabled" doc:"False when PANEL_UPDATE_CHECK=off"`
+	CheckedAt    *time.Time        `json:"checked_at,omitempty" doc:"The last successful check; absent before the first one"`
+	Error        string            `json:"error,omitempty" doc:"Why the last check failed; releases are from the check before it"`
+	StackFile    bool              `json:"stack_file" doc:"True when the panel can keep its stack file in step with an update"`
+	Releases     []apiRelease      `json:"releases" doc:"Releases newer than the running version, newest first" nullable:"false"`
+	LastUpdate   *apiUpdateAttempt `json:"last_update,omitempty"`
 }
 
 type updatesOutput struct{ Body apiUpdates }
@@ -56,14 +57,24 @@ func (s *Server) updateStatus() updates.Status {
 	return s.Updates.Status()
 }
 
+func (s *Server) updatesOutput(ctx context.Context) (*updatesOutput, error) {
+	out := toAPIUpdates(s.updateStatus(), s.hasStackFile())
+	last, err := s.lastUpdate(ctx, out.Current)
+	if err != nil {
+		return nil, err
+	}
+	out.LastUpdate = last
+	return &updatesOutput{Body: out}, nil
+}
+
 func (s *Server) registerUpdates(api huma.API) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-updates", Method: http.MethodGet, Path: "/api/v1/updates",
 		Summary: "Releases newer than the running version, with their notes", Middlewares: admin, Security: signedIn,
-	}, func(context.Context, *struct{}) (*updatesOutput, error) {
-		return &updatesOutput{Body: toAPIUpdates(s.updateStatus(), s.hasStackFile())}, nil
+	}, func(ctx context.Context, _ *struct{}) (*updatesOutput, error) {
+		return s.updatesOutput(ctx)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -75,7 +86,7 @@ func (s *Server) registerUpdates(api huma.API) {
 				return nil, backendProblem(http.StatusBadGateway, "updates_unavailable", err)
 			}
 		}
-		return &updatesOutput{Body: toAPIUpdates(s.updateStatus(), s.hasStackFile())}, nil
+		return s.updatesOutput(ctx)
 	})
 }
 
