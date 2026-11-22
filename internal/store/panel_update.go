@@ -9,14 +9,15 @@ import (
 )
 
 type PanelUpdate struct {
-	Version       string    `json:"version"`
-	Service       string    `json:"service"`
-	Image         string    `json:"image"`
-	OriginalImage string    `json:"original_image"`
-	Backup        string    `json:"backup"`
-	RequestedAt   time.Time `json:"requested_at"`
-	PreviousStart time.Time `json:"previous_start"`
-	Failed        bool      `json:"failed"`
+	Version            string    `json:"version"`
+	Service            string    `json:"service"`
+	Image              string    `json:"image"`
+	OriginalImage      string    `json:"original_image"`
+	AgentOriginalImage string    `json:"agent_original_image,omitempty"`
+	Backup             string    `json:"backup"`
+	RequestedAt        time.Time `json:"requested_at"`
+	PreviousStart      time.Time `json:"previous_start"`
+	Failed             bool      `json:"failed"`
 }
 
 func (d *DB) LastPanelUpdate(ctx context.Context) (*PanelUpdate, error) {

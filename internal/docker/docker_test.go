@@ -194,6 +194,69 @@ func TestImageRepo(t *testing.T) {
 	}
 }
 
+func TestImageTag(t *testing.T) {
+	for in, want := range map[string]string{
+		"ghcr.io/modularnost/panel:edge":             "edge",
+		"ghcr.io/modularnost/panel:0.2.0@sha256:abc": "0.2.0@sha256:abc",
+		"ghcr.io/modularnost/panel@sha256:abc":       "@sha256:abc",
+		"ghcr.io/modularnost/panel":                  "",
+		"localhost:5000/panel:dev":                   "dev",
+		"nginx:1.28":                                 "1.28",
+		"alpine":                                     "",
+	} {
+		if got := ImageTag(in); got != want {
+			t.Errorf("ImageTag(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestTargetImage(t *testing.T) {
+	for _, tc := range []struct {
+		current, tag, want string
+	}{
+		{"ghcr.io/modularnost/panel:0.1.0", "0.2.0", "ghcr.io/modularnost/panel:0.2.0"},
+		{"ghcr.io/modularnost/panel:0.1.0", "0.2.0@sha256:abc", "ghcr.io/modularnost/panel:0.2.0@sha256:abc"},
+		{"ghcr.io/modularnost/panel:0.1.0", "@sha256:abc", "ghcr.io/modularnost/panel@sha256:abc"},
+		{"ghcr.io/modularnost/panel:0.1.0", "ghcr.io/modularnost/panel:0.1.0", "ghcr.io/modularnost/panel:0.1.0"},
+		{"panel:latest", "0.2.0", "panel:0.2.0"},
+	} {
+		if got := targetImage(tc.current, tc.tag); got != tc.want {
+			t.Errorf("targetImage(%q, %q) = %q, want %q", tc.current, tc.tag, got, tc.want)
+		}
+	}
+}
+
+func TestDistributionInspect(t *testing.T) {
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/_ping":
+			w.Header().Set("API-Version", "1.40")
+		case "/v1.40/distribution/nginx:1.28/json":
+			_, _ = io.WriteString(w, `{"Descriptor":{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":1234,"digest":"sha256:abcdef1234567890"}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer daemon.Close()
+	t.Setenv("DOCKER_HOST", daemon.URL)
+	t.Setenv("DOCKER_API_VERSION", "")
+	t.Setenv("DOCKER_TLS_VERIFY", "")
+	t.Setenv("DOCKER_CERT_PATH", "")
+	c, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	insp, err := c.DistributionInspect(context.Background(), "nginx:1.28", "")
+	if err != nil {
+		t.Fatalf("DistributionInspect err: %v", err)
+	}
+	if string(insp.Descriptor.Digest) != "sha256:abcdef1234567890" {
+		t.Fatalf("digest = %s, want sha256:abcdef1234567890", insp.Descriptor.Digest)
+	}
+}
+
 func TestLastFailure(t *testing.T) {
 	at := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	task := func(ago time.Duration, state swarm.TaskState, errText string) swarm.Task {

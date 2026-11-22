@@ -17,6 +17,7 @@ import (
 
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 )
@@ -176,9 +177,14 @@ func (c *Client) RollOut(ctx context.Context, nameOrID, tag string) (Deploy, err
 	return c.moveToTag(ctx, nameOrID, tag, swarm.UpdateOrderStartFirst)
 }
 
+// Rollback moves a service back to a previously running image or tag.
+func (c *Client) Rollback(ctx context.Context, nameOrID, image string) (Deploy, error) {
+	return c.moveToTag(ctx, nameOrID, image, swarm.UpdateOrderStopFirst)
+}
+
 func (c *Client) moveToTag(ctx context.Context, nameOrID, tag string, order swarm.UpdateOrder) (Deploy, error) {
 	return c.updateSpec(ctx, nameOrID, nil, func(spec *swarm.ServiceSpec, img string) {
-		spec.TaskTemplate.ContainerSpec.Image = ImageRepo(img) + ":" + tag
+		spec.TaskTemplate.ContainerSpec.Image = targetImage(img, tag)
 		spec.UpdateConfig = &swarm.UpdateConfig{
 			Parallelism:   1,
 			Order:         order,
@@ -188,6 +194,17 @@ func (c *Client) moveToTag(ctx context.Context, nameOrID, tag string, order swar
 	})
 }
 
+func targetImage(current, tag string) string {
+	if strings.Contains(tag, "/") {
+		return tag
+	}
+	repo := ImageRepo(current)
+	if strings.HasPrefix(tag, "@") {
+		return repo + tag
+	}
+	return repo + ":" + tag
+}
+
 // ImageRepo drops the tag and the digest: ghcr.io/x/panel:edge@sha256:.. -> ghcr.io/x/panel.
 func ImageRepo(img string) string {
 	name, _ := splitImage(img)
@@ -195,6 +212,34 @@ func ImageRepo(img string) string {
 		name = name[:i]
 	}
 	return name
+}
+
+// ImageTag extracts the tag and digest from an image reference.
+// "ghcr.io/x/panel:0.1.0@sha256:..." -> "0.1.0@sha256:..."
+// "ghcr.io/x/panel:0.1.0" -> "0.1.0"
+// "ghcr.io/x/panel@sha256:..." -> "@sha256:..."
+func ImageTag(img string) string {
+	name, digest := splitImage(img)
+	tag := ""
+	if i := strings.LastIndex(name, ":"); i > strings.LastIndex(name, "/") {
+		tag = name[i+1:]
+	}
+	if digest != "" {
+		if tag != "" {
+			return tag + "@" + digest
+		}
+		return "@" + digest
+	}
+	return tag
+}
+
+// DistributionInspect queries the registry for the given image reference and returns
+// its manifest descriptor (including the content-addressable digest).
+func (c *Client) DistributionInspect(ctx context.Context, image, auth string) (registry.DistributionInspect, error) {
+	res, err := c.api.DistributionInspect(ctx, image, client.DistributionInspectOptions{
+		EncodedRegistryAuth: auth,
+	})
+	return res.DistributionInspect, err
 }
 
 // updateSpec applies change to the service's spec; img is the image without
