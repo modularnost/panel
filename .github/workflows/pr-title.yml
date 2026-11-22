@@ -1,0 +1,17 @@
+name: pr-title
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "$TITLE" | grep -Eq '^(feat|fix|docs|refactor|test|ci|chore|perf)(\([a-z0-9-]+\))?!?: .{1,72}$' || {
+            echo "PR title must be 'type(scope): subject', got: $TITLE"
+            exit 1
+          }
