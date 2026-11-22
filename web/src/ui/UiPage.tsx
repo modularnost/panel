@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api, call, retryableQueryError } from "../api/client";
 import { RefreshWarning } from "../components/RefreshWarning";
@@ -84,12 +84,7 @@ function BlockView({ block, module, page }: { block: Block; module: string; page
     case "banner":
       return <Banner tone={block.tone === "warning" || block.tone === "error" ? block.tone : "info"}>{str(block.text)}</Banner>;
     case "code":
-      return (
-        <>
-          {str(block.title) && <h3>{str(block.title)}</h3>}
-          <pre className="logbox">{str(block.text)}</pre>
-        </>
-      );
+      return <CodeBlock block={block} />;
     case "facts":
       return (
         <dl className="facts">
@@ -124,6 +119,33 @@ function BlockView({ block, module, page }: { block: Block; module: string; page
     default:
       return <p className="muted">This page has a block this panel does not know: {block.type}.</p>;
   }
+}
+
+
+function CodeBlock({ block }: { block: Block }) {
+  const title = str(block.title);
+  const text = str(block.text);
+  const box = useRef<HTMLPreElement>(null);
+  const stick = useRef(true);
+
+  useEffect(() => {
+    const el = box.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [text]);
+
+  const onScroll = () => {
+    const el = box.current;
+    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  };
+
+  return (
+    <figure className="code-block">
+      {title ? <figcaption>{title}</figcaption> : null}
+      <pre className="codebox" ref={box} tabIndex={0} onScroll={onScroll}>
+        {text}
+      </pre>
+    </figure>
+  );
 }
 
 function Stat({ block }: { block: Block }) {
