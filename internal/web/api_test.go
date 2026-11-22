@@ -100,6 +100,61 @@ func TestAPISession(t *testing.T) {
 	}
 }
 
+func TestAPISessionCookieAttributes(t *testing.T) {
+	_, _, db := apiServer(t)
+	proxies, err := ParseProxies("192.0.2.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := (&Server{DB: db, TrustedProxies: proxies}).Routes()
+	for _, tc := range []struct {
+		name, url, peer, proto string
+		secure                 bool
+	}{
+		{"direct HTTP", "http://panel", "192.0.2.20:1234", "", false},
+		{"untrusted forwarding", "http://panel", "192.0.2.20:1234", "https", false},
+		{"trusted HTTPS proxy", "http://panel", "192.0.2.10:1234", "https", true},
+		{"trusted HTTP proxy", "http://panel", "192.0.2.10:1234", "http", false},
+		{"direct TLS", "https://panel", "192.0.2.20:1234", "http", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var session *http.Cookie
+			for _, step := range []struct {
+				action, body string
+				status       int
+			}{
+				{"login", `{"username":"ann","password":"s3cret-pass"}`, http.StatusOK},
+				{"logout", `{}`, http.StatusNoContent},
+			} {
+				req := httptest.NewRequest("POST", tc.url+"/api/v1/auth/"+step.action, strings.NewReader(step.body))
+				req.RemoteAddr = tc.peer
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("X-Forwarded-Proto", tc.proto)
+				req.Header.Set("X-Forwarded-For", "192.0.2.10")
+				if session != nil {
+					req.AddCookie(session)
+				}
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, req)
+				res := rec.Result()
+				res.Body.Close()
+				cookies := res.Cookies()
+				if res.StatusCode != step.status || len(cookies) != 1 {
+					t.Fatalf("%s: status %d, cookies %d", step.action, res.StatusCode, len(cookies))
+				}
+				c := cookies[0]
+				if c.Name != sessionCookie || c.Path != "/" || !c.HttpOnly || c.SameSite != http.SameSiteLaxMode || c.Secure != tc.secure {
+					t.Errorf("%s: unexpected cookie attributes", step.action)
+				}
+				if step.action == "logout" && (c.Value != "" || c.MaxAge >= 0) {
+					t.Error("logout must expire the session cookie")
+				}
+				session = c
+			}
+		})
+	}
+}
+
 func TestAPIRefusesNonJSONWrites(t *testing.T) {
 	c, base := apiClient(t)
 	// What a hostile page can do with a form: no JSON content type.

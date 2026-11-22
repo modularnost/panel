@@ -52,8 +52,7 @@ type Server struct {
 	stackMu    sync.Mutex
 	stackLocks map[string]*stackLock
 
-	// TrustedProxies are the peers whose X-Forwarded-For is believed; empty
-	// means none, and a client is whoever connected.
+	// TrustedProxies are the peers allowed to supply forwarding headers.
 	TrustedProxies []netip.Prefix
 	logins         loginLimiter
 }
