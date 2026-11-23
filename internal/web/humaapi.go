@@ -142,7 +142,12 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 					"too many attempts, try again in "+plural(secs, "second")),
 				http.Header{"Retry-After": {strconv.Itoa(secs)}})
 		}
-		u, err := s.DB.Authenticate(in.Body.Username, in.Body.Password)
+		u, err := s.authenticatePassword(in.Body.Username, in.Body.Password)
+		if errors.Is(err, errPasswordChecksBusy) {
+			return nil, huma.ErrorWithHeaders(
+				problem(http.StatusTooManyRequests, "too_many_attempts", "sign-in is busy, try again in 1 second"),
+				http.Header{"Retry-After": {"1"}})
+		}
 		if errors.Is(err, store.ErrNoUser) {
 			s.loginFailed(r, in.Body.Username)
 			return nil, problem(http.StatusUnauthorized, "invalid_credentials", err.Error())

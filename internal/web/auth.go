@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -9,9 +10,21 @@ import (
 )
 
 const (
-	sessionCookie = "panel_session"
-	sessionTTL    = 30 * 24 * time.Hour
+	sessionCookie     = "panel_session"
+	sessionTTL        = 30 * 24 * time.Hour
+	maxPasswordChecks = 4
 )
+
+var errPasswordChecksBusy = errors.New("password checks are busy")
+
+func (s *Server) authenticatePassword(name, pass string) (store.User, error) {
+	if s.passwordChecks.Add(1) > maxPasswordChecks {
+		s.passwordChecks.Add(-1)
+		return store.User{}, errPasswordChecksBusy
+	}
+	defer s.passwordChecks.Add(-1)
+	return s.DB.Authenticate(name, pass)
+}
 
 type ctxKey struct{}
 
@@ -30,11 +43,14 @@ func (s *Server) identify(r *http.Request) (store.User, bool) {
 	}
 	if name, pass, ok := r.BasicAuth(); ok && s.loginBlocked(r, name) == 0 {
 		// The same counters as the sign-in form: this is a password guess too.
-		if u, err := s.DB.Authenticate(name, pass); err == nil {
+		u, err := s.authenticatePassword(name, pass)
+		if err == nil {
 			s.loginSucceeded(r, name)
 			return u, true
 		}
-		s.loginFailed(r, name)
+		if errors.Is(err, store.ErrNoUser) {
+			s.loginFailed(r, name)
+		}
 	}
 	return store.User{}, false
 }

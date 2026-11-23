@@ -59,6 +59,7 @@ type Server struct {
 	// TrustedProxies are the peers allowed to supply forwarding headers.
 	TrustedProxies []netip.Prefix
 	logins         loginLimiter
+	passwordChecks atomic.Int32
 	hookRequests   webhookLimiter
 }
 
