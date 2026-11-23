@@ -21,8 +21,10 @@ import (
 )
 
 var (
-	core  = or(os.Getenv("PANEL_CORE_URL"), "http://panel:8080")
-	creds atomic.Pointer[[2]string] // [module, token] from the core's latest request
+	core                = or(os.Getenv("PANEL_CORE_URL"), "http://panel:8080")
+	moduleName          = or(os.Getenv("PANEL_MODULE_NAME"), "metrics")
+	creds               atomic.Pointer[[2]string] // [module, token] from the core's latest request
+	checkingCredentials atomic.Bool
 )
 
 func or(v, def string) string {
@@ -205,7 +207,7 @@ func tone(bad bool) string {
 
 func main() {
 	http.HandleFunc("/manifest", func(w http.ResponseWriter, r *http.Request) {
-		remember(r) // discovery carries the token, so this is where it arrives first
+		remember(r)
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, manifest)
 	})
@@ -213,14 +215,12 @@ func main() {
 		io.WriteString(w, "ok")
 	})
 	http.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
-		remember(r)
 		mu.Lock()
 		doc := overview(latest)
 		mu.Unlock()
 		write(w, doc)
 	})
 	http.HandleFunc("/service", func(w http.ResponseWriter, r *http.Request) {
-		remember(r)
 		name := r.URL.Query().Get("service")
 		mu.Lock()
 		doc := serviceDoc(name, r.URL.Query().Get("range"), history[name], time.Now())
@@ -259,9 +259,38 @@ func poll() {
 
 // remember stores the credentials the core arrived with; we answer with them.
 func remember(r *http.Request) {
-	if m := r.Header.Get("X-Panel-Module"); m != "" {
-		creds.Store(&[2]string{m, r.Header.Get("X-Panel-Token")})
+	candidate := [2]string{r.Header.Get("X-Panel-Module"), r.Header.Get("X-Panel-Token")}
+	current := creds.Load()
+	if candidate[0] != moduleName || candidate[1] == "" ||
+		(current != nil && *current == candidate) || !checkingCredentials.CompareAndSwap(false, true) {
+		return
 	}
+	// Discovery must finish before the core can authorize our callback.
+	go func() {
+		defer checkingCredentials.Store(false)
+		if verifiedCredentials(candidate) {
+			creds.Store(&candidate)
+		}
+	}()
+}
+
+func verifiedCredentials(candidate [2]string) bool {
+	req, err := http.NewRequest(http.MethodGet, core+"/internal/stats", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("X-Panel-Module", candidate[0])
+	req.Header.Set("X-Panel-Token", candidate[1])
+	client := &http.Client{
+		Timeout:       5 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 func coreRequest(method, path string, body io.Reader) (*http.Response, error) {

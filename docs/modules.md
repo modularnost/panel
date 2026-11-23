@@ -38,6 +38,9 @@ The installer uses `modularnost` by default. For a manually deployed stack,
 use its private overlay network and set `PANEL_CORE_URL` to the actual panel
 service address.
 
+When running the example unchanged under a name other than `metrics`, also
+set `PANEL_MODULE_NAME` to the value of its `panel.module.name` label.
+
 The module shows up in the panel's menu within 15 seconds. If it doesn't, open
 the Modules page — the reason is printed there instead of the `ok` status.
 
