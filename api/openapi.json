@@ -31,6 +31,83 @@
         ],
         "type": "object"
       },
+      "CatalogEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "docs_url": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "incompatibility": {
+            "type": "string"
+          },
+          "instructions_url": {
+            "type": "string"
+          },
+          "maintainer": {
+            "type": "string"
+          },
+          "mount_path": {
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "screenshots": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogScreenshot"
+            },
+            "type": "array"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "maintainer",
+          "source_url",
+          "screenshots",
+          "permissions",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "CatalogScreenshot": {
+        "additionalProperties": false,
+        "properties": {
+          "alt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "alt"
+        ],
+        "type": "object"
+      },
       "Contribution": {
         "additionalProperties": false,
         "properties": {
@@ -373,6 +450,34 @@
         "required": [
           "page",
           "action"
+        ],
+        "type": "object"
+      },
+      "ModuleCatalogOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogEntry"
+            },
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "stale",
+              "unavailable"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "modules",
+          "state"
         ],
         "type": "object"
       },
@@ -1880,6 +1985,78 @@
           }
         ],
         "summary": "The signed-in user"
+      }
+    },
+    "/api/v1/module-catalog": {
+      "get": {
+        "operationId": "get-module-catalog",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleCatalogOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Curated modules and catalog freshness"
+      }
+    },
+    "/api/v1/module-catalog/refresh": {
+      "post": {
+        "operationId": "refresh-module-catalog",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleCatalogOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refresh the curated module catalog"
       }
     },
     "/api/v1/modules": {

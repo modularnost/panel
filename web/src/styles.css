@@ -460,6 +460,21 @@ pre.notes {
   margin-bottom: 24px;
 }
 
+.module-catalog-card {
+  border-block-end: 1px solid var(--md-sys-color-outline-variant);
+  padding-block: 12px;
+}
+
+.module-catalog-images {
+  display: grid;
+  gap: 12px;
+}
+
+.module-catalog-images img {
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
 .tab-item {
   display: inline-flex;
   flex: none;

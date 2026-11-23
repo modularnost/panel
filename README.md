@@ -362,6 +362,12 @@ A module answers `GET /manifest`:
 Modules call the core with the permissions declared in their manifests.
 They have no direct access to the Docker socket.
 
+Administrators can browse **Modules → Catalog** for compatible modules,
+permissions and installation guides. The panel refreshes the catalog hourly from
+[modularnost/module-catalog](https://github.com/modularnost/module-catalog)
+and shows the last available list when a refresh fails. Use **Install from
+image** to install a module. **Installed** shows the cluster's modules.
+
 Writing one: [docs/modules.md](docs/modules.md). What exists:
 [docs/catalog.md](docs/catalog.md). The bundled examples double as skeletons to
 copy:

@@ -238,6 +238,7 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	s.registerServiceActions(api)
 	s.registerStackActions(api)
 	s.registerManage(api)
+	s.registerModuleCatalog(api)
 	s.registerRegistries(api)
 	s.registerUserActions(api)
 	s.registerNodeActions(api)
