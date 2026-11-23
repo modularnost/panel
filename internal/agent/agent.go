@@ -23,7 +23,7 @@ import (
 // Token is what the panel presents to an agent, and what the agent checks.
 func Token(secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte("agent"))
+	mac.Write([]byte("service:agent"))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 

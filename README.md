@@ -153,6 +153,11 @@ running services and can rewrite the installer-managed Compose when
 `PANEL_STACK_FILE` is mounted. It cannot rewrite the Compose stored in
 Portainer.
 
+When upgrading across a change to the internal token format, redeploy the
+whole panel stack on the same version, including the agents and firewall.
+For installer-managed stacks, re-run the installer with the current settings.
+Mixed versions cannot authenticate to each other during the rollout.
+
 **Updates** shows the latest self-update, its Swarm rollout status and the
 path of the pre-update database copy. If Swarm rolls the service back,
 check whether the database needs restoring before retrying.

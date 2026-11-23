@@ -61,7 +61,7 @@ type Spec struct {
 // Token is what a firewall service presents to the panel, and what the panel checks.
 func Token(secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte("firewall"))
+	mac.Write([]byte("service:firewall"))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 

@@ -196,11 +196,10 @@ func NewRegistry(dk *docker.Client, secret string) *Registry {
 	}
 }
 
-// Token is how a module proves to the core that it is itself: an HMAC of its
-// name, so the core stores nothing and has nothing to keep in sync.
+// Token derives a module credential in a separate domain from system services.
 func (r *Registry) Token(module string) string {
 	mac := hmac.New(sha256.New, r.secret)
-	mac.Write([]byte(module))
+	mac.Write([]byte("module:" + module))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 

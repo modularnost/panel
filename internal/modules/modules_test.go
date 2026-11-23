@@ -5,7 +5,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"modularnost/internal/agent"
+	"modularnost/internal/firewall"
 )
+
+func TestModuleCredentialsAreSeparateFromSystemCredentials(t *testing.T) {
+	const secret = "test-secret"
+	r := NewRegistry(nil, secret)
+	for _, name := range []string{"agent", "firewall", "service:agent", "service:firewall"} {
+		if r.ValidToken(name, agent.Token(secret)) || r.ValidToken(name, firewall.Token(secret)) {
+			t.Errorf("system credential accepted for module %q", name)
+		}
+	}
+}
 
 func TestTokenAndPermissions(t *testing.T) {
 	r := NewRegistry(nil, "secret")
