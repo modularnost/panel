@@ -26,6 +26,14 @@ type Node struct {
 
 func (n Node) Healthy() bool { return n.Status == "ready" && n.Availability == "active" }
 
+func (c *Client) LocalSwarmNode(ctx context.Context) (string, error) {
+	info, err := c.api.Info(ctx, client.InfoOptions{})
+	if err != nil {
+		return "", err
+	}
+	return info.Info.Swarm.NodeID, nil
+}
+
 func (c *Client) Nodes(ctx context.Context) ([]Node, error) {
 	list, err := c.api.NodeList(ctx, client.NodeListOptions{})
 	if err != nil {

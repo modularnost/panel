@@ -362,11 +362,16 @@ A module answers `GET /manifest`:
 Modules call the core with the permissions declared in their manifests.
 They have no direct access to the Docker socket.
 
-Administrators can browse **Modules → Catalog** for compatible modules,
-permissions and installation guides. The panel refreshes the catalog hourly from
-[modularnost/module-catalog](https://github.com/modularnost/module-catalog)
-and shows the last available list when a refresh fails. Use **Install from
-image** to install a module. **Installed** shows the cluster's modules.
+Administrators can browse **Modules → Catalog**, then install a compatible
+module or open its installation guide. The catalog is fetched hourly from
+[modularnost/module-catalog](https://github.com/modularnost/module-catalog).
+If a refresh fails, cached entries remain visible and installations wait for
+a successful refresh. **Installed** shows the cluster's modules. Use
+**Install from image** for third-party and private images.
+
+Modules installed from the catalog use the approved image digest and
+permissions. A module with a data volume stays on its selected Swarm node.
+Removing its service keeps the volume and placement for reinstallation.
 
 Writing one: [docs/modules.md](docs/modules.md). What exists:
 [docs/catalog.md](docs/catalog.md). The bundled examples double as skeletons to

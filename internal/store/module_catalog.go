@@ -22,3 +22,10 @@ func (d *DB) SaveModuleCatalog(ctx context.Context, body []byte, checkedAt time.
 		ON CONFLICT(id) DO UPDATE SET body = excluded.body, checked_at = excluded.checked_at`, string(body), checkedAt.Unix())
 	return err
 }
+
+func (d *DB) ModuleStorageNode(ctx context.Context, name, node string) (string, error) {
+	var stored string
+	err := d.QueryRowContext(ctx, `INSERT INTO module_storage (name, node) VALUES (?, ?)
+		ON CONFLICT(name) DO UPDATE SET node = module_storage.node RETURNING node`, name, node).Scan(&stored)
+	return stored, err
+}

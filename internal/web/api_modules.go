@@ -51,6 +51,9 @@ func toAPIModules(in []modules.Module) []apiModule {
 			mod.Error = "module tasks failed"
 		case modules.StateError:
 			mod.Error = "could not load the module manifest"
+			if m.CatalogError != "" {
+				mod.Error = m.CatalogError
+			}
 		}
 		for _, c := range m.Manifest.Contributions {
 			match := c.Match
