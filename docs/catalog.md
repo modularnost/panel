@@ -1,7 +1,9 @@
 # Module catalogue
 
-Known modules for the panel. A module is an ordinary Swarm service — see
-[modules.md](modules.md) for what one is and how to write your own.
+Administrators can browse the curated
+[module catalog](https://github.com/modularnost/module-catalog) under
+**Modules → Catalog**. A module is an ordinary Swarm service. See
+[modules.md](modules.md) for the module contract and manual installation.
 
 Nothing here is installed automatically. The panel does not read this file: it
 discovers whatever is running in your cluster by labels, and this page only
@@ -27,13 +29,17 @@ module contract changes.
 
 ## Adding your module
 
-Send a pull request that adds one row. Requirements:
+For inclusion in the panel's Catalog, open a pull request in
+[modularnost/module-catalog](https://github.com/modularnost/module-catalog).
+Its README documents the catalog schema, the approved image digest, and the
+option to link to a manual installation guide.
+
+When publishing a module:
 
 - the repository is public and the image is published somewhere anyone can pull
   from;
 - the `README` says what the module does and which permissions it asks for;
-- `permissions` in the row match the module's manifest exactly — that column is
-  what an administrator decides by.
+- `permissions` in the catalog entry match the module's manifest exactly. Administrators see those permissions before installing.
 
 Keep the description to one line. This is an index, not a showcase.
 

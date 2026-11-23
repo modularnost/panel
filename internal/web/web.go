@@ -38,6 +38,7 @@ type Server struct {
 	DB                 *store.DB
 	RegistryEncryption cipher.AEAD
 	Modules            *modules.Registry
+	Catalog            *modules.Catalog
 	// Secret is the shared module secret: the firewall services present a token made from it.
 	Secret   string
 	Firewall FirewallConfig

@@ -1,0 +1,92 @@
+package web
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"modularnost/internal/store"
+)
+
+type catalogScreenshot struct {
+	URL string `json:"url"`
+	Alt string `json:"alt"`
+}
+
+type catalogEntry struct {
+	ID              string              `json:"id"`
+	Title           string              `json:"title"`
+	Summary         string              `json:"summary"`
+	Maintainer      string              `json:"maintainer"`
+	SourceURL       string              `json:"source_url"`
+	DocsURL         string              `json:"docs_url,omitempty"`
+	Screenshots     []catalogScreenshot `json:"screenshots" nullable:"false"`
+	Permissions     []string            `json:"permissions" nullable:"false"`
+	Version         string              `json:"version,omitempty"`
+	Revision        string              `json:"revision"`
+	Incompatibility string              `json:"incompatibility,omitempty"`
+	InstructionsURL string              `json:"instructions_url,omitempty"`
+	MountPath       string              `json:"mount_path,omitempty"`
+}
+
+type moduleCatalogOutput struct {
+	Body struct {
+		Modules   []catalogEntry `json:"modules" nullable:"false"`
+		CheckedAt *time.Time     `json:"checked_at,omitempty"`
+		State     string         `json:"state" enum:"ready,stale,unavailable"`
+	}
+}
+
+func (s *Server) catalogOutput() *moduleCatalogOutput {
+	snapshot := s.Catalog.Status()
+	out := &moduleCatalogOutput{}
+	out.Body.Modules = make([]catalogEntry, 0, len(snapshot.Entries))
+	out.Body.State = "unavailable"
+	if !snapshot.CheckedAt.IsZero() {
+		out.Body.CheckedAt = &snapshot.CheckedAt
+		out.Body.State = "stale"
+		if snapshot.Fresh(time.Now()) {
+			out.Body.State = "ready"
+		}
+	}
+	for _, entry := range snapshot.Entries {
+		card := catalogEntry{
+			ID: entry.ID, Title: entry.Title, Summary: entry.Summary, Maintainer: entry.Maintainer,
+			SourceURL: entry.SourceURL, DocsURL: entry.DocsURL, Permissions: entry.Permissions,
+			Version: entry.Install.Version, Revision: entry.Revision(), Incompatibility: entry.Incompatibility(Version),
+			InstructionsURL: entry.Install.InstructionsURL, Screenshots: []catalogScreenshot{},
+		}
+		if entry.Install.DataVolume != nil {
+			card.MountPath = entry.Install.DataVolume.MountPath
+		}
+		for _, shot := range entry.Screenshots {
+			card.Screenshots = append(card.Screenshots, catalogScreenshot{shot.URL(), shot.Alt})
+		}
+		out.Body.Modules = append(out.Body.Modules, card)
+	}
+	return out
+}
+
+func (s *Server) registerModuleCatalog(api huma.API) {
+	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
+	huma.Register(api, huma.Operation{
+		OperationID: "get-module-catalog", Method: http.MethodGet, Path: "/api/v1/module-catalog",
+		Summary: "Curated modules and catalog freshness", Middlewares: admin, Security: signedIn,
+	}, func(_ context.Context, _ *struct{}) (*moduleCatalogOutput, error) {
+		return s.catalogOutput(), nil
+	})
+	huma.Register(api, huma.Operation{
+		OperationID: "refresh-module-catalog", Method: http.MethodPost, Path: "/api/v1/module-catalog/refresh",
+		Summary: "Refresh the curated module catalog", Middlewares: admin, Security: signedIn,
+	}, func(ctx context.Context, _ *struct{}) (*moduleCatalogOutput, error) {
+		if s.Catalog != nil {
+			if err := s.Catalog.Refresh(ctx); err != nil && ctx.Err() == nil {
+				log.Printf("refreshing module catalog: %v", err)
+			}
+		}
+		return s.catalogOutput(), nil
+	})
+}

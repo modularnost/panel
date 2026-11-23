@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, Outlet } from "react-router";
 import { api, call, retryableQueryError } from "../api/client";
 import { RefreshWarning } from "../components/RefreshWarning";
 import { atLeast, useMe } from "../auth";
@@ -8,8 +8,28 @@ import { Button } from "../components/Button";
 import { Chip } from "../components/Chip";
 import { useDialogs } from "../components/Dialogs";
 import { Table } from "../components/Table";
+import { Tab, Tabs } from "../components/Tabs";
 
 export function Modules() {
+  const me = useMe();
+  return (
+    <>
+      <h1>Modules</h1>
+      {atLeast(me.data?.role, "admin") && (
+        <>
+          <Tabs label="Modules">
+            <Tab to="/modules/catalog" end>Catalog</Tab>
+            <Tab to="/modules" end>Installed</Tab>
+          </Tabs>
+          <p><Link to="/install-module">Install from image</Link></p>
+        </>
+      )}
+      <Outlet />
+    </>
+  );
+}
+
+export function InstalledModules() {
   const me = useMe();
   const queryClient = useQueryClient();
   const admin = atLeast(me.data?.role, "admin");
@@ -37,12 +57,6 @@ export function Modules() {
   return (
     <>
       <RefreshWarning error={modules.error} />
-      <h1>Modules</h1>
-      {admin && (
-        <p>
-          <Link to="/install-module">Install a module</Link>
-        </p>
-      )}
       {uninstall.isError && <p className="error">{uninstall.error.message}</p>}
       {modules.data.length === 0 ? (
         <p className="muted">No modules.</p>

@@ -160,6 +160,8 @@ func main() {
 
 	checker := updates.New(version, os.Getenv("PANEL_UPDATE_CHECK") != "off")
 	go checker.Run(ctx, 6*time.Hour)
+	catalog := modules.NewCatalog(ctx, db)
+	go catalog.Run(ctx)
 
 	if path := os.Getenv("PANEL_STACK_FILE"); path != "" {
 		go syncStackFile(dk, path)
@@ -192,6 +194,7 @@ func main() {
 		Docker:       dk,
 		DB:           db,
 		Modules:      registry,
+		Catalog:      catalog,
 		Updates:      checker,
 		AgentService: os.Getenv("PANEL_AGENT_SERVICE"),
 		StackFile:    os.Getenv("PANEL_STACK_FILE"),

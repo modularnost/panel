@@ -10,7 +10,8 @@ import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { ModuleInstall } from "./pages/ModuleInstall";
 import { ModulePage } from "./pages/ModulePage";
-import { Modules } from "./pages/Modules";
+import { InstalledModules, Modules } from "./pages/Modules";
+import { ModuleCatalog } from "./pages/ModuleCatalog";
 import { Nodes } from "./pages/Nodes";
 import { Ports } from "./pages/Ports";
 import { Resources } from "./pages/Resources";
@@ -176,7 +177,10 @@ export function App() {
           <Route path="stacks" element={<Stacks />} />
           <Route path="stacks/new" element={<StackNew />} />
           <Route path="stacks/:name" element={<Stack />} />
-          <Route path="modules" element={<Modules />} />
+          <Route path="modules" element={<Modules />}>
+            <Route index element={<InstalledModules />} />
+            <Route path="catalog" element={<ModuleCatalog />} />
+          </Route>
           <Route path="install-module" element={<ModuleInstall />} />
           <Route path="module/:name/*" element={<ModulePage />} />
           <Route path="nodes" element={<Nodes />} />
