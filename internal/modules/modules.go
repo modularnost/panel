@@ -148,13 +148,16 @@ const (
 )
 
 type Module struct {
-	Name     string // from the label, not the manifest: labels are the routing truth
-	Version  string
-	Service  string // swarm service name
-	BaseURL  string
-	Manifest Manifest
-	State    string
-	Err      string // why it is not ready
+	Name         string // from the label, not the manifest: labels are the routing truth
+	Version      string
+	Service      string // swarm service name
+	BaseURL      string
+	Manifest     Manifest
+	State        string
+	Err          string // why it is not ready
+	CatalogError string
+	serviceID    string
+	approval     *catalogApproval
 }
 
 func (m Module) OK() bool { return m.Err == "" }
@@ -219,6 +222,16 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 	if err != nil {
 		return nil, err
 	}
+	names := make(map[string]int)
+	for _, sv := range svcs {
+		if sv.Labels[LabelEnabled] == "true" {
+			name := sv.Labels[LabelName]
+			if name == "" {
+				name = sv.Name
+			}
+			names[strings.ToLower(name)]++
+		}
+	}
 	var mods []Module
 	for _, sv := range svcs {
 		if sv.Labels[LabelEnabled] != "true" {
@@ -233,12 +246,27 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 			port = "8080"
 		}
 		m := Module{
-			Name:    name,
-			Version: sv.Labels[LabelVersion],
-			Service: sv.Name,
-			BaseURL: "http://" + sv.Name + ":" + port,
+			Name:      name,
+			Version:   sv.Labels[LabelVersion],
+			Service:   sv.Name,
+			BaseURL:   "http://" + sv.Name + ":" + port,
+			serviceID: sv.ID,
+		}
+		if names[strings.ToLower(name)] > 1 {
+			m.State, m.Err = StateError, "multiple services use this module name"
+			mods = append(mods, m)
+			continue
+		}
+		if approval, ok := sv.Labels[LabelCatalogApproval]; ok {
+			if err := m.loadApproval(approval, sv.Image+"@"+sv.Digest); err != nil {
+				m.State, m.Err = StateError, err.Error()
+				m.CatalogError = err.Error()
+				mods = append(mods, m)
+				continue
+			}
 		}
 		if err := r.fetchManifest(ctx, &m); err != nil {
+			m.Manifest = Manifest{}
 			var failure string
 			if sv.Running < sv.Desired {
 				failure, _ = r.dk.LastFailure(ctx, sv.ID)
@@ -269,7 +297,7 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 	// Discovery also hands the module its token, before any user request and
 	// again on every refresh, so a restarted core repairs itself.
 	req.Header.Set("X-Panel-Module", m.Name)
-	req.Header.Set("X-Panel-Token", r.Token(m.Name))
+	req.Header.Set("X-Panel-Token", r.moduleToken(*m))
 	resp, err := r.http.Do(req)
 	if err != nil {
 		return err
@@ -281,7 +309,14 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 	if err := json.NewDecoder(resp.Body).Decode(&m.Manifest); err != nil {
 		return err
 	}
-	return m.Manifest.validate()
+	if err := m.Manifest.validate(); err != nil {
+		return err
+	}
+	if err := m.verifyApprovedManifest(); err != nil {
+		m.CatalogError = err.Error()
+		return err
+	}
+	return nil
 }
 
 // Refresh keeps discovery running with nobody watching, so scheduled modules

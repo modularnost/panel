@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/moby/moby/api/types/mount"
+
 	"modularnost/internal/docker"
 	"modularnost/internal/modules"
 	"modularnost/internal/store"
@@ -22,11 +24,11 @@ import (
 func (s *Server) moduleAuth(perm string, next func(http.ResponseWriter, *http.Request, modules.Module)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name, token := r.Header.Get("X-Panel-Module"), r.Header.Get("X-Panel-Token")
-		if name == "" || !s.Modules.ValidToken(name, token) {
+		if name == "" || token == "" {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		m, ok := s.Modules.Get(r.Context(), name)
+		m, ok := s.Modules.Authenticate(r.Context(), name, token)
 		if !ok {
 			http.Error(w, "module not found in the cluster", http.StatusUnauthorized)
 			return
@@ -233,15 +235,33 @@ func corePort(addr string) string {
 
 // deployModule creates the service that makes a module appear in the panel: the
 // labels, the overlay network and the core's address are filled in here.
-func (s *Server) deployModule(ctx context.Context, m moduleInstall, registryHost, auth string) error {
+var errModuleExists = errors.New("a module with this name is already installed")
+var errModuleStorage = errors.New("the module storage node is unavailable")
+
+func (s *Server) deployModule(ctx context.Context, m moduleInstall, registryHost, auth string, entry *modules.CatalogEntry) (string, error) {
 	m.Name, m.Image = strings.TrimSpace(m.Name), strings.TrimSpace(m.Image)
 	m.Port, m.Service = strings.TrimSpace(m.Port), strings.TrimSpace(m.Service)
 	m.Network = strings.TrimSpace(m.Network)
 	if err := m.validate(); err != nil {
-		return err
+		return "", err
 	}
 
-	self, _ := s.Docker.Self(ctx)
+	s.moduleMu.Lock()
+	defer s.moduleMu.Unlock()
+	services, err := s.Docker.Services(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, service := range services {
+		if service.Labels[modules.LabelEnabled] == "true" &&
+			strings.EqualFold(cmp.Or(service.Labels[modules.LabelName], service.Name), m.Name) {
+			return "", errModuleExists
+		}
+	}
+	self, err := s.Docker.Self(ctx)
+	if entry != nil && (err != nil || self.Service == "" || self.Network == "") {
+		return "", errors.New("the panel could not resolve its Swarm network")
+	}
 	env := slices.Clone(m.Env)
 	if self.Service != "" {
 		env = append(env, "PANEL_CORE_URL=http://"+net.JoinHostPort(self.Service, corePort(s.Addr)))
@@ -254,19 +274,49 @@ func (s *Server) deployModule(ctx context.Context, m moduleInstall, registryHost
 	if registryHost != "" {
 		labels[registryLabel] = registryHost
 	}
-	_, err := s.Docker.CreateService(ctx, docker.NewService{
-		Name:         cmp.Or(m.Service, m.Name+"_module"),
+	service := cmp.Or(m.Service, m.Name+"_module")
+	if m.Service == "" && len(service) > 63 {
+		service = m.Name
+	}
+	spec := docker.NewService{
+		Name:         service,
 		Image:        m.Image,
 		Replicas:     1,
 		Env:          env,
 		Networks:     []string{cmp.Or(m.Network, self.Network)},
 		Labels:       labels,
 		RegistryAuth: auth,
-	})
+	}
+	if entry != nil {
+		labels[modules.LabelVersion] = entry.Install.Version
+		labels[modules.LabelCatalogApproval] = entry.ApprovalLabel()
+		if volume := entry.Install.DataVolume; volume != nil {
+			local, err := s.Docker.LocalSwarmNode(ctx)
+			if err != nil {
+				return "", err
+			}
+			if local == "" {
+				return "", errModuleStorage
+			}
+			spec.NodeID, err = s.DB.ModuleStorageNode(ctx, strings.ToLower(m.Name), local)
+			if err != nil {
+				return "", err
+			}
+			nodes, err := s.Docker.Nodes(ctx)
+			if err != nil {
+				return "", err
+			}
+			if !slices.ContainsFunc(nodes, func(node docker.Node) bool { return node.ID == spec.NodeID && node.Healthy() }) {
+				return "", errModuleStorage
+			}
+			spec.Mounts = []mount.Mount{{Type: mount.TypeVolume, Source: "modularnost-module-" + strings.ToLower(m.Name), Target: volume.MountPath}}
+		}
+	}
+	_, err = s.Docker.CreateService(ctx, spec)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// The module is not up yet, but the list must stop showing the old state.
 	s.Modules.Forget()
-	return nil
+	return service, nil
 }

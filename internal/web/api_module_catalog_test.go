@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 	"modularnost/internal/store"
 )
 
-func TestModuleCatalogIsAdminOnlyAndShowsCachedState(t *testing.T) {
+func TestModuleCatalogIsAdminOnlyAndStaleInstallsAreRefused(t *testing.T) {
 	c, base, db := apiServerWith(t, func(s *Server) {
 		if err := s.DB.SaveModuleCatalog(t.Context(), []byte(`{"schema_version":1,"modules":[]}`), time.Now()); err != nil {
 			t.Fatal(err)
@@ -33,5 +34,9 @@ func TestModuleCatalogIsAdminOnlyAndShowsCachedState(t *testing.T) {
 	}
 	if status, body := send(t, c, "GET", catalog, "", ""); status != http.StatusOK || body["state"] != "stale" {
 		t.Fatalf("cached catalog: %d %v", status, body)
+	}
+	if status, body := send(t, c, "POST", catalog+"/metrics/install", "application/json",
+		`{"version":"0.4.0","revision":"`+strings.Repeat("a", 64)+`"}`); status != http.StatusConflict || errorCode(body) != "catalog_stale" {
+		t.Fatalf("stale install: %d %v", status, body)
 	}
 }

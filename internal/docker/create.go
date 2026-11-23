@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/api/types/swarm"
@@ -24,6 +25,8 @@ type NewService struct {
 	Env          []string // KEY=value
 	Ports        []string // published:target[/proto]
 	Networks     []string
+	Mounts       []mount.Mount
+	NodeID       string
 	Labels       map[string]string
 	RegistryAuth string
 }
@@ -97,11 +100,14 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 	spec := swarm.ServiceSpec{
 		Annotations: swarm.Annotations{Name: n.Name, Labels: n.Labels},
 		TaskTemplate: swarm.TaskSpec{
-			ContainerSpec: &swarm.ContainerSpec{Image: n.Image, Env: n.Env},
+			ContainerSpec: &swarm.ContainerSpec{Image: n.Image, Env: n.Env, Mounts: n.Mounts},
 			Networks:      nets,
 		},
 		Mode:         swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &n.Replicas}},
 		EndpointSpec: &swarm.EndpointSpec{Ports: ports},
+	}
+	if n.NodeID != "" {
+		spec.TaskTemplate.Placement = &swarm.Placement{Constraints: []string{"node.id==" + n.NodeID}}
 	}
 	resp, err := c.api.ServiceCreate(ctx, client.ServiceCreateOptions{Spec: spec, QueryRegistry: true, EncodedRegistryAuth: n.RegistryAuth})
 	if err != nil {

@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -110,12 +111,12 @@ func (s *Server) registerManage(api huma.API) {
 		if err != nil {
 			return nil, err
 		}
-		if err := s.deployModule(ctx, m, b.RegistryHost, auth); err != nil {
-			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
+		service, err := s.deployModule(ctx, m, b.RegistryHost, auth, nil)
+		if errors.Is(err, errModuleExists) {
+			return nil, problem(http.StatusConflict, "module_exists", err.Error())
 		}
-		service := m.Service
-		if service == "" {
-			service = m.Name + "_module"
+		if err != nil {
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		return &moduleInstalledOutput{Body: apiModuleInstalled{Name: m.Name, Service: service}}, nil
 	})
@@ -127,6 +128,8 @@ func (s *Server) registerManage(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		Name string `path:"name"`
 	}) (*struct{}, error) {
+		s.moduleMu.Lock()
+		defer s.moduleMu.Unlock()
 		m, ok := s.Modules.Get(ctx, in.Name)
 		if !ok {
 			return nil, problem(http.StatusNotFound, "not_found", "no such module")

@@ -2,12 +2,16 @@ package web
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
+	"slices"
+	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"modularnost/internal/modules"
 	"modularnost/internal/store"
 )
 
@@ -38,6 +42,11 @@ type moduleCatalogOutput struct {
 		CheckedAt *time.Time     `json:"checked_at,omitempty"`
 		State     string         `json:"state" enum:"ready,stale,unavailable"`
 	}
+}
+
+type apiCatalogInstall struct {
+	Version  string `json:"version" minLength:"1"`
+	Revision string `json:"revision" pattern:"^[a-f0-9]{64}$"`
 }
 
 func (s *Server) catalogOutput() *moduleCatalogOutput {
@@ -88,5 +97,43 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 			}
 		}
 		return s.catalogOutput(), nil
+	})
+	huma.Register(api, huma.Operation{
+		OperationID: "install-catalog-module", Method: http.MethodPost, Path: "/api/v1/module-catalog/{id}/install",
+		Summary: "Install the approved module version", DefaultStatus: http.StatusCreated, Middlewares: admin, Security: signedIn,
+	}, func(ctx context.Context, in *struct {
+		ID   string `path:"id" maxLength:"63"`
+		Body apiCatalogInstall
+	}) (*moduleInstalledOutput, error) {
+		snapshot := s.Catalog.Status()
+		if !snapshot.Fresh(time.Now()) {
+			return nil, problem(http.StatusConflict, "catalog_stale", "Refresh the catalog before installing")
+		}
+		index := slices.IndexFunc(snapshot.Entries, func(entry modules.CatalogEntry) bool { return entry.ID == in.ID })
+		if index < 0 {
+			return nil, problem(http.StatusConflict, "catalog_changed", "This module is no longer in the catalog")
+		}
+		entry := snapshot.Entries[index]
+		if entry.Install.Kind != "swarm_service" {
+			return nil, problem(http.StatusUnprocessableEntity, "manual_install", "Follow this module's installation guide")
+		}
+		if entry.Install.Version != in.Body.Version || entry.Revision() != in.Body.Revision {
+			return nil, problem(http.StatusConflict, "catalog_changed", "The catalog entry changed. Review it before installing")
+		}
+		if reason := entry.Incompatibility(Version); reason != "" {
+			return nil, problem(http.StatusConflict, "module_incompatible", reason)
+		}
+		m := moduleInstall{Name: entry.ID, Image: entry.Install.Image}
+		if entry.Install.Port != 0 {
+			m.Port = strconv.Itoa(entry.Install.Port)
+		}
+		service, err := s.deployModule(ctx, m, "", "", &entry)
+		if errors.Is(err, errModuleExists) || errors.Is(err, errModuleStorage) {
+			return nil, problem(http.StatusConflict, "module_unavailable", err.Error())
+		}
+		if err != nil {
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
+		}
+		return &moduleInstalledOutput{Body: apiModuleInstalled{Name: m.Name, Service: service}}, nil
 	})
 }

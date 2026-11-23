@@ -102,7 +102,7 @@ type Viewer struct{ Username, Role string }
 
 // sign adds how the module knows the request is the panel's and who is looking.
 func (r *Registry) sign(req *http.Request, m Module, v Viewer) {
-	token, now := r.Token(m.Name), time.Now().Unix()
+	token, now := r.moduleToken(m), time.Now().Unix()
 	req.Header.Set("X-Panel-Module", m.Name)
 	req.Header.Set("X-Panel-Token", token)
 	req.Header.Set("X-Panel-User", v.Username)

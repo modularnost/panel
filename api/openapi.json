@@ -92,6 +92,24 @@
         ],
         "type": "object"
       },
+      "CatalogInstall": {
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "revision"
+        ],
+        "type": "object"
+      },
       "CatalogScreenshot": {
         "additionalProperties": false,
         "properties": {
@@ -2057,6 +2075,63 @@
           }
         ],
         "summary": "Refresh the curated module catalog"
+      }
+    },
+    "/api/v1/module-catalog/{id}/install": {
+      "post": {
+        "operationId": "install-catalog-module",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogInstall"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleInstalled"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Install the approved module version"
       }
     },
     "/api/v1/modules": {
