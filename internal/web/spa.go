@@ -11,6 +11,10 @@ import (
 // index.html for every other path, so a client-side route survives a reload.
 func spaHandler(fsys fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 		if st, err := fs.Stat(fsys, name); err == nil && !st.IsDir() {
 			if strings.HasPrefix(name, "assets/") {

@@ -17,6 +17,16 @@ func TestSPAHandler(t *testing.T) {
 	get := func(path string) (int, string, string) {
 		rec := httptest.NewRecorder()
 		h(rec, httptest.NewRequest("GET", path, nil))
+		for name, want := range map[string]string{
+			"Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+			"X-Frame-Options":         "DENY",
+			"X-Content-Type-Options":  "nosniff",
+			"Referrer-Policy":         "strict-origin-when-cross-origin",
+		} {
+			if got := rec.Header().Get(name); got != want {
+				t.Errorf("%s: %s = %q, want %q", path, name, got, want)
+			}
+		}
 		return rec.Code, rec.Body.String(), rec.Header().Get("Cache-Control")
 	}
 
