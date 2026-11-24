@@ -94,7 +94,7 @@ func applyMigration(db *sql.DB, name string, nextVersion int) error {
 	if _, err := tx.Exec(string(sqlText)); err != nil {
 		return err
 	}
-	if name == "0012_token_expiry_keys.sql" {
+	if name == "0013_token_expiry_keys.sql" {
 		if err := backfillTokenExpiryKeys(tx); err != nil {
 			return err
 		}

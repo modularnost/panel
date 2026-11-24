@@ -19,12 +19,16 @@ func TestPurgeExpiredTokensUsesIndexAndPreservesLegacyTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, file := range files {
-		if file.Name() == "0012_token_expiry_keys.sql" {
+		if file.Name() == "0013_token_expiry_keys.sql" {
 			break
 		}
 		if err := applyMigration(old, file.Name(), i+1); err != nil {
 			t.Fatal(err)
 		}
+	}
+	var version int
+	if err := old.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 12 {
+		t.Fatalf("fixture schema version = %d, %v, want 12", version, err)
 	}
 	if _, err := old.Exec(`INSERT INTO users (id, username, password_hash, role) VALUES (1, 'ann', 'unused', 'admin')`); err != nil {
 		t.Fatal(err)
