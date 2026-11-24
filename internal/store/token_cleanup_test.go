@@ -16,18 +16,21 @@ func TestTokenCleanupRemovesOnlyExpiredTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	now := time.Now()
+	var tokens []string
 	for _, tc := range []struct {
-		name    string
-		expires any
+		name string
+		ttl  time.Duration
 	}{
-		{"expired", now.Add(-time.Hour).In(time.FixedZone("Legacy Local Time", 14*60*60))},
-		{"active", now.Add(time.Hour).In(time.FixedZone("HST", -12*60*60))},
-		{"permanent", nil},
+		{"expired", -time.Hour},
+		{"active", time.Hour},
+		{"permanent", 0},
 	} {
-		if _, err := db.Exec(`INSERT INTO api_tokens (user_id, name, token_hash, expires_at) VALUES (?,?,?,?)`,
-			user.ID, tc.name, hashToken(tc.name), tc.expires); err != nil {
+		token, _, err := db.CreateToken(user.ID, tc.name, "", tc.ttl)
+		if err != nil {
 			t.Fatal(err)
+		}
+		if tc.ttl >= 0 {
+			tokens = append(tokens, token)
 		}
 	}
 
@@ -52,9 +55,9 @@ func TestTokenCleanupRemovesOnlyExpiredTokens(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	for _, token := range []string{"active", "permanent"} {
+	for _, token := range tokens {
 		if _, err := db.UserByToken(token); err != nil {
-			t.Fatalf("%s token was lost: %v", token, err)
+			t.Fatalf("a non-expired token was lost: %v", err)
 		}
 	}
 }

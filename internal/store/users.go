@@ -221,12 +221,13 @@ func (d *DB) CreateToken(userID int64, name, role string, ttl time.Duration) (st
 		return "", 0, fmt.Errorf("unknown role %q", role)
 	}
 	token := NewToken()
-	var expires any // nil = never expires
+	var expires, expiresKey any
 	if ttl != 0 {
-		expires = time.Now().Add(ttl).UTC()
+		at := time.Now().Add(ttl).UTC()
+		expires, expiresKey = at, at.Format(tokenExpiryKeyFormat)
 	}
-	result, err := d.Exec(`INSERT INTO api_tokens (user_id, name, token_hash, role, expires_at) VALUES (?,?,?,?,?)`,
-		userID, name, hashToken(token), role, expires)
+	result, err := d.Exec(`INSERT INTO api_tokens (user_id, name, token_hash, role, expires_at, expires_at_key) VALUES (?,?,?,?,?,?)`,
+		userID, name, hashToken(token), role, expires, expiresKey)
 	if err != nil {
 		return "", 0, err
 	}
@@ -312,40 +313,49 @@ func (d *DB) RunTokenCleanup(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (d *DB) PurgeExpiredTokens(ctx context.Context) error {
-	tx, err := d.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
+const tokenExpiryKeyFormat = "2006-01-02T15:04:05.000000000Z"
 
-	rows, err := tx.QueryContext(ctx, `SELECT id, expires_at FROM api_tokens WHERE expires_at IS NOT NULL`)
+func (d *DB) PurgeExpiredTokens(ctx context.Context) error {
+	_, err := d.ExecContext(ctx, `DELETE FROM api_tokens WHERE expires_at_key < ?`, time.Now().UTC().Format(tokenExpiryKeyFormat))
+	return err
+}
+
+func backfillTokenExpiryKeys(tx *sql.Tx) error {
+	rows, err := tx.Query(`SELECT id, expires_at FROM api_tokens WHERE expires_at IS NOT NULL`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	now := time.Now()
-	var expired []int64
+	type tokenExpiryKey struct {
+		id  int64
+		key string
+	}
+	var keys []tokenExpiryKey
 	for rows.Next() {
 		var id int64
 		var value any
 		if err := rows.Scan(&id, &value); err != nil {
 			return err
 		}
-		if expires := tokenExpiry(value); !expires.IsZero() && expires.Before(now) {
-			expired = append(expired, id)
+		if expires := tokenExpiry(value); !expires.IsZero() {
+			keys = append(keys, tokenExpiryKey{id, expires.UTC().Format(tokenExpiryKeyFormat)})
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	for _, id := range expired {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM api_tokens WHERE id=?`, id); err != nil {
+	stmt, err := tx.Prepare(`UPDATE api_tokens SET expires_at_key = ? WHERE id = ?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, row := range keys {
+		if _, err := stmt.Exec(row.key, row.id); err != nil {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func tokenExpiry(value any) time.Time {
