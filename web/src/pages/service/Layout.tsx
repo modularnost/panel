@@ -20,7 +20,7 @@ export function ServiceLayout() {
   const service = useQuery({
     queryKey: ["service", id],
     queryFn: () => call(api.getService(id)),
-    refetchInterval: 3000,
+    refetchInterval: ({ state: { data } }) => data && data.running < data.desired ? 3000 : 10_000,
   });
 
   const modules = useModules();
