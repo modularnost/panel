@@ -31,10 +31,11 @@ import (
 )
 
 const (
-	LabelEnabled = "panel.module"
-	LabelName    = "panel.module.name"
-	LabelVersion = "panel.module.version"
-	LabelPort    = "panel.module.port"
+	LabelEnabled      = "panel.module"
+	LabelName         = "panel.module.name"
+	LabelVersion      = "panel.module.version"
+	LabelPort         = "panel.module.port"
+	LabelPullRegistry = "panel.module.pull-registry"
 )
 
 // ContractVersion is the manifest format this core understands.
@@ -152,6 +153,7 @@ type Module struct {
 	Version      string
 	Service      string // swarm service name
 	BaseURL      string
+	PullRegistry string
 	Manifest     Manifest
 	State        string
 	Err          string // why it is not ready
@@ -251,11 +253,12 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 			port = "8080"
 		}
 		m := Module{
-			Name:      name,
-			Version:   sv.Labels[LabelVersion],
-			Service:   sv.Name,
-			BaseURL:   "http://" + sv.Name + ":" + port,
-			serviceID: sv.ID,
+			Name:         name,
+			Version:      sv.Labels[LabelVersion],
+			Service:      sv.Name,
+			BaseURL:      "http://" + sv.Name + ":" + port,
+			PullRegistry: sv.Labels[LabelPullRegistry],
+			serviceID:    sv.ID,
 		}
 		if names[strings.ToLower(name)] > 1 {
 			m.State, m.Err = StateError, "multiple services use this module name"
