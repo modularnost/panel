@@ -220,6 +220,11 @@ func sortedPeers(in []string, v6 bool) []string {
 type runner func(ctx context.Context, stdin string, name string, args ...string) error
 
 func execRun(ctx context.Context, stdin, name string, args ...string) error {
+	_, err := execOutput(ctx, stdin, name, args...)
+	return err
+}
+
+func execOutput(ctx context.Context, stdin, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
@@ -227,9 +232,9 @@ func execRun(ctx context.Context, stdin, name string, args ...string) error {
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, strings.TrimSpace(out.String()))
+		return "", fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, strings.TrimSpace(out.String()))
 	}
-	return nil
+	return out.String(), nil
 }
 
 // Apply puts the spec in force on this node, for both address families. IPv6 is
@@ -239,20 +244,81 @@ func Apply(ctx context.Context, s Spec) error {
 }
 
 func apply(ctx context.Context, s Spec, run runner) error {
+	var state ruleState
+	return state.reconcile(ctx, s, run, nil)
+}
+
+type ruleState struct {
+	v4, v6 familyState
+}
+
+func (r *ruleState) reconcile(ctx context.Context, s Spec, run runner, read func(context.Context, string) string) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
-	if err := family(ctx, run, "iptables", false, s); err != nil {
+	if err := r.v4.reconcile(ctx, run, read, "iptables", false, Rules(s, false)); err != nil {
 		return err
 	}
-	if err := family(ctx, run, "ip6tables", true, s); err != nil {
+	if err := r.v6.reconcile(ctx, run, read, "ip6tables", true, Rules(s, true)); err != nil {
 		log.Printf("firewall: IPv6 not applied: %v", err)
 	}
 	return nil
 }
 
-func family(ctx context.Context, run runner, bin string, v6 bool, s Spec) error {
-	if err := run(ctx, Rules(s, v6), bin+"-restore", "--noflush"); err != nil {
+type familyState struct {
+	desired, applied string
+}
+
+func (r *familyState) reconcile(ctx context.Context, run runner, read func(context.Context, string) string, bin string, v6 bool, rules string) error {
+	if read != nil && r.desired == rules && r.applied != "" && read(ctx, bin) == r.applied {
+		return nil
+	}
+	*r = familyState{}
+	if err := family(ctx, run, bin, v6, rules); err != nil {
+		return err
+	}
+	if read != nil {
+		r.desired, r.applied = rules, read(ctx, bin)
+	}
+	return nil
+}
+
+func readManagedRules(ctx context.Context, bin string) string {
+	out, err := execOutput(ctx, "", bin, "-S")
+	if err != nil {
+		return ""
+	}
+	return managedRules(out)
+}
+
+func managedRules(out string) string {
+	var managed strings.Builder
+	var inputJump, forwardJump, dockerChain bool
+	for line := range strings.SplitSeq(out, "\n") {
+		switch line {
+		case "-A INPUT -j " + Chain:
+			inputJump = true
+		case "-A " + userChain + " -j " + ForwardChain:
+			forwardJump = true
+		case "-N " + userChain:
+			dockerChain = true
+		case "-N " + Chain, "-N " + ForwardChain:
+		default:
+			if !strings.HasPrefix(line, "-A "+Chain+" ") && !strings.HasPrefix(line, "-A "+ForwardChain+" ") {
+				continue
+			}
+		}
+		managed.WriteString(line)
+		managed.WriteByte('\n')
+	}
+	if !inputJump || (dockerChain && !forwardJump) {
+		return ""
+	}
+	return managed.String()
+}
+
+func family(ctx context.Context, run runner, bin string, v6 bool, rules string) error {
+	if err := run(ctx, rules, bin+"-restore", "--noflush"); err != nil {
 		return err
 	}
 	// The jumps go in after the chains are full, never before.
@@ -315,11 +381,12 @@ func (s Spec) Sig() string {
 // place, which is the safe side of that.
 func Run(ctx context.Context, coreURL, secret, node string, every time.Duration) {
 	c := &http.Client{Timeout: 15 * time.Second}
+	var rules ruleState
 	var lastSig, lastErr string
 	for {
 		spec, err := fetch(ctx, c, coreURL, secret, node)
 		if err == nil {
-			err = Apply(ctx, spec)
+			err = rules.reconcile(ctx, spec, execRun, readManagedRules)
 		}
 		st := Status{Node: node, OK: err == nil, Sig: spec.Sig()}
 		if err != nil {
