@@ -229,7 +229,8 @@ The panel holds the cluster, so the host it starts on is not left that way.
   the overlay), authenticated with the module secret as the agents are, applies
   what it is told and reports back.
 - **One mechanism, ours.** One chain, `MODULARNOST`, hooked into `INPUT`, rebuilt
-  whole and atomically with `iptables-restore`, for IPv4 and IPv6. Not `ufw`:
+  atomically with `iptables-restore` when the desired rules or the managed
+  rules in the kernel change, for IPv4 and IPv6. Not `ufw`:
   Debian has none, and two firewalls on one host confuse each other. In order:
   established traffic, loopback and the Docker bridges, SSH (the port or ports
   `sshd` listens on, and 22 always, whatever the panel says), the allowed ports,

@@ -14,6 +14,47 @@ func index(rules []string, want string) int {
 	return slices.IndexFunc(rules, func(l string) bool { return strings.Contains(l, want) })
 }
 
+func TestReconcileSkipsUnchangedRulesAndRepairsDrift(t *testing.T) {
+	const listing = "-N MODULARNOST\n-N MODULARNOST-FWD\n-N DOCKER-USER\n-A INPUT -j MODULARNOST\n-A DOCKER-USER -j MODULARNOST-FWD\n-A MODULARNOST -j DROP\n"
+	current := listing
+	restores := 0
+	fail := false
+	run := func(_ context.Context, _ string, name string, _ ...string) error {
+		if name == "iptables-restore" {
+			restores++
+			if fail {
+				return errors.New("busy")
+			}
+			current = listing
+		}
+		return nil
+	}
+	read := func(context.Context, string) string { return managedRules(current) }
+	var state ruleState
+	for _, step := range []struct {
+		name string
+		spec Spec
+		list string
+		fail bool
+		want int
+	}{
+		{name: "initial apply", list: listing, want: 1},
+		{name: "unrelated rule", list: listing + "-A OUTPUT -j ACCEPT\n", want: 1},
+		{name: "missing Docker jump", list: strings.Replace(listing, "-A DOCKER-USER -j MODULARNOST-FWD\n", "", 1), want: 2},
+		{name: "flushed managed chain", list: strings.Replace(listing, "-A MODULARNOST -j DROP\n", "", 1), want: 3},
+		{name: "failed apply", list: listing, spec: Spec{SSH: []int{2222}}, fail: true, want: 4},
+		{name: "retry", list: listing, spec: Spec{SSH: []int{2222}}, want: 5},
+	} {
+		t.Run(step.name, func(t *testing.T) {
+			current, fail = step.list, step.fail
+			err := state.reconcile(t.Context(), step.spec, run, read)
+			if (err != nil) != step.fail || restores != step.want {
+				t.Fatalf("reconcile = %v, IPv4 restores = %d, want %d", err, restores, step.want)
+			}
+		})
+	}
+}
+
 func TestRulesAreAChainThatEndsInDropAndAlwaysKeepsSSH(t *testing.T) {
 	// The spec has no SSH at all, as a panel that could not read sshd would send.
 	r := lines(Rules(Spec{Allow: []Port{{443, "tcp"}, {80, "tcp"}, {10050, "tcp"}}}, false))
