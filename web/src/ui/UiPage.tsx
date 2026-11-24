@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api, call, retryableQueryError } from "../api/client";
 import { RefreshWarning } from "../components/RefreshWarning";
@@ -28,10 +28,15 @@ export function UiPage({ module, path, context = "" }: { module: string; path: s
   const [search] = useSearchParams();
   const queryClient = useQueryClient();
   const query = queryFor(context, search);
+  const queryKey = ["ui", module, path, query] as const;
 
   const page = useQuery({
-    queryKey: ["ui", module, path, query],
-    queryFn: () => call(api.getModulePage(module, { path, query })),
+    queryKey,
+    queryFn: async () => ({
+      ...(await call(api.getModulePage(module, { path, query }))),
+      // Placeholder data keeps the identity of the document it displays.
+      documentKey: JSON.stringify(queryKey),
+    }),
     placeholderData: keepPreviousData,
     retry: 1,
   });
@@ -67,7 +72,7 @@ export function UiPage({ module, path, context = "" }: { module: string; path: s
               ))}
             </div>
           ) : (
-            <BlockView key={i} block={b} module={module} page={path} />
+            <BlockView key={i} block={b} module={module} page={path} documentKey={page.data.documentKey} />
           ),
         )}
       </div>
@@ -75,7 +80,7 @@ export function UiPage({ module, path, context = "" }: { module: string; path: s
   );
 }
 
-function BlockView({ block, module, page }: { block: Block; module: string; page: string }) {
+function BlockView({ block, module, page, documentKey }: { block: Block; module: string; page: string; documentKey: string }) {
   switch (block.type) {
     case "heading":
       return block.level === 1 ? <h2>{str(block.text)}</h2> : <h3>{str(block.text)}</h3>;
@@ -84,12 +89,7 @@ function BlockView({ block, module, page }: { block: Block; module: string; page
     case "banner":
       return <Banner tone={block.tone === "warning" || block.tone === "error" ? block.tone : "info"}>{str(block.text)}</Banner>;
     case "code":
-      return (
-        <>
-          {str(block.title) && <h3>{str(block.title)}</h3>}
-          <pre className="logbox">{str(block.text)}</pre>
-        </>
-      );
+      return <CodeBlock key={documentKey} block={block} />;
     case "facts":
       return (
         <dl className="facts">
@@ -124,6 +124,41 @@ function BlockView({ block, module, page }: { block: Block; module: string; page
     default:
       return <p className="muted">This page has a block this panel does not know: {block.type}.</p>;
   }
+}
+
+function CodeBlock({ block }: { block: Block }) {
+  const title = str(block.title);
+  const text = str(block.text);
+  const captionId = useId();
+  const box = useRef<HTMLPreElement>(null);
+  const stick = useRef(true);
+
+  useEffect(() => {
+    const el = box.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [text]);
+
+  const onScroll = () => {
+    const el = box.current;
+    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  };
+
+  return (
+    <figure className="code-block">
+      {title && <figcaption id={captionId}>{title}</figcaption>}
+      <pre
+        className="codebox"
+        ref={box}
+        tabIndex={0}
+        role="region"
+        aria-labelledby={title ? captionId : undefined}
+        aria-label={title ? undefined : "Code"}
+        onScroll={onScroll}
+      >
+        {text}
+      </pre>
+    </figure>
+  );
 }
 
 function Stat({ block }: { block: Block }) {
