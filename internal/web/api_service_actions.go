@@ -35,16 +35,14 @@ type redeployOutput struct{ Body apiRedeploy }
 type traefikOutput struct{ Body apiTraefik }
 
 func (s *Server) apiFindService(ctx context.Context, id string) (docker.Service, error) {
-	svcs, err := s.Docker.Services(ctx)
+	sv, found, err := s.Docker.Service(ctx, id)
 	if err != nil {
 		return docker.Service{}, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 	}
-	for _, sv := range svcs {
-		if sv.ID == id || sv.Name == id {
-			return sv, nil
-		}
+	if !found {
+		return docker.Service{}, problem(http.StatusNotFound, "not_found", "no such service")
 	}
-	return docker.Service{}, problem(http.StatusNotFound, "not_found", "no such service")
+	return sv, nil
 }
 
 func (s *Server) registerServiceActions(api huma.API) {

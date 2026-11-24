@@ -13,6 +13,7 @@ declare module "react" {
         minLength?: number;
         pattern?: string;
         placeholder?: string;
+        "supporting-text"?: string;
         autocomplete?: string;
         rows?: number;
         error?: boolean;
@@ -34,6 +35,7 @@ type Props = {
   minLength?: number;
   pattern?: string;
   placeholder?: string;
+  supportingText?: string;
   inputMode?: "numeric";
   autoComplete?: string;
   autoFocus?: boolean;
@@ -44,7 +46,7 @@ type Props = {
   mono?: boolean;
 };
 
-export function TextField({ onChange, value, autoFocus, error, mono, autoComplete, ...rest }: Props) {
+export function TextField({ onChange, value, autoFocus, error, mono, autoComplete, supportingText, ...rest }: Props) {
   const ref = useRef<HTMLElement & { value: string; form: HTMLFormElement | null; updateComplete: Promise<unknown> }>(null);
   const multiline = rest.type === "textarea";
 
@@ -81,6 +83,7 @@ export function TextField({ onChange, value, autoFocus, error, mono, autoComplet
       ref={ref}
       value={value}
       autocomplete={autoComplete}
+      supporting-text={supportingText}
       error={!!error}
       error-text={error}
       className={mono ? "mono" : undefined}

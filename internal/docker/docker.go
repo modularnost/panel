@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/registry"
@@ -80,30 +81,55 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 	running, scheduled := runningTasks(tasks.Items), scheduledTasks(tasks.Items)
 	out := make([]Service, 0, len(list.Items))
 	for _, s := range list.Items {
-		img, digest := splitImage(s.Spec.TaskTemplate.ContainerSpec.Image)
-		svc := Service{
-			ID:        s.ID,
-			Name:      s.Spec.Name,
-			Stack:     s.Spec.Labels[stackLabel],
-			Image:     img,
-			Digest:    digest,
-			Labels:    s.Spec.Labels,
-			UpdatedAt: s.UpdatedAt,
-			Mode:      "replicated",
-		}
-		if s.Spec.Mode.Global != nil {
-			svc.Mode = "global"
-		}
-		for _, p := range s.Endpoint.Ports {
-			if p.PublishedPort > 0 {
-				svc.Ports = append(svc.Ports, PublishedPort{int(p.PublishedPort), string(p.Protocol)})
-			}
-		}
-		svc.Running = running[s.ID]
-		svc.Desired = desiredReplicas(s, scheduled)
-		out = append(out, svc)
+		out = append(out, serviceView(s, running, scheduled))
 	}
 	return out, nil
+}
+
+// Service reads only the service and its currently scheduled tasks.
+func (c *Client) Service(ctx context.Context, id string) (Service, bool, error) {
+	s, err := c.service(ctx, id)
+	if errdefs.IsNotFound(err) {
+		return Service{}, false, nil
+	}
+	if err != nil {
+		return Service{}, false, err
+	}
+	if s.ID != id && s.Spec.Name != id {
+		return Service{}, false, nil
+	}
+	tasks, err := c.api.TaskList(ctx, client.TaskListOptions{
+		Filters: make(client.Filters).Add("service", s.ID).Add("desired-state", string(swarm.TaskStateRunning)),
+	})
+	if err != nil {
+		return Service{}, false, err
+	}
+	return serviceView(s, runningTasks(tasks.Items), scheduledTasks(tasks.Items)), true, nil
+}
+
+func serviceView(s swarm.Service, running, scheduled map[string]uint64) Service {
+	img, digest := splitImage(s.Spec.TaskTemplate.ContainerSpec.Image)
+	svc := Service{
+		ID:        s.ID,
+		Name:      s.Spec.Name,
+		Stack:     s.Spec.Labels[stackLabel],
+		Image:     img,
+		Digest:    digest,
+		Labels:    s.Spec.Labels,
+		UpdatedAt: s.UpdatedAt,
+		Mode:      "replicated",
+		Running:   running[s.ID],
+		Desired:   desiredReplicas(s, scheduled),
+	}
+	if s.Spec.Mode.Global != nil {
+		svc.Mode = "global"
+	}
+	for _, p := range s.Endpoint.Ports {
+		if p.PublishedPort > 0 {
+			svc.Ports = append(svc.Ports, PublishedPort{int(p.PublishedPort), string(p.Protocol)})
+		}
+	}
+	return svc
 }
 
 // desiredReplicas reads the count from the spec for a replicated service. A

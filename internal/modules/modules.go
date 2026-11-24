@@ -186,12 +186,22 @@ type Registry struct {
 	secret []byte
 	http   *http.Client
 
-	mu     sync.Mutex
-	cached []Module
-	at     time.Time
+	mu         sync.Mutex
+	cached     []Module
+	at         time.Time
+	generation uint64
+	refreshing *discoveryRefresh
 }
 
 const ttl = 15 * time.Second
+const refreshGrace = 5 * time.Second
+const maxManifestRequests = 8
+
+type discoveryRefresh struct {
+	done       chan struct{}
+	generation uint64
+	err        error
+}
 
 func NewRegistry(dk *docker.Client, secret string) *Registry {
 	return &Registry{
@@ -220,11 +230,61 @@ func (r *Registry) ValidToken(module, token string) bool {
 // List returns modules with their manifests. Cached in memory for a short TTL,
 // never in the database (ADR 2).
 func (r *Registry) List(ctx context.Context) ([]Module, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if time.Since(r.at) < ttl && r.cached != nil {
-		return r.cached, nil
+	return r.list(ctx, false)
+}
+
+func (r *Registry) list(ctx context.Context, requireFresh bool) ([]Module, error) {
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		r.mu.Lock()
+		age := time.Since(r.at)
+		flight := r.refreshing
+		if age < ttl || (!requireFresh && flight != nil && age < ttl+refreshGrace) {
+			cached := r.cached
+			r.mu.Unlock()
+			return cached, nil
+		}
+		if flight != nil {
+			r.mu.Unlock()
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-flight.done:
+			}
+			r.mu.Lock()
+			current := flight.generation == r.generation
+			r.mu.Unlock()
+			if current && flight.err != nil {
+				return nil, flight.err
+			}
+			continue
+		}
+		flight = &discoveryRefresh{done: make(chan struct{}), generation: r.generation}
+		r.refreshing = flight
+		r.mu.Unlock()
+
+		mods, err := r.discover(ctx)
+		if err == nil {
+			err = ctx.Err()
+		}
+		r.mu.Lock()
+		current := flight.generation == r.generation
+		if current && err == nil {
+			r.cached, r.at = mods, time.Now()
+		}
+		flight.err = err
+		r.refreshing = nil
+		close(flight.done)
+		r.mu.Unlock()
+		if current {
+			return mods, err
+		}
 	}
+}
+
+func (r *Registry) discover(ctx context.Context) ([]Module, error) {
 	svcs, err := r.dk.Services(ctx)
 	if err != nil {
 		return nil, err
@@ -239,7 +299,9 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 			names[strings.ToLower(name)]++
 		}
 	}
-	var mods []Module
+	mods := make([]Module, 0, len(svcs))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, maxManifestRequests)
 	for _, sv := range svcs {
 		if sv.Labels[LabelEnabled] != "true" {
 			continue
@@ -273,28 +335,42 @@ func (r *Registry) List(ctx context.Context) ([]Module, error) {
 				continue
 			}
 		}
-		if err := r.fetchManifest(ctx, &m); err != nil {
-			m.Manifest = Manifest{}
-			var failure string
-			if sv.Running < sv.Desired {
-				failure, _ = r.dk.LastFailure(ctx, sv.ID)
-			}
-			m.State, m.Err = classify(sv.Running, sv.Desired, failure, err)
-			if m.State != StateStarting {
-				log.Printf("module %s: %s", name, m.Err)
-			}
-		} else {
-			m.State = StateReady
-			if m.Version == "" {
-				// The version label is optional; the manifest always has one.
-				m.Version = m.Manifest.Version
-			}
-		}
 		mods = append(mods, m)
+		entry := &mods[len(mods)-1]
+		select {
+		case slots <- struct{}{}:
+		case <-ctx.Done():
+			wg.Wait()
+			return nil, ctx.Err()
+		}
+		wg.Go(func() {
+			defer func() { <-slots }()
+			r.loadManifest(ctx, entry, sv)
+		})
 	}
+	wg.Wait()
 	slices.SortFunc(mods, func(a, b Module) int { return strings.Compare(a.Name, b.Name) })
-	r.cached, r.at = mods, time.Now()
 	return mods, nil
+}
+
+func (r *Registry) loadManifest(ctx context.Context, m *Module, sv docker.Service) {
+	if err := r.fetchManifest(ctx, m); err != nil {
+		m.Manifest = Manifest{}
+		var failure string
+		if sv.Running < sv.Desired {
+			failure, _ = r.dk.LastFailure(ctx, sv.ID)
+		}
+		m.State, m.Err = classify(sv.Running, sv.Desired, failure, err)
+		if m.State != StateStarting {
+			log.Printf("module %s: %s", m.Name, m.Err)
+		}
+	} else {
+		m.State = StateReady
+		if m.Version == "" {
+			// The version label is optional; the manifest always has one.
+			m.Version = m.Manifest.Version
+		}
+	}
 }
 
 func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
@@ -331,7 +407,7 @@ func (r *Registry) fetchManifest(ctx context.Context, m *Module) error {
 // get their token before the first page view.
 func (r *Registry) Refresh(ctx context.Context) {
 	for {
-		if _, err := r.List(ctx); err != nil {
+		if _, err := r.list(ctx, true); err != nil && ctx.Err() == nil {
 			log.Printf("module discovery: %v", err)
 		}
 		select {
@@ -346,6 +422,7 @@ func (r *Registry) Refresh(ctx context.Context) {
 // It is for tests of what sits above discovery.
 func (r *Registry) Pin(mods ...Module) {
 	r.mu.Lock()
+	r.generation++
 	r.cached, r.at = mods, time.Now().Add(24*time.Hour)
 	r.mu.Unlock()
 }
@@ -353,12 +430,14 @@ func (r *Registry) Pin(mods ...Module) {
 // Forget drops the cache; call it after installing or removing a module.
 func (r *Registry) Forget() {
 	r.mu.Lock()
+	r.generation++
+	r.cached = nil
 	r.at = time.Time{}
 	r.mu.Unlock()
 }
 
 func (r *Registry) Get(ctx context.Context, name string) (Module, bool) {
-	mods, err := r.List(ctx)
+	mods, err := r.list(ctx, true)
 	if err != nil {
 		return Module{}, false
 	}
