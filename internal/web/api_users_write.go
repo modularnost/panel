@@ -42,19 +42,6 @@ type apiTokenCreated struct {
 type userOutput struct{ Body apiUser }
 type tokenCreatedOutput struct{ Body apiTokenCreated }
 
-func (s *Server) userByID(id int64) (store.User, bool) {
-	users, err := s.DB.Users()
-	if err != nil {
-		return store.User{}, false
-	}
-	for _, u := range users {
-		if u.ID == id {
-			return u, true
-		}
-	}
-	return store.User{}, false
-}
-
 func (s *Server) registerUserActions(api huma.API) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
 
@@ -79,7 +66,7 @@ func (s *Server) registerUserActions(api huma.API) {
 		ID   int64 `path:"id"`
 		Body apiUserPatch
 	}) (*userOutput, error) {
-		u, ok := s.userByID(in.ID)
+		u, ok := s.DB.UserByID(in.ID)
 		if !ok {
 			return nil, problem(http.StatusNotFound, "not_found", "no such user")
 		}
@@ -110,7 +97,7 @@ func (s *Server) registerUserActions(api huma.API) {
 	}, func(_ context.Context, in *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
-		if _, ok := s.userByID(in.ID); !ok {
+		if _, ok := s.DB.UserByID(in.ID); !ok {
 			return nil, problem(http.StatusNotFound, "not_found", "no such user")
 		}
 		if err := s.DB.DeleteUser(in.ID); err != nil {
@@ -128,7 +115,7 @@ func (s *Server) registerUserActions(api huma.API) {
 		Middlewares: admin, Security: signedIn,
 	}, func(_ context.Context, in *struct{ Body apiTokenCreate }) (*tokenCreatedOutput, error) {
 		b := in.Body
-		user, ok := s.userByID(b.UserID)
+		user, ok := s.DB.UserByID(b.UserID)
 		if !ok {
 			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "no such user")
 		}
@@ -155,19 +142,12 @@ func (s *Server) registerUserActions(api huma.API) {
 	}, func(_ context.Context, in *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
-		tokens, err := s.DB.Tokens()
+		found, err := s.DB.DeleteNamedToken(in.ID)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
-		found := false
-		for _, t := range tokens {
-			found = found || t.ID == in.ID
-		}
 		if !found {
 			return nil, problem(http.StatusNotFound, "not_found", "no such token")
-		}
-		if err := s.DB.DeleteToken(in.ID); err != nil {
-			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})

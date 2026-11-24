@@ -142,8 +142,11 @@ func TestWebhookAndDeployRoundtrip(t *testing.T) {
 		t.Fatalf("deploys: %v %+v", err, events)
 	}
 
-	if err := db.DeleteWebhook(w.ID); err != nil {
-		t.Fatal(err)
+	if found, err := db.DeleteWebhook(w.ID); err != nil || !found {
+		t.Fatalf("delete webhook = %t, %v", found, err)
+	}
+	if found, err := db.DeleteWebhook(w.ID); err != nil || found {
+		t.Fatalf("delete missing webhook = %t, %v", found, err)
 	}
 	if hooks, _ := db.Webhooks(); len(hooks) != 0 {
 		t.Fatalf("not deleted: %+v", hooks)

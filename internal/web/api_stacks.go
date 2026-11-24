@@ -138,8 +138,12 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
+		managed, err := s.DB.StackNames(ctx)
+		if err != nil {
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
+		}
 		for i := range out {
-			_, out[i].Managed = s.DB.Stack(out[i].Name)
+			out[i].Managed = managed[out[i].Name]
 			out[i].LastDeployAt = deploys.Stacks[out[i].Name]
 		}
 		return &stackListOutput{Body: out}, nil
