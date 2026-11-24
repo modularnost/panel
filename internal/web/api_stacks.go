@@ -97,13 +97,7 @@ func summarizeStacks(svcs []docker.Service) []apiStack {
 			st = &apiStack{Name: sv.Stack, Healthy: true}
 			byName[sv.Stack] = st
 		}
-		st.ServiceCount++
-		st.Running += sv.Running
-		st.Desired += sv.Desired
-		st.Healthy = st.Healthy && sv.Healthy()
-		if !sv.UpdatedAt.IsZero() && (st.SwarmUpdatedAt == nil || sv.UpdatedAt.After(*st.SwarmUpdatedAt)) {
-			st.SwarmUpdatedAt = &sv.UpdatedAt
-		}
+		st.addService(sv)
 	}
 	out := make([]apiStack, 0, len(byName))
 	for _, st := range byName {
@@ -111,6 +105,16 @@ func summarizeStacks(svcs []docker.Service) []apiStack {
 	}
 	slices.SortFunc(out, func(a, b apiStack) int { return cmp.Compare(a.Name, b.Name) })
 	return out
+}
+
+func (st *apiStack) addService(sv docker.Service) {
+	st.ServiceCount++
+	st.Running += sv.Running
+	st.Desired += sv.Desired
+	st.Healthy = st.Healthy && sv.Healthy()
+	if !sv.UpdatedAt.IsZero() && (st.SwarmUpdatedAt == nil || sv.UpdatedAt.After(*st.SwarmUpdatedAt)) {
+		st.SwarmUpdatedAt = &sv.UpdatedAt
+	}
 }
 
 type stackListOutput struct {
@@ -158,12 +162,14 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 		}
 		var detail apiStackDetail
 		detail.Services = []apiService{}
+		summary := apiStack{Healthy: true}
 		deploys, err := s.DB.LastDeployments(ctx)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		for _, sv := range svcs {
 			if sv.Stack == in.Name {
+				summary.addService(sv)
 				view := toAPIService(sv, false)
 				view.LastDeployAt = deploys.ForService(sv.Name, sv.Stack)
 				detail.Services = append(detail.Services, view)
@@ -173,14 +179,10 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 		if len(detail.Services) == 0 && !managed {
 			return nil, problem(http.StatusNotFound, "not_found", "no such stack")
 		}
-		for _, st := range summarizeStacks(svcs) {
-			if st.Name == in.Name {
-				detail.ServiceCount, detail.Running = st.ServiceCount, st.Running
-				detail.Desired, detail.Healthy = st.Desired, st.Healthy
-				detail.SwarmUpdatedAt = st.SwarmUpdatedAt
-			}
-		}
 		detail.Name, detail.Managed = in.Name, managed
+		detail.ServiceCount, detail.Running, detail.Desired = summary.ServiceCount, summary.Running, summary.Desired
+		detail.Healthy = summary.ServiceCount > 0 && summary.Healthy
+		detail.SwarmUpdatedAt = summary.SwarmUpdatedAt
 		detail.LastDeployAt = deploys.Stacks[in.Name]
 		self, _ := s.Docker.Self(ctx)
 		detail.Self = self.Stack == in.Name
@@ -215,19 +217,14 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 		ID    string `path:"id"`
 		Limit int    `query:"limit" default:"50" minimum:"1" maximum:"500"`
 	}) (*deployListOutput, error) {
-		svcs, err := s.Docker.Services(ctx)
+		sv, err := s.apiFindService(ctx, in.ID)
 		if err != nil {
-			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
+			return nil, err
 		}
-		for _, sv := range svcs {
-			if sv.ID == in.ID || sv.Name == in.ID {
-				events, err := s.DB.DeploysFor(sv.Name, sv.Stack, in.Limit)
-				if err != nil {
-					return nil, backendProblem(http.StatusInternalServerError, "internal", err)
-				}
-				return &deployListOutput{Body: toAPIDeploys(events)}, nil
-			}
+		events, err := s.DB.DeploysFor(sv.Name, sv.Stack, in.Limit)
+		if err != nil {
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
-		return nil, problem(http.StatusNotFound, "not_found", "no such service")
+		return &deployListOutput{Body: toAPIDeploys(events)}, nil
 	})
 }

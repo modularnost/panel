@@ -131,19 +131,14 @@ func (s *Server) registerModules(api huma.API, viewer huma.Middlewares) {
 	}, func(ctx context.Context, in *struct {
 		ID string `path:"id"`
 	}) (*webhookListOutput, error) {
-		svcs, err := s.Docker.Services(ctx)
+		sv, err := s.apiFindService(ctx, in.ID)
 		if err != nil {
-			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
+			return nil, err
 		}
-		for _, sv := range svcs {
-			if sv.ID == in.ID || sv.Name == in.ID {
-				hooks, err := s.DB.WebhooksFor(sv.Name, sv.Stack)
-				if err != nil {
-					return nil, backendProblem(http.StatusInternalServerError, "internal", err)
-				}
-				return &webhookListOutput{Body: toAPIWebhooks(hooks)}, nil
-			}
+		hooks, err := s.DB.WebhooksFor(sv.Name, sv.Stack)
+		if err != nil {
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
-		return nil, problem(http.StatusNotFound, "not_found", "no such service")
+		return &webhookListOutput{Body: toAPIWebhooks(hooks)}, nil
 	})
 }
