@@ -61,6 +61,13 @@ func TestLastDeployments(t *testing.T) {
 	if latest := times.ForService("external_web", "external"); latest != nil {
 		t.Fatalf("expected unknown deployment time, got %v", latest)
 	}
+	for _, target := range [][2]string{{"app_web", "app"}, {"app_web", ""}, {"external_web", "external"}} {
+		latest, err := db.LastServiceDeployment(t.Context(), target[0], target[1])
+		want := times.ForService(target[0], target[1])
+		if err != nil || (latest == nil) != (want == nil) || (latest != nil && !latest.Equal(*want)) {
+			t.Errorf("LastServiceDeployment(%q) = %v, %v, want %v", target, latest, err, want)
+		}
+	}
 }
 
 func TestConcurrentUserChangesKeepAnAdmin(t *testing.T) {
