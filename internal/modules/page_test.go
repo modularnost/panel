@@ -129,8 +129,13 @@ func TestActionPath(t *testing.T) {
 		"/action/../x":     false,
 		"/action//x":       false,
 		"action/x":         false,
+		"/action/x?key=v":  false,
+		"/action/x#part":   false,
+		"/action/x%20y":    false,
+		`/action/x\y`:      false,
+		"/action/x;key=v":  false,
 	} {
-		if _, got := ActionPath(p); got != ok {
+		if accepted, got := ActionPath(p); got != ok || (got && accepted != p) {
 			t.Errorf("%q: %v, want %v", p, got, ok)
 		}
 	}

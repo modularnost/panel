@@ -199,8 +199,8 @@ under the block; anything else is shown as the error, with the body as the
 reason (up to 4 KiB). The panel then asks for the page again. The role is the
 one of the longest declared `path` that covers the action, as for a page: give a
 dangerous action its own `path` in the manifest with a higher `role`. An action
-outside `/action/` is refused, and so is one from a page the module did not
-declare as `ui`.
+must use a canonical path below `/action/` without query, fragment, percent
+escapes, backslashes, or path parameters. Its page must be declared as `ui`.
 
 ### Telling the panel a page changed
 

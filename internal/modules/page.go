@@ -142,11 +142,12 @@ const (
 	MaxActionAnswer = 4 << 10
 )
 
-// ActionPath is the cleaned path of an action below /action/, or false: a
-// button may call only what the module keeps for that.
+// ActionPath accepts only a canonical path below /action/.
 func ActionPath(p string) (string, bool) {
-	c := path.Clean("/" + p)
-	return c, strings.HasPrefix(c, "/action/") && c == p
+	if !strings.HasPrefix(p, "/action/") || strings.ContainsAny(p, "?#\\%;") || path.Clean(p) != p {
+		return "", false
+	}
+	return p, true
 }
 
 // Act sends what a button or a form carried to one of the module's actions and
