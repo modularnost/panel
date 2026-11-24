@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -75,11 +76,11 @@ func TestFetchPageSendsTheViewerSigned(t *testing.T) {
 
 	r := NewRegistry(nil, "secret")
 	m := Module{Name: "m", BaseURL: srv.URL}
-	d, err := r.FetchPage(context.Background(), m, "/service", "service=shop&range=6h", Viewer{"ann", "viewer"})
+	d, err := r.FetchPage(context.Background(), m, "/service", url.Values{"service": {"shop"}, "range": {"6h"}}, Viewer{"ann", "viewer"})
 	if err != nil || len(d.Blocks) != 1 {
 		t.Fatalf("%+v, %v", d, err)
 	}
-	if gotPath != "/service" || gotQuery != "service=shop&range=6h" {
+	if gotPath != "/service" || gotQuery != "range=6h&service=shop" {
 		t.Errorf("asked for %s?%s", gotPath, gotQuery)
 	}
 	token := r.Token("m")
@@ -111,7 +112,7 @@ func TestFetchPageFailures(t *testing.T) {
 			w.WriteHeader(c.status)
 			w.Write([]byte(c.body))
 		}))
-		_, err := NewRegistry(nil, "s").FetchPage(context.Background(), Module{Name: "m", BaseURL: srv.URL}, "/", "", Viewer{})
+		_, err := NewRegistry(nil, "s").FetchPage(context.Background(), Module{Name: "m", BaseURL: srv.URL}, "/", nil, Viewer{})
 		srv.Close()
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want one containing %q", name, err, c.want)

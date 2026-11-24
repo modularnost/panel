@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -49,12 +50,13 @@ func newUIFixture(t *testing.T) *uiFixture {
 
 func TestModulePageIsTheModulesDocumentForTheViewer(t *testing.T) {
 	f := newUIFixture(t)
-	status, body := send(t, f.c, "GET", f.base+"/api/v1/modules/m/page?path=/&query=range%3D1h%26service%3Dshop", "", "")
+	query := url.QueryEscape("service=store #1&range=1h&range=6h")
+	status, body := send(t, f.c, "GET", f.base+"/api/v1/modules/m/page?path=/&query="+query, "", "")
 	blocks, _ := body["blocks"].([]any)
 	if status != 200 || body["ui"] != float64(1) || len(blocks) != 1 {
 		t.Fatalf("%d %v", status, body)
 	}
-	if f.seen.path != "/" || f.seen.query != "range=1h&service=shop" || f.seen.user != "ann" || f.seen.role != store.RoleViewer {
+	if f.seen.path != "/" || f.seen.query != "range=1h&range=6h&service=store+%231" || f.seen.user != "ann" || f.seen.role != store.RoleViewer {
 		t.Errorf("the module was asked %+v", f.seen)
 	}
 }
@@ -70,6 +72,7 @@ func TestModulePageRefusals(t *testing.T) {
 		"a page the module never said":   {"/api/v1/modules/m/page?path=/other", 404, "not_found"},
 		"a module that is not installed": {"/api/v1/modules/nope/page?path=/", 404, "not_found"},
 		"no path at all":                 {"/api/v1/modules/m/page", 422, "invalid_input"},
+		"invalid query escape":           {"/api/v1/modules/m/page?path=/&query=" + url.QueryEscape("range=%xx"), 400, "bad_request"},
 	} {
 		if status, body := send(t, f.c, "GET", f.base+c.url, "", ""); status != c.status || errorCode(body) != c.code {
 			t.Errorf("%s: %d %v, want %d %s", name, status, body, c.status, c.code)

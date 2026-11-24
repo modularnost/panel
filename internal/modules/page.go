@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -113,15 +114,13 @@ func (r *Registry) sign(req *http.Request, m Module, v Viewer) {
 
 // FetchPage asks a module for the document of one of its pages. The request is
 // the panel's own: nothing the browser sent, cookies included, goes with it.
-func (r *Registry) FetchPage(ctx context.Context, m Module, p, rawQuery string, v Viewer) (Document, error) {
+func (r *Registry) FetchPage(ctx context.Context, m Module, p string, query url.Values, v Viewer) (Document, error) {
 	u := m.BaseURL + path.Clean("/"+p)
-	if rawQuery != "" {
-		u += "?" + rawQuery
-	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return Document{}, err
 	}
+	req.URL.RawQuery = query.Encode()
 	req.Header.Set("Accept", "application/json")
 	r.sign(req, m, v)
 	resp, err := r.http.Do(req)
