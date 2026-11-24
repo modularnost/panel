@@ -14,6 +14,15 @@ import (
 	"github.com/moby/moby/api/types/swarm"
 )
 
+func TestServiceRejectsMalformedIdentifiersBeforeInspect(t *testing.T) {
+	var c Client
+	for _, id := range []string{"", "two words", "api/service", "?name"} {
+		if _, found, err := c.Service(t.Context(), id); found || err != nil {
+			t.Errorf("Service(%q): found=%t, err=%v", id, found, err)
+		}
+	}
+}
+
 func TestServiceUsesInspectAndFiltersTasks(t *testing.T) {
 	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
