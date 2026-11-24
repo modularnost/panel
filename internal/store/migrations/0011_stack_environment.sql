@@ -1,0 +1,1 @@
+ALTER TABLE stacks ADD COLUMN environment TEXT NOT NULL DEFAULT '';
