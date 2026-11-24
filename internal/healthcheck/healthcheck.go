@@ -1,4 +1,4 @@
-package main
+package healthcheck
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func checkHealth(mode, addr string) error {
+func Check(mode, addr string) error {
 	path := "/healthz"
 	switch mode {
 	case "firewall", "firewall-clear":

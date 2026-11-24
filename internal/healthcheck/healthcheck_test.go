@@ -1,4 +1,4 @@
-package main
+package healthcheck
 
 import (
 	"net"
@@ -29,8 +29,8 @@ func TestHealthCheckModes(t *testing.T) {
 		{"invalid panel address", "", "invalid", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := checkHealth(tc.mode, tc.addr); (err == nil) != tc.ok {
-				t.Fatalf("checkHealth: %v, want success %v", err, tc.ok)
+			if err := Check(tc.mode, tc.addr); (err == nil) != tc.ok {
+				t.Fatalf("Check: %v, want success %v", err, tc.ok)
 			}
 		})
 	}
