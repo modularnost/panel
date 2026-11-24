@@ -289,6 +289,19 @@ at the registry when removing access.
 SQLite holds panel-owned data such as Compose files, deploy history, users,
 webhooks, firewall settings and encrypted registry credentials.
 
+### Stack environment variables
+
+In the stack editor, enter one `NAME=value` per line and reference it in the
+Compose file with `${NAME}`. For example, set `IMAGE_TAG=1.28` and use
+`image: nginx:${IMAGE_TAG}`. To pass a value to a container, reference it in
+that service's `environment` section.
+
+The panel treats everything after the first `=` as the literal value. Use
+`NAME=` for an empty value. Remove a line and deploy to remove that variable.
+After a successful deploy, the panel saves the variables for editing and
+redeploying the stack. Stack variables are stored in plaintext in SQLite and
+are visible to panel admins. Use Docker Swarm secrets for sensitive values.
+
 ### Screenshots
 
 ![Service overview showing the image, redeploy action, and CPU, memory, and network usage for each replica](docs/screenshots/service-overview.webp)

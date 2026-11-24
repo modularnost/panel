@@ -173,16 +173,8 @@ func router(name string) string    { return "traefik.http.routers." + name }
 func lbService(name string) string { return "traefik.http.services." + name }
 
 func (s *Server) findService(ctx context.Context, id string) (docker.Service, bool) {
-	svcs, err := s.Docker.Services(ctx)
-	if err != nil {
-		return docker.Service{}, false
-	}
-	for _, sv := range svcs {
-		if sv.ID == id || sv.Name == id {
-			return sv, true
-		}
-	}
-	return docker.Service{}, false
+	sv, found, err := s.Docker.Service(ctx, id)
+	return sv, found && err == nil
 }
 
 func traefikFrom(sv docker.Service) traefikForm {

@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const feed = `[
@@ -56,12 +58,22 @@ func TestNewerReleasesNewestFirst(t *testing.T) {
 }
 
 func TestNothingToUpdateFromAnEdgeBuild(t *testing.T) {
-	for _, cur := range []string{"dev", "v0.1.0-4-gabc1234", ""} {
-		c := checker(t, cur, serve(feed))
+	for _, cur := range []string{"dev", "edge", "v0.1.0-4-gabc1234", ""} {
+		var calls atomic.Int32
+		c := checker(t, cur, func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			serve(feed)(w, r)
+		})
 		if err := c.Refresh(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if st := c.Status(); st.ReleaseBuild || len(st.Newer) != 0 {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		c.Run(ctx, time.Hour)
+		cancel()
+		if got := calls.Load(); got != 0 {
+			t.Errorf("%q: made %d release feed requests", cur, got)
+		}
+		if st := c.Status(); st.ReleaseBuild || len(st.Newer) != 0 || !st.CheckedAt.IsZero() {
 			t.Errorf("%q: %+v", cur, st)
 		}
 	}
