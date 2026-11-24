@@ -47,13 +47,19 @@ func TestStatsSampleSharesWorkAcrossCallers(t *testing.T) {
 		close(release)
 		synctest.Wait()
 
-		c.sample(t.Context(), "web", collect)
+		if _, err := c.sample(t.Context(), "web", collect); err != nil {
+			t.Fatal(err)
+		}
 		if got := calls.Load(); got != 1 {
 			t.Fatalf("collected %d times before expiry, want 1", got)
 		}
-		c.sample(t.Context(), "db", collect)
+		if _, err := c.sample(t.Context(), "db", collect); err != nil {
+			t.Fatal(err)
+		}
 		time.Sleep(sampleTTL)
-		c.sample(t.Context(), "web", collect)
+		if _, err := c.sample(t.Context(), "web", collect); err != nil {
+			t.Fatal(err)
+		}
 		if got := calls.Load(); got != 3 {
 			t.Fatalf("collected %d times after a different filter and expiry, want 3", got)
 		}
