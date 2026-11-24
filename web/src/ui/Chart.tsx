@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { chartTop, formatUnix, formatValue, nearest, type Point } from "./document";
 
 type Series = { name: string; points: Point[] };
@@ -69,14 +69,33 @@ export function Chart({ block }: { block: ChartBlock }) {
   const setAt = (t: number | null) => (key && ctx ? ctx.set(key, t) : setLocal(t));
 
   const unit = typeof block.unit === "string" ? block.unit : undefined;
-  const series = seriesOf(block.series);
-  const all = series.flatMap((s) => s.points);
-  const from = Number.isFinite(block.from) ? (block.from as number) : Math.min(...all.map((p) => p[0]));
-  const to = Number.isFinite(block.to) ? (block.to as number) : Math.max(...all.map((p) => p[0]));
-  const span = Math.max(to - from, 1);
-  const top = chartTop(series);
-  const x = (t: number) => PAD.left + (plotW * (t - from)) / span;
-  const y = (v: number) => PAD.top + PLOT_H * (1 - v / top);
+  const { series: rawSeries, from: rawFrom, to: rawTo } = block;
+  const { series, all, from, to, span, top, x, y, paths } = useMemo(() => {
+    const series = seriesOf(rawSeries);
+    const all = series.flatMap((s) => s.points);
+    const from = Number.isFinite(rawFrom) ? (rawFrom as number) : Math.min(...all.map((p) => p[0]));
+    const to = Number.isFinite(rawTo) ? (rawTo as number) : Math.max(...all.map((p) => p[0]));
+    const span = Math.max(to - from, 1);
+    const top = chartTop(series);
+    const x = (t: number) => PAD.left + (plotW * (t - from)) / span;
+    const y = (v: number) => PAD.top + PLOT_H * (1 - v / top);
+    const paths = series.map((s, i) => {
+      if (s.points.length === 0) return null;
+      const color = COLORS[i % COLORS.length];
+      const line = s.points.map(([t, v], j) => `${j ? "L" : "M"}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join("");
+      const first = s.points[0][0];
+      const last = s.points[s.points.length - 1][0];
+      return (
+        <g key={i} style={{ color }}>
+          {series.length === 1 && (
+            <path className="area" d={`${line}L${x(last).toFixed(1)},${y(0)}L${x(first).toFixed(1)},${y(0)}Z`} />
+          )}
+          <path className="line" d={line} />
+        </g>
+      );
+    });
+    return { series, all, from, to, span, top, x, y, paths };
+  }, [rawSeries, rawFrom, rawTo, plotW]);
   const title = typeof block.title === "string" ? block.title : "";
 
   const move = (e: PointerEvent<SVGSVGElement>) => {
@@ -127,21 +146,7 @@ export function Chart({ block }: { block: ChartBlock }) {
                 {formatUnix(t)}
               </text>
             ))}
-            {series.map((s, i) => {
-              if (s.points.length === 0) return null;
-              const color = COLORS[i % COLORS.length];
-              const line = s.points.map(([t, v], j) => `${j ? "L" : "M"}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join("");
-              const first = s.points[0][0];
-              const last = s.points[s.points.length - 1][0];
-              return (
-                <g key={i} style={{ color }}>
-                  {series.length === 1 && (
-                    <path className="area" d={`${line}L${x(last).toFixed(1)},${y(0)}L${x(first).toFixed(1)},${y(0)}Z`} />
-                  )}
-                  <path className="line" d={line} />
-                </g>
-              );
-            })}
+            {paths}
             {snapped !== undefined && (
               <g className="cursor">
                 <line x1={x(snapped)} x2={x(snapped)} y1={PAD.top} y2={PAD.top + PLOT_H} />
