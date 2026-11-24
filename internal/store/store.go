@@ -28,10 +28,14 @@ func init() {
 	})
 }
 
-type DB struct{ *sql.DB }
+type DB struct {
+	*sql.DB
+	backupDSN string
+}
 
 func Open(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	dsn := path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -41,13 +45,31 @@ func Open(path string) (*DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	return &DB{db}, nil
+	d := &DB{DB: db}
+	file, err := d.Path()
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	if file != "" {
+		d.backupDSN = dsn
+	}
+	return d, nil
 }
 
 // Backup writes a consistent copy of the database to dest, which must not
 // exist yet. Migrations only go forward, so this is the way back.
 func (d *DB) Backup(dest string) error {
-	_, err := d.Exec("VACUUM INTO ?", dest)
+	source := d.DB
+	if d.backupDSN != "" {
+		var err error
+		source, err = sql.Open("sqlite", d.backupDSN)
+		if err != nil {
+			return err
+		}
+		defer source.Close()
+	}
+	_, err := source.Exec("VACUUM INTO ?", dest)
 	return err
 }
 
