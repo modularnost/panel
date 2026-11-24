@@ -17,13 +17,21 @@ const (
 
 var errPasswordChecksBusy = errors.New("password checks are busy")
 
-func (s *Server) authenticatePassword(name, pass string) (store.User, error) {
+func (s *Server) authenticatePassword(r *http.Request, name, pass string) (store.User, time.Duration, error) {
+	ip, user := loginKeys(r, s.TrustedProxies, name)
+	finish, wait := s.logins.reserve(ip, user)
+	if wait > 0 {
+		return store.User{}, wait, nil
+	}
 	if s.passwordChecks.Add(1) > maxPasswordChecks {
 		s.passwordChecks.Add(-1)
-		return store.User{}, errPasswordChecksBusy
+		finish(false, false)
+		return store.User{}, 0, errPasswordChecksBusy
 	}
 	defer s.passwordChecks.Add(-1)
-	return s.DB.Authenticate(name, pass)
+	u, err := s.DB.Authenticate(name, pass)
+	finish(errors.Is(err, store.ErrNoUser), err == nil)
+	return u, 0, err
 }
 
 type ctxKey struct{}
@@ -41,15 +49,10 @@ func (s *Server) identify(r *http.Request) (store.User, bool) {
 			return u, true
 		}
 	}
-	if name, pass, ok := r.BasicAuth(); ok && s.loginBlocked(r, name) == 0 {
-		// The same counters as the sign-in form: this is a password guess too.
-		u, err := s.authenticatePassword(name, pass)
-		if err == nil {
-			s.loginSucceeded(r, name)
+	if name, pass, ok := r.BasicAuth(); ok {
+		u, wait, err := s.authenticatePassword(r, name, pass)
+		if wait == 0 && err == nil {
 			return u, true
-		}
-		if errors.Is(err, store.ErrNoUser) {
-			s.loginFailed(r, name)
 		}
 	}
 	return store.User{}, false

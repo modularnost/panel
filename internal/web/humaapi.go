@@ -135,27 +135,25 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 		Summary: "Sign in; the session cookie is set on the response",
 	}, func(ctx context.Context, in *loginInput) (*loginOutput, error) {
 		r, _ := ctx.Value(reqKey{}).(*http.Request)
-		if wait := s.loginBlocked(r, in.Body.Username); wait > 0 {
+		u, wait, err := s.authenticatePassword(r, in.Body.Username, in.Body.Password)
+		if wait > 0 {
 			secs := retryAfterSeconds(wait)
 			return nil, huma.ErrorWithHeaders(
 				problem(http.StatusTooManyRequests, "too_many_attempts",
 					"too many attempts, try again in "+plural(secs, "second")),
 				http.Header{"Retry-After": {strconv.Itoa(secs)}})
 		}
-		u, err := s.authenticatePassword(in.Body.Username, in.Body.Password)
 		if errors.Is(err, errPasswordChecksBusy) {
 			return nil, huma.ErrorWithHeaders(
 				problem(http.StatusTooManyRequests, "too_many_attempts", "sign-in is busy, try again in 1 second"),
 				http.Header{"Retry-After": {"1"}})
 		}
 		if errors.Is(err, store.ErrNoUser) {
-			s.loginFailed(r, in.Body.Username)
 			return nil, problem(http.StatusUnauthorized, "invalid_credentials", err.Error())
 		}
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
-		s.loginSucceeded(r, in.Body.Username)
 		c, err := s.sessionCookie(r, u.ID)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)

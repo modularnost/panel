@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -62,72 +63,149 @@ type fakeClock struct{ t time.Time }
 
 func (c *fakeClock) now() time.Time { return c.t }
 
+func checkWait(l *loginLimiter, ip, user string) time.Duration {
+	finish, wait := l.reserve(ip, user)
+	if finish != nil {
+		finish(false, false)
+	}
+	return wait
+}
+
+func recordFailure(t *testing.T, l *loginLimiter, ip, user string) {
+	t.Helper()
+	finish, wait := l.reserve(ip, user)
+	if finish == nil {
+		t.Fatalf("unexpected pause %v", wait)
+	}
+	finish(true, false)
+}
+
 func TestLimiterPausesDoubleAndNeverLock(t *testing.T) {
 	clock := &fakeClock{t: time.Unix(1_000_000, 0)}
 	l := &loginLimiter{now: clock.now}
 	for range freeAttempts - 1 {
-		l.fail("k")
-		if w := l.wait("k"); w != 0 {
+		recordFailure(t, l, "ip", "user")
+		if w := checkWait(l, "ip", "user"); w != 0 {
 			t.Fatalf("paused before the free attempts were used: %v", w)
 		}
 	}
 	for i, want := range []time.Duration{time.Second, 2 * time.Second, 4 * time.Second} {
-		l.fail("k")
-		if got := l.wait("k"); got != want {
+		recordFailure(t, l, "ip", "user")
+		if got := checkWait(l, "ip", "user"); got != want {
 			t.Fatalf("failure %d: pause %v, want %v", freeAttempts+i, got, want)
 		}
 		clock.t = clock.t.Add(want) // wait it out
 	}
 	for range 20 {
-		l.fail("k")
+		recordFailure(t, l, "ip", "user")
 		clock.t = clock.t.Add(maxPause)
 	}
-	l.fail("k")
-	if got := l.wait("k"); got != maxPause {
+	recordFailure(t, l, "ip", "user")
+	if got := checkWait(l, "ip", "user"); got != maxPause {
 		t.Fatalf("pause %v must stop growing at %v", got, maxPause)
 	}
 	clock.t = clock.t.Add(attemptWindow + maxPause)
-	if got := l.wait("k"); got != 0 {
+	if got := checkWait(l, "ip", "user"); got != 0 {
 		t.Fatalf("a quiet key must be free again, still %v", got)
 	}
-	l.fail("k")
-	if got := l.wait("k"); got != 0 {
+	recordFailure(t, l, "ip", "user")
+	if got := checkWait(l, "ip", "user"); got != 0 {
 		t.Fatalf("a long quiet key starts again from one failure, got pause %v", got)
 	}
 }
 
 func TestLimiterPerAddressAndPerName(t *testing.T) {
 	clock := &fakeClock{t: time.Unix(1_000_000, 0)}
-	s := &Server{logins: loginLimiter{now: clock.now}}
+	l := &loginLimiter{now: clock.now}
 	attacker := req("203.0.113.7:1")
 	other := req("198.51.100.9:1")
+	fail := func(r *http.Request, name string) {
+		ip, user := loginKeys(r, nil, name)
+		recordFailure(t, l, ip, user)
+	}
+	wait := func(r *http.Request, name string) time.Duration {
+		ip, user := loginKeys(r, nil, name)
+		return checkWait(l, ip, user)
+	}
 
 	// One address guessing against many different names.
 	for i := range freeAttempts {
-		s.loginFailed(attacker, "user"+string(rune('a'+i)))
+		fail(attacker, "user"+string(rune('a'+i)))
 	}
-	if s.loginBlocked(attacker, "fresh") == 0 {
+	if wait(attacker, "fresh") == 0 {
 		t.Error("the address must be paused whatever name it tries")
 	}
-	if s.loginBlocked(other, "fresh") != 0 {
+	if wait(other, "fresh") != 0 {
 		t.Error("another address must not feel it")
 	}
 
 	// Many addresses guessing against one name, spelled differently.
 	for i := range freeAttempts {
-		s.loginFailed(req("192.0.2."+string(rune('1'+i))+":1"), "  Ann ")
+		fail(req("192.0.2."+string(rune('1'+i))+":1"), "  Ann ")
 	}
-	if s.loginBlocked(other, "ann") == 0 {
+	if wait(other, "ann") == 0 {
 		t.Error("the name must be paused for everyone, in any case and spacing")
 	}
 
 	// Success clears the name, but not the address.
-	s.loginSucceeded(other, "ann")
-	if s.loginBlocked(other, "ann") != 0 {
-		t.Error("a successful sign-in clears the name")
+	clock.t = clock.t.Add(time.Second)
+	ip, user := loginKeys(other, nil, "ann")
+	finish, delay := l.reserve(ip, user)
+	if finish == nil {
+		t.Fatalf("unexpected pause %v", delay)
 	}
-	if s.loginBlocked(attacker, "fresh") == 0 {
-		t.Error("a success elsewhere must not clear the attacker's address")
+	finish(false, true)
+	if l.m[user] != nil {
+		t.Error("a successful sign-in must clear the name")
+	}
+	ip, _ = loginKeys(attacker, nil, "fresh")
+	if l.m[ip] == nil || l.m[ip].fails != freeAttempts {
+		t.Error("a success elsewhere must preserve the address's failure count")
+	}
+}
+
+func TestLoginReservationsShareRemainingBudget(t *testing.T) {
+	l := &loginLimiter{}
+	for range freeAttempts - 1 {
+		recordFailure(t, l, "ip", "user")
+	}
+	var wg sync.WaitGroup
+	reservations := make(chan func(bool, bool), 2)
+	for range cap(reservations) {
+		wg.Go(func() {
+			finish, _ := l.reserve("ip", "user")
+			reservations <- finish
+		})
+	}
+	wg.Wait()
+	close(reservations)
+	admitted := 0
+	for finish := range reservations {
+		if finish != nil {
+			admitted++
+			finish(false, true)
+		}
+	}
+	if admitted != 1 {
+		t.Fatalf("got %d reservations for the last slot, want 1", admitted)
+	}
+	if wait := checkWait(l, "ip", "user"); wait != 0 {
+		t.Fatalf("successful sign-in did not release its slot: %v", wait)
+	}
+}
+
+func TestLoginReservationsBoundTracking(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1_000_000, 0)}
+	l := &loginLimiter{now: clock.now, m: make(map[string]*attempts)}
+	for i := range maxTracked - 1 {
+		l.m[string(rune(i))] = &attempts{fails: 1, last: clock.t}
+	}
+	if wait := checkWait(l, "ip:example", "user:example"); wait == 0 {
+		t.Fatal("admitted an attempt without room for both keys")
+	}
+	clock.t = clock.t.Add(attemptWindow + time.Second)
+	if wait := checkWait(l, "ip:example", "user:example"); wait != 0 {
+		t.Fatalf("expired entries still occupy the table: %v", wait)
 	}
 }
 

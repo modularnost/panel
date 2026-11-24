@@ -17,9 +17,10 @@ const (
 )
 
 type attempts struct {
-	fails int
-	until time.Time // no attempt before this
-	last  time.Time
+	pending int
+	fails   int
+	until   time.Time // no attempt before this
+	last    time.Time
 }
 
 const webhookRequestsPerMinute = 60
@@ -50,9 +51,10 @@ func (l *webhookLimiter) take(ip string, now time.Time) time.Duration {
 // short enough not to matter to its owner. State is in memory; a restart
 // forgets it, which costs the attacker nothing it did not already have.
 type loginLimiter struct {
-	mu  sync.Mutex
-	m   map[string]*attempts
-	now func() time.Time // a test sets it
+	mu        sync.Mutex
+	m         map[string]*attempts
+	now       func() time.Time // a test sets it
+	nextPrune time.Time
 }
 
 func (l *loginLimiter) clock() time.Time {
@@ -62,61 +64,75 @@ func (l *loginLimiter) clock() time.Time {
 	return time.Now()
 }
 
-// wait is how long the longest-paused key still has to wait; zero means go on.
-func (l *loginLimiter) wait(keys ...string) time.Duration {
+func (l *loginLimiter) reserve(ip, user string) (finish func(failed, succeeded bool), wait time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.clock()
-	var longest time.Duration
-	for _, k := range keys {
-		if a := l.m[k]; a != nil && a.until.After(now) {
-			longest = max(longest, a.until.Sub(now))
-		}
-	}
-	return longest
-}
-
-func (l *loginLimiter) fail(keys ...string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	now := l.clock()
-	if l.m == nil {
-		l.m = map[string]*attempts{}
-	}
-	if len(l.m) >= maxTracked {
+	if !now.Before(l.nextPrune) {
 		l.prune(now)
+		l.nextPrune = now.Add(time.Second)
 	}
+	keys := [2]string{ip, user}
+	missing := 0
 	for _, k := range keys {
 		a := l.m[k]
 		if a == nil {
-			// ponytail: past the cap an unseen key goes untracked, the per-IP keys still hold; add eviction if it shows.
-			if len(l.m) >= maxTracked {
-				continue
-			}
-			a = &attempts{}
-			l.m[k] = a
+			missing++
+			continue
 		}
-		if now.Sub(a.last) > attemptWindow {
+		if a.pending == 0 && now.Sub(a.last) > attemptWindow {
 			a.fails = 0
 		}
-		a.fails++
-		a.last = now
-		if a.fails >= freeAttempts {
-			pause := time.Second << min(a.fails-freeAttempts, 6)
-			a.until = now.Add(min(pause, maxPause))
+		if a.until.After(now) {
+			wait = max(wait, a.until.Sub(now))
+		} else if a.pending >= max(1, freeAttempts-a.fails) {
+			wait = max(wait, time.Second)
 		}
 	}
-}
-
-func (l *loginLimiter) reset(key string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	delete(l.m, key)
+	if len(l.m)+missing > maxTracked {
+		wait = max(wait, time.Second)
+	}
+	if wait > 0 {
+		return nil, wait
+	}
+	if l.m == nil {
+		l.m = make(map[string]*attempts)
+	}
+	for _, k := range keys {
+		if l.m[k] == nil {
+			l.m[k] = &attempts{}
+		}
+		l.m[k].pending++
+	}
+	return func(failed, succeeded bool) {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		now := l.clock()
+		for _, k := range keys {
+			a := l.m[k]
+			a.pending--
+			switch {
+			case failed:
+				a.fails++
+				a.last = now
+				if a.fails >= freeAttempts {
+					pause := time.Second << min(a.fails-freeAttempts, 6)
+					a.until = now.Add(min(pause, maxPause))
+				}
+			case succeeded && k == user:
+				a.fails = 0
+				a.until = time.Time{}
+			}
+			if a.pending == 0 && a.fails == 0 {
+				delete(l.m, k)
+			}
+		}
+	}, 0
 }
 
 func (l *loginLimiter) prune(now time.Time) {
 	for k, a := range l.m {
-		if now.Sub(a.last) > attemptWindow && !a.until.After(now) {
+		if a.pending == 0 && now.Sub(a.last) > attemptWindow && !a.until.After(now) {
 			delete(l.m, k)
 		}
 	}
@@ -126,24 +142,6 @@ func (l *loginLimiter) prune(now time.Time) {
 // a different answer for an unknown name would tell an attacker which exist.
 func loginKeys(r *http.Request, trusted []netip.Prefix, username string) (ip, user string) {
 	return "ip:" + clientIP(r, trusted), "user:" + strings.ToLower(strings.TrimSpace(username))
-}
-
-// loginBlocked is how long this caller must wait before a password is tried.
-func (s *Server) loginBlocked(r *http.Request, username string) time.Duration {
-	ip, user := loginKeys(r, s.TrustedProxies, username)
-	return s.logins.wait(ip, user)
-}
-
-func (s *Server) loginFailed(r *http.Request, username string) {
-	ip, user := loginKeys(r, s.TrustedProxies, username)
-	s.logins.fail(ip, user)
-}
-
-// loginSucceeded clears the name only: a signed-in attacker must not be able
-// to wipe the counter of the address it guesses from.
-func (s *Server) loginSucceeded(r *http.Request, username string) {
-	_, user := loginKeys(r, s.TrustedProxies, username)
-	s.logins.reset(user)
 }
 
 func plural(n int, unit string) string {
