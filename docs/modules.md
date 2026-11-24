@@ -145,6 +145,8 @@ the manifest declared; the role of the contribution applies.
 For a tab the context is in the query (`?service=<name>`), and
 so is what a `choice` block set (`?range=24h`): the panel keeps it in its own
 URL and asks again when it changes.
+The panel parses and encodes these parameters before forwarding them. Repeated
+values are preserved, and invalid query syntax returns HTTP 400.
 
 `ui` is the version of the vocabulary: `1`. A block the panel does not know is
 shown as unsupported and the rest of the page still draws, so a module may use

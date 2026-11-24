@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"path"
 	"time"
 
@@ -71,13 +72,17 @@ func (s *Server) registerPages(api huma.API, viewer huma.Middlewares) {
 	}, func(ctx context.Context, in *struct {
 		Name  string `path:"name"`
 		Path  string `query:"path" required:"true" doc:"The contribution's path"`
-		Query string `query:"query" doc:"What the module is told as its query string: the context of a tab, the range of a chart"`
+		Query string `query:"query" doc:"URL query string for the module, such as tab context or a chart range. Invalid syntax returns 400."`
 	}) (*pageOutput, error) {
 		m, u, p, err := s.uiPage(ctx, in.Name, in.Path)
 		if err != nil {
 			return nil, err
 		}
-		doc, err := s.Modules.FetchPage(ctx, m, p, in.Query, modules.Viewer{Username: u.Username, Role: u.Role})
+		query, err := url.ParseQuery(in.Query)
+		if err != nil {
+			return nil, problem(http.StatusBadRequest, "bad_request", "query: invalid URL query string")
+		}
+		doc, err := s.Modules.FetchPage(ctx, m, p, query, modules.Viewer{Username: u.Username, Role: u.Role})
 		if err != nil {
 			return nil, backendProblem(http.StatusBadGateway, "module_error", err)
 		}

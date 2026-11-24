@@ -2451,12 +2451,12 @@
             }
           },
           {
-            "description": "What the module is told as its query string: the context of a tab, the range of a chart",
+            "description": "URL query string for the module, such as tab context or a chart range. Invalid syntax returns 400.",
             "explode": false,
             "in": "query",
             "name": "query",
             "schema": {
-              "description": "What the module is told as its query string: the context of a tab, the range of a chart",
+              "description": "URL query string for the module, such as tab context or a chart range. Invalid syntax returns 400.",
               "type": "string"
             }
           }
