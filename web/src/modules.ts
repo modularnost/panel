@@ -1,7 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { api, call } from "./api/client";
 import type { Contribution, Module, Service } from "./api/generated";
 import { atLeast } from "./auth";
+
+export const moduleCatalogQuery = queryOptions({
+  queryKey: ["module-catalog"],
+  queryFn: () => call(api.getModuleCatalog()),
+});
 
 export function useModules(enabled = true) {
   return useQuery({
@@ -10,6 +15,16 @@ export function useModules(enabled = true) {
     refetchInterval: 10_000,
     enabled,
   });
+}
+
+export function permissionDescription(permission: string) {
+  switch (permission) {
+    case "stats:read": return "Read resource statistics";
+    case "service:read": return "Read Swarm services";
+    case "service:update": return "Redeploy Swarm services";
+    case "service:create": return "Create Swarm services";
+    default: return permission;
+  }
 }
 
 export type Slotted = { module: string; contribution: Contribution };

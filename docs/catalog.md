@@ -5,6 +5,12 @@ Administrators can browse the curated
 **Modules → Catalog**. A module is an ordinary Swarm service. See
 [modules.md](modules.md) for the module contract and manual installation.
 
+Open **Module details** on a catalog card to review its maintainer, catalog
+version, permissions, source, and documentation. On the **Installed** tab, the
+same control shows the installed version, Swarm service, and permissions. A
+ready module with a menu page has an **Open** action. Administrators see the
+catalog description on both tabs when the installed module is listed there.
+
 Nothing here is installed automatically. The panel does not read this file: it
 discovers whatever is running in your cluster by labels, and this page only
 answers "what exists".

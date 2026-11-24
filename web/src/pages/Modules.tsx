@@ -1,31 +1,38 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, Outlet } from "react-router";
 import { api, call, retryableQueryError } from "../api/client";
 import { RefreshWarning } from "../components/RefreshWarning";
 import { atLeast, useMe } from "../auth";
-import { modulePath } from "../modules";
-import { Button } from "../components/Button";
-import { Chip } from "../components/Chip";
+import { moduleCatalogQuery, modulePath, permissionDescription, slot } from "../modules";
+import { Button, LinkButton } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
-import { Table } from "../components/Table";
+import { Icon } from "../components/Icon";
 import { Tab, Tabs } from "../components/Tabs";
 
 export function Modules() {
   const me = useMe();
+  const admin = atLeast(me.data?.role, "admin");
+  const [tabActions, setTabActions] = useState<HTMLDivElement | null>(null);
   return (
-    <>
-      <h1>Modules</h1>
-      {atLeast(me.data?.role, "admin") && (
-        <>
+    <div className="modules-page">
+      <header className="modules-heading">
+        <h1>Modules</h1>
+        {admin && (
+          <LinkButton variant="outlined" to="/install-module">Install from image</LinkButton>
+        )}
+      </header>
+      {admin && (
+        <div className="module-tabs-row">
           <Tabs label="Modules">
             <Tab to="/modules/catalog" end>Catalog</Tab>
             <Tab to="/modules" end>Installed</Tab>
           </Tabs>
-          <p><Link to="/install-module">Install from image</Link></p>
-        </>
+          <div ref={setTabActions} />
+        </div>
       )}
-      <Outlet />
-    </>
+      <Outlet context={tabActions} />
+    </div>
   );
 }
 
@@ -34,6 +41,8 @@ export function InstalledModules() {
   const queryClient = useQueryClient();
   const admin = atLeast(me.data?.role, "admin");
   const { confirm } = useDialogs();
+  const catalog = useQuery({ ...moduleCatalogQuery, enabled: admin });
+  const entries = admin ? catalog.data?.modules : undefined;
 
   const modules = useQuery({
     queryKey: ["modules"],
@@ -45,75 +54,82 @@ export function InstalledModules() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["modules"] }),
   });
 
-  // The first menu entry this role may open.
-  const firstNav = (m: { contributions: { slot: string; path: string; role: string }[] }) =>
-    m.contributions.find((c) => c.slot === "nav" && atLeast(me.data?.role, c.role as "viewer" | "operator" | "admin"));
-
-  if (modules.isPending) return <p>Loading…</p>;
+  if (modules.isPending) return <p role="status">Loading installed modules…</p>;
   if (modules.isError && (modules.data === undefined || !retryableQueryError(modules.error))) {
-    return <p className="error">{modules.error.message}</p>;
+    return <p className="error" role="alert">{modules.error.message}</p>;
   }
 
   return (
     <>
       <RefreshWarning error={modules.error} />
-      {uninstall.isError && <p className="error">{uninstall.error.message}</p>}
+      {uninstall.isError && <p className="error" role="alert">{uninstall.error.message}</p>}
       {modules.data.length === 0 ? (
-        <p className="muted">No modules.</p>
+        <div className="module-card module-empty">
+          <h2>No installed modules</h2>
+          {admin && <LinkButton variant="tonal" to="/modules/catalog">Browse catalog</LinkButton>}
+        </div>
       ) : (
-        <Table>
-          <thead>
-            <tr>
-              <th>Module</th>
-              <th>Version</th>
-              <th>Service</th>
-              <th>Status</th>
-              <th>Permissions</th>
-              {admin && <th />}
-            </tr>
-          </thead>
-          <tbody>
-            {modules.data.map((m) => (
-              <tr key={m.name}>
-                <td>
-                  {m.ok && firstNav(m) ? (
-                    <Link to={modulePath(m.name, firstNav(m)!.path)}>{m.name}</Link>
-                  ) : (
-                    m.name
-                  )}
-                </td>
-                <td>{m.version}</td>
-                <td className="mono">{m.service}</td>
-                <td>
-                  {m.ok && <Chip tone="ok">ok</Chip>}
-                  {m.state === "starting" && <Chip>{m.error}</Chip>}
-                  {(m.state === "failed" || m.state === "error") && (
-                    <Chip tone="bad">{m.error || "unavailable"}</Chip>
-                  )}
-                </td>
-                <td className="muted">{m.permissions.join(", ")}</td>
-                {admin && (
-                  <td>
-                    <Button
-                      variant="text"
-                      disabled={uninstall.isPending}
-                      onClick={async () =>
-                        (await confirm({
-                          title: `Remove ${m.name}?`,
-                          message: "Its service is stopped; the image and its data stay.",
-                          action: "Remove",
-                          danger: true,
-                        })) && uninstall.mutate(m.name)
-                      }
-                    >
-                      Remove
-                    </Button>
-                  </td>
+        <div className="module-grid">
+          {modules.data.map((m) => {
+            const nav = slot([m], "nav", me.data?.role)[0]?.contribution;
+            const serviceTabs = slot([m], "service.tab", me.data?.role)
+              .map(({ contribution }) => contribution.title).join(", ");
+            const summary = entries?.find((entry) => entry.id.toLowerCase() === m.name.toLowerCase())?.summary;
+            const title = nav?.title || m.name;
+            const issue = m.error || (m.state === "starting" ? "Waiting for Swarm replicas" : "Module is not responding");
+            const service = `/services/${encodeURIComponent(m.service)}`;
+            return (
+              <article className="module-card" key={m.name}>
+                <header className="module-card-heading">
+                  <span className="module-icon"><Icon name="extension" /></span>
+                  <h2>{title}</h2>
+                </header>
+                {!m.ok && <p className={m.state === "starting" ? "muted" : "error"}>{issue}</p>}
+                {summary ? <p>{summary}</p> : serviceTabs && <p>Service tabs: {serviceTabs}</p>}
+                <details className="module-details">
+                  <summary><Icon name="chevron_right" size={18} />Module details</summary>
+                  <dl>
+                    {m.version && <>
+                      <dt>Installed version</dt>
+                      <dd>{m.version}</dd>
+                    </>}
+                    <dt>Swarm service</dt>
+                    <dd><Link to={service}><code>{m.service}</code></Link></dd>
+                    <dt>Permissions</dt>
+                    <dd>{m.permissions.map(permissionDescription).join(", ") || "None"}</dd>
+                    {summary && serviceTabs && <>
+                      <dt>Service tabs</dt>
+                      <dd>{serviceTabs}</dd>
+                    </>}
+                  </dl>
+                </details>
+                {(nav || !m.ok || admin) && (
+                  <footer className="module-actions">
+                    {nav && <LinkButton to={modulePath(m.name, nav.path)}>Open {nav.title}</LinkButton>}
+                    {!m.ok && <LinkButton variant="tonal" to={`${service}/logs`}>View service logs</LinkButton>}
+                    {admin && (
+                      <Button
+                        variant="text"
+                        aria-label={`Remove ${title}`}
+                        disabled={uninstall.isPending}
+                        onClick={async () =>
+                          (await confirm({
+                            title: `Remove ${title}?`,
+                            message: "Its service is stopped; the image and its data stay.",
+                            action: "Remove",
+                            danger: true,
+                          })) && uninstall.mutate(m.name)
+                        }
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </footer>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+              </article>
+            );
+          })}
+        </div>
       )}
     </>
   );
