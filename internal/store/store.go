@@ -310,24 +310,27 @@ func (d *DB) deploys(where string, args []any, limit int) ([]DeployEvent, error)
 type Stack struct {
 	Name         string
 	Compose      string
+	Environment  string
 	RegistryHost string
 	UpdatedBy    string
 	UpdatedAt    time.Time
 }
 
-func (d *DB) SaveStack(name, compose, by, registryHost string) error {
-	_, err := d.Exec(`INSERT INTO stacks (name, compose, updated_by, registry_host, updated_at)
-		VALUES (?,?,?,?,CURRENT_TIMESTAMP)
+func (d *DB) SaveStack(s Stack) error {
+	_, err := d.Exec(`INSERT INTO stacks (name, compose, environment, updated_by, registry_host, updated_at)
+		VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
 		ON CONFLICT(name) DO UPDATE SET compose=excluded.compose,
-			updated_by=excluded.updated_by, registry_host=excluded.registry_host, updated_at=CURRENT_TIMESTAMP`, name, compose, by, registryHost)
+			environment=excluded.environment, updated_by=excluded.updated_by,
+			registry_host=excluded.registry_host, updated_at=CURRENT_TIMESTAMP`,
+		s.Name, s.Compose, s.Environment, s.UpdatedBy, s.RegistryHost)
 	return err
 }
 
 // Stack returns the stored compose file, if the stack was deployed from the panel.
 func (d *DB) Stack(name string) (Stack, bool) {
 	var s Stack
-	err := d.QueryRow(`SELECT name, compose, updated_by, updated_at, registry_host FROM stacks WHERE name=?`,
-		name).Scan(&s.Name, &s.Compose, &s.UpdatedBy, &s.UpdatedAt, &s.RegistryHost)
+	err := d.QueryRow(`SELECT name, compose, environment, updated_by, updated_at, registry_host FROM stacks WHERE name=?`,
+		name).Scan(&s.Name, &s.Compose, &s.Environment, &s.UpdatedBy, &s.UpdatedAt, &s.RegistryHost)
 	return s, err == nil
 }
 

@@ -118,12 +118,16 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 
 // DeployStack runs `docker stack deploy`: compose is a client-side format the
 // daemon API does not know, so the image ships the CLI.
-func (c *Client) DeployStack(ctx context.Context, name, compose string, auth *registry.AuthConfig) (string, error) {
+func (c *Client) DeployStack(ctx context.Context, name, compose string, values map[string]string, auth *registry.AuthConfig) (string, error) {
 	if !ValidName(name) {
 		return "", fmt.Errorf("stack name %q: letters, digits, dot, dash and underscore only", name)
 	}
 	if strings.TrimSpace(compose) == "" {
 		return "", fmt.Errorf("compose file is empty")
+	}
+	compose, variables, err := stackComposeEnvironment(compose, values)
+	if err != nil {
+		return "", err
 	}
 	args := []string{"stack", "deploy",
 		"--compose-file", "-", // read the file from stdin, nothing hits the disk
@@ -144,8 +148,18 @@ func (c *Client) DeployStack(ctx context.Context, name, compose string, auth *re
 	}
 	cmd := exec.CommandContext(ctx, "docker", append(args, name)...)
 	cmd.Env = env
+	if len(variables) > 0 {
+		cmd.Env = append(cmd.Environ(), variables...)
+	}
 	cmd.Stdin = strings.NewReader(compose)
 	out, err := cmd.CombinedOutput()
+	if len(variables) > 0 {
+		// Docker can print interpolated values in diagnostics.
+		if err != nil {
+			return "", fmt.Errorf("docker stack deploy with environment variables: %w", err)
+		}
+		return "", nil
+	}
 	if err != nil {
 		return string(out), fmt.Errorf("docker stack deploy: %w: %s", err, strings.TrimSpace(string(out)))
 	}

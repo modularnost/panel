@@ -2,14 +2,88 @@ package modules
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"modularnost/internal/agent"
+	"modularnost/internal/docker"
 	"modularnost/internal/firewall"
 )
+
+func TestDiscoveryServesCachedListWhileRefreshingAndHonorsForget(t *testing.T) {
+	busy, release := make(chan struct{}), make(chan struct{})
+	var scans atomic.Int32
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/_ping":
+			w.Header().Set("API-Version", "1.40")
+		case "/v1.40/services":
+			if scans.Add(1) == 1 {
+				close(busy)
+				select {
+				case <-release:
+				case <-r.Context().Done():
+				}
+			}
+			_, _ = io.WriteString(w, `[]`)
+		case "/v1.40/tasks":
+			_, _ = io.WriteString(w, `[]`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer daemon.Close()
+	t.Setenv("DOCKER_HOST", daemon.URL)
+	t.Setenv("DOCKER_API_VERSION", "")
+	t.Setenv("DOCKER_TLS_VERIFY", "")
+	t.Setenv("DOCKER_CERT_PATH", "")
+	dk, err := docker.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dk.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	r := NewRegistry(dk, "test-secret")
+	r.cached = []Module{{Name: "previous"}}
+	r.at = time.Now().Add(-ttl)
+	result := make(chan error, 1)
+	go func() {
+		_, err := r.list(ctx, true)
+		result <- err
+	}()
+	select {
+	case <-busy:
+	case <-ctx.Done():
+		t.Fatal("discovery refresh did not start")
+	}
+	quick, stop := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer stop()
+	if mods, err := r.List(quick); err != nil || len(mods) != 1 || mods[0].Name != "previous" {
+		t.Fatalf("List while refreshing = %v, %v", mods, err)
+	}
+	if _, ok := r.Get(quick, "previous"); ok {
+		t.Fatal("Get accepted a module whose manifest has expired")
+	}
+	r.Forget()
+	quick, stopAfterForget := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer stopAfterForget()
+	if _, err := r.List(quick); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("List after Forget returned %v", err)
+	}
+	close(release)
+	if err := <-result; err != nil {
+		t.Fatal(err)
+	}
+	if mods, err := r.List(ctx); err != nil || len(mods) != 0 || scans.Load() != 2 {
+		t.Fatalf("List after refresh = %v, %v, Docker scans = %d", mods, err, scans.Load())
+	}
+}
 
 func TestModuleCredentialsAreSeparateFromSystemCredentials(t *testing.T) {
 	const secret = "test-secret"

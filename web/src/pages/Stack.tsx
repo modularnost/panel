@@ -137,7 +137,7 @@ export function Stack() {
           {s.managed ? (
             /* key: a new file arriving from outside must not keep the old text */
             <ComposeEditor key={s.updated_at ?? "none"} name={s.name} initial={s.compose ?? ""}
-              initialRegistry={s.registry_host} />
+              initialEnvironment={s.environment} initialRegistry={s.registry_host} />
           ) : (
             <details>
               <summary>Manage with a compose file…</summary>
