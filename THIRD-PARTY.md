@@ -11,7 +11,7 @@ scripts/licenses.sh
 
 ## Go modules compiled into the binary
 
-30 modules: 17 Apache-2.0, 7 MIT, 6 BSD-3-Clause. No copyleft,
+32 modules: 19 Apache-2.0, 7 MIT, 6 BSD-3-Clause. No copyleft,
 nothing that restricts redistributing the binary or the image.
 
 | Module | Version | License |
@@ -38,9 +38,11 @@ nothing that restricts redistributing the binary or the image.
 | github.com/remyoudompheng/bigfft | v0.0.0-20230129092748-24d4a6f8daec | BSD-3-Clause |
 | go.opentelemetry.io/auto/sdk | v1.2.1 | Apache-2.0 |
 | go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp | v0.70.0 | Apache-2.0 |
-| go.opentelemetry.io/otel | v1.45.0 | Apache-2.0 |
-| go.opentelemetry.io/otel/metric | v1.45.0 | Apache-2.0 |
-| go.opentelemetry.io/otel/trace | v1.45.0 | Apache-2.0 |
+| go.opentelemetry.io/otel | v1.47.0 | Apache-2.0 |
+| go.opentelemetry.io/otel/log | v1.47.0 | Apache-2.0 |
+| go.opentelemetry.io/otel/metric | v1.47.0 | Apache-2.0 |
+| go.opentelemetry.io/otel/trace | v1.47.0 | Apache-2.0 |
+| go.yaml.in/yaml/v3 | v3.0.5 | Apache-2.0 (ships a NOTICE) |
 | golang.org/x/sys | v0.47.0 | BSD-3-Clause |
 | modernc.org/libc | v1.74.4 | BSD-3-Clause |
 | modernc.org/mathutil | v1.7.1 | BSD-3-Clause |

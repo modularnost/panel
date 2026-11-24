@@ -39,6 +39,7 @@ type apiStackDetail struct {
 	Services []apiService `json:"services" nullable:"false"`
 	// Compose is for admins only: a compose file is access to the whole cluster.
 	Compose        string     `json:"compose,omitempty"`
+	Environment    string     `json:"environment,omitempty" doc:"Saved Compose variables; visible to admins only"`
 	RegistryHost   string     `json:"registry_host,omitempty"`
 	UpdatedBy      string     `json:"updated_by,omitempty"`
 	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
@@ -187,6 +188,7 @@ func (s *Server) registerStacks(api huma.API, viewer huma.Middlewares) {
 			u, _ := ctx.Value(ctxKey{}).(store.User)
 			if store.AtLeast(u.Role, store.RoleAdmin) {
 				detail.Compose = stored.Compose
+				detail.Environment = stored.Environment
 				detail.RegistryHost = stored.RegistryHost
 			}
 			detail.UpdatedBy = stored.UpdatedBy

@@ -7,6 +7,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/moby/moby/api v1.57.0
 	github.com/moby/moby/client v0.6.3
+	go.yaml.in/yaml/v3 v3.0.5
 	modernc.org/sqlite v1.57.0
 )
 
