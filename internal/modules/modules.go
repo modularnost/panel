@@ -195,7 +195,12 @@ func NewRegistry(dk *docker.Client, secret string) *Registry {
 	return &Registry{
 		dk:     dk,
 		secret: []byte(secret),
-		http:   &http.Client{Timeout: 5 * time.Second},
+		http: &http.Client{
+			Timeout: 5 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 }
 
