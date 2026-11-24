@@ -280,6 +280,22 @@ func (t DeploymentTimes) ForService(service, stack string) *time.Time {
 	return direct
 }
 
+func (d *DB) LastServiceDeployment(ctx context.Context, service, stack string) (*time.Time, error) {
+	var seconds sql.NullInt64
+	err := d.QueryRowContext(ctx, `SELECT MAX(at) FROM (
+		SELECT MAX(unixepoch(finished_at)) AS at FROM deploy_events
+		WHERE status = 'success' AND finished_at IS NOT NULL AND service_name = ?
+		UNION ALL
+		SELECT MAX(unixepoch(finished_at)) FROM deploy_events
+		WHERE status = 'success' AND finished_at IS NOT NULL AND service_name = '' AND stack_name = ? AND stack_name != ''
+	)`, service, stack).Scan(&seconds)
+	if err != nil || !seconds.Valid {
+		return nil, err
+	}
+	finished := time.Unix(seconds.Int64, 0).UTC()
+	return &finished, nil
+}
+
 // DeploysFor returns the history of one service, including redeploys of the
 // whole stack it belongs to.
 func (d *DB) DeploysFor(service, stack string, limit int) ([]DeployEvent, error) {
