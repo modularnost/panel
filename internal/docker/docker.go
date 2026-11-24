@@ -168,22 +168,22 @@ func (c *Client) ForceUpdate(ctx context.Context, nameOrID string, auth Registry
 // rollout stops the old task first and rolls back when the new one fails: for
 // the panel the old and the new process must not share the SQLite file.
 func (c *Client) UpdateImage(ctx context.Context, nameOrID, tag string) (Deploy, error) {
-	return c.moveToTag(ctx, nameOrID, tag, swarm.UpdateOrderStopFirst)
+	return c.moveToTag(ctx, nameOrID, tag, swarm.UpdateOrderStopFirst, nil)
 }
 
 // RollOut is UpdateImage for a service that may run two versions at once: the
 // new task starts before the old one stops, so a healthy service stays up.
-func (c *Client) RollOut(ctx context.Context, nameOrID, tag string) (Deploy, error) {
-	return c.moveToTag(ctx, nameOrID, tag, swarm.UpdateOrderStartFirst)
+func (c *Client) RollOut(ctx context.Context, nameOrID, tag string, auth RegistryAuth) (Deploy, error) {
+	return c.moveToTag(ctx, nameOrID, tag, swarm.UpdateOrderStartFirst, auth)
 }
 
 // Rollback moves a service back to a previously running image or tag.
 func (c *Client) Rollback(ctx context.Context, nameOrID, image string) (Deploy, error) {
-	return c.moveToTag(ctx, nameOrID, image, swarm.UpdateOrderStopFirst)
+	return c.moveToTag(ctx, nameOrID, image, swarm.UpdateOrderStopFirst, nil)
 }
 
-func (c *Client) moveToTag(ctx context.Context, nameOrID, tag string, order swarm.UpdateOrder) (Deploy, error) {
-	return c.updateSpec(ctx, nameOrID, nil, func(spec *swarm.ServiceSpec, img string) {
+func (c *Client) moveToTag(ctx context.Context, nameOrID, tag string, order swarm.UpdateOrder, auth RegistryAuth) (Deploy, error) {
+	return c.updateSpec(ctx, nameOrID, auth, func(spec *swarm.ServiceSpec, img string) {
 		spec.TaskTemplate.ContainerSpec.Image = targetImage(img, tag)
 		spec.UpdateConfig = &swarm.UpdateConfig{
 			Parallelism:   1,

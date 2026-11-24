@@ -140,13 +140,19 @@ func (s *Server) apiCreateService(w http.ResponseWriter, r *http.Request, m modu
 		labels = map[string]string{}
 	}
 	labels[labelOwner] = m.Name
+	image := strings.TrimSpace(in.Image)
+	auth, err := s.encodeRegistryAuth(m.PullRegistry, image)
+	if err != nil {
+		fail(w, err)
+		return
+	}
 
 	finish, _ := s.DB.StartDeploy(store.DeployEvent{
 		ServiceName: in.Name, Source: "module", TriggeredBy: "module:" + m.Name,
 	})
-	_, err := s.Docker.CreateService(r.Context(), docker.NewService{
-		Name: in.Name, Image: strings.TrimSpace(in.Image), Replicas: in.Replicas,
-		Env: in.Env, Networks: []string{self.Network}, Labels: labels,
+	_, err = s.Docker.CreateService(r.Context(), docker.NewService{
+		Name: in.Name, Image: image, Replicas: in.Replicas,
+		Env: in.Env, Networks: []string{self.Network}, Labels: labels, RegistryAuth: auth,
 	})
 	finish("", "", err)
 	if err != nil {
@@ -182,7 +188,12 @@ func (s *Server) apiSetServiceImage(w http.ResponseWriter, r *http.Request, m mo
 		ServiceName: sv.Name, StackName: sv.Stack,
 		Source: "module", TriggeredBy: "module:" + m.Name,
 	})
-	d, err := s.Docker.RollOut(r.Context(), sv.ID, in.Tag)
+	d, err := s.Docker.RollOut(r.Context(), sv.ID, in.Tag, func(image string, labels map[string]string) (string, error) {
+		if labels[labelOwner] != m.Name {
+			return "", errors.New("service ownership changed")
+		}
+		return s.encodeRegistryAuth(m.PullRegistry, image)
+	})
 	finish(d.OldDigest, d.NewDigest, err)
 	logWarnings(d)
 	if err != nil {

@@ -279,6 +279,13 @@ with `panel.` are refused, and the core adds `panel.owner=<module>` itself, whic
 is what lets only that module move the service to another image. Both calls are
 recorded in deploy history as `module:<name>`.
 
+For authenticated pulls, save a pull-only token for the registry in the panel.
+As a Swarm administrator, add `panel.module.pull-registry=<host[:port]>` to the
+module's service labels. For Builder, use the same host as `REGISTRY_PULL`.
+Every eligible node's Docker engine must be able to resolve and reach that host.
+The core sends saved credentials to Docker on service creation and tag updates
+when the image uses the approved host.
+
 `/internal/stats` returns one object per replica:
 
 ```json
