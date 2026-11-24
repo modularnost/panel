@@ -13,11 +13,10 @@ export function Logs() {
   const [task, setTask] = useState("");
   const [tail, setTail] = useState(200);
   const [paused, setPaused] = useState(false);
-  const [view, setView] = useState<string[]>([]);
+  const [view, setView] = useState<string | null>(null);
   const [problem, setProblem] = useState("");
   const [connected, setConnected] = useState(false);
 
-  const buffer = useRef<string[]>([]);
   const pausedRef = useRef(false);
   const box = useRef<HTMLPreElement>(null);
   const stick = useRef(true);
@@ -30,8 +29,9 @@ export function Logs() {
   });
 
   useEffect(() => {
-    buffer.current = [];
-    setView([]);
+    let buffer: string[] = [];
+    let dirty = false;
+    setView(null);
     setProblem("");
     setConnected(false);
 
@@ -41,7 +41,9 @@ export function Logs() {
 
     source.onopen = () => setConnected(true);
     source.addEventListener("line", (e) => {
-      buffer.current = capLines([...buffer.current, parseLine((e as MessageEvent).data)]);
+      buffer.push(parseLine((e as MessageEvent).data));
+      if (buffer.length >= 2 * MAX_LINES) buffer = capLines(buffer);
+      dirty = true;
     });
     source.addEventListener("problem", (e) => {
       try {
@@ -63,7 +65,10 @@ export function Logs() {
 
     // Lines arrive in bursts; painting a few times a second is plenty.
     const paint = setInterval(() => {
-      if (!pausedRef.current) setView([...buffer.current]);
+      if (!dirty || pausedRef.current) return;
+      buffer = capLines(buffer);
+      setView(buffer.join("\n"));
+      dirty = false;
     }, 250);
 
     return () => {
@@ -105,7 +110,7 @@ export function Logs() {
       </div>
       {problem && <p className="error">{problem}</p>}
       <pre className="logbox" ref={box} onScroll={onScroll}>
-        {view.length === 0 && !problem ? "Waiting for output…" : view.join("\n")}
+        {view ?? (problem ? "" : "Waiting for output…")}
       </pre>
       <p className="muted">Showing the last {MAX_LINES} lines at most.</p>
     </>
