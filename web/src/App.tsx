@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call, retryableQueryError } from "./api/client";
 import { RefreshWarning } from "./components/RefreshWarning";
@@ -9,22 +9,10 @@ import { usePanelVersion, useUpdates } from "./updates";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { ModuleInstall } from "./pages/ModuleInstall";
-import { ModulePage } from "./pages/ModulePage";
 import { InstalledModules, Modules } from "./pages/Modules";
-import { ModuleCatalog } from "./pages/ModuleCatalog";
-import { Nodes } from "./pages/Nodes";
-import { Ports } from "./pages/Ports";
-import { Resources } from "./pages/Resources";
-import { Stack } from "./pages/Stack";
-import { StackNew } from "./pages/StackNew";
 import { Stacks } from "./pages/Stacks";
-import { Settings } from "./pages/Settings";
-import { Users } from "./pages/Users";
-import { Webhooks } from "./pages/Webhooks";
 import { ServiceLayout } from "./pages/service/Layout";
-import { ModuleTab } from "./pages/service/ModuleTab";
 import { ServiceDeploys } from "./pages/service/Deploys";
-import { Logs } from "./pages/service/Logs";
 import { Overview } from "./pages/service/Overview";
 import { Traefik } from "./pages/service/Traefik";
 import { ServiceWebhooks } from "./pages/service/Webhooks";
@@ -33,6 +21,19 @@ import { Button } from "./components/Button";
 import { DialogsProvider } from "./components/Dialogs";
 import { Chip } from "./components/Chip";
 import { Icon } from "./components/Icon";
+
+const ModulePage = lazy(() => import("./pages/ModulePage").then((page) => ({ default: page.ModulePage })));
+const ModuleCatalog = lazy(() => import("./pages/ModuleCatalog").then((page) => ({ default: page.ModuleCatalog })));
+const Nodes = lazy(() => import("./pages/Nodes").then((page) => ({ default: page.Nodes })));
+const Ports = lazy(() => import("./pages/Ports").then((page) => ({ default: page.Ports })));
+const Resources = lazy(() => import("./pages/Resources").then((page) => ({ default: page.Resources })));
+const Stack = lazy(() => import("./pages/Stack").then((page) => ({ default: page.Stack })));
+const StackNew = lazy(() => import("./pages/StackNew").then((page) => ({ default: page.StackNew })));
+const Settings = lazy(() => import("./pages/Settings").then((page) => ({ default: page.Settings })));
+const Users = lazy(() => import("./pages/Users").then((page) => ({ default: page.Users })));
+const Webhooks = lazy(() => import("./pages/Webhooks").then((page) => ({ default: page.Webhooks })));
+const ModuleTab = lazy(() => import("./pages/service/ModuleTab").then((page) => ({ default: page.ModuleTab })));
+const Logs = lazy(() => import("./pages/service/Logs").then((page) => ({ default: page.Logs })));
 
 function Shell() {
   const me = useMe();
@@ -153,7 +154,9 @@ function Shell() {
       </aside>
       <main className="main">
         <RefreshWarning error={me.error} />
-        <Outlet />
+        <Suspense fallback={<p role="status">Loading…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );
