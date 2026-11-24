@@ -8,11 +8,11 @@ export const moduleCatalogQuery = queryOptions({
   queryFn: () => call(api.getModuleCatalog()),
 });
 
-export function useModules(enabled = true) {
+export function useModules(enabled = true, poll = false) {
   return useQuery({
     queryKey: ["modules"],
     queryFn: () => call(api.listModules()),
-    refetchInterval: 10_000,
+    refetchInterval: poll ? 10_000 : false,
     enabled,
   });
 }

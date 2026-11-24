@@ -502,9 +502,10 @@ func TestAPIStackDeployValidatesBeforeDocker(t *testing.T) {
 		t.Fatal("sign in")
 	}
 	for name, tc := range map[string]struct{ path, body string }{
-		"a name that is a flag": {"/api/v1/stacks/-rf", `{"compose":"services: {}"}`},
-		"a name with a slash":   {"/api/v1/stacks/a%2Fb", `{"compose":"services: {}"}`},
-		"an empty compose file": {"/api/v1/stacks/shop", `{"compose":"   "}`},
+		"a name that is a flag":  {"/api/v1/stacks/-rf", `{"compose":"services: {}"}`},
+		"a name with a slash":    {"/api/v1/stacks/a%2Fb", `{"compose":"services: {}"}`},
+		"an empty compose file":  {"/api/v1/stacks/shop", `{"compose":"   "}`},
+		"an invalid environment": {"/api/v1/stacks/shop", `{"compose":"services: {}","environment":"TAG"}`},
 	} {
 		if status, body := send(t, c, "PUT", base+tc.path, "application/json", tc.body); status != 422 {
 			t.Errorf("%s: %d %v", name, status, body)

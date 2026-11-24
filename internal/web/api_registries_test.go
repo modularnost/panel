@@ -66,7 +66,7 @@ func TestRegistryCredentialsAreWriteOnlyAndScoped(t *testing.T) {
 	if bytes.Contains(raw, []byte("secret-pull-token")) {
 		t.Fatal("registry token was stored in plaintext")
 	}
-	if err := db.SaveStack("test", "services: {}", "admin", host); err != nil {
+	if err := db.SaveStack(store.Stack{Name: "test", Compose: "services: {}", UpdatedBy: "admin", RegistryHost: host}); err != nil {
 		t.Fatal(err)
 	}
 	labels := map[string]string{"com.docker.stack.namespace": "test"}

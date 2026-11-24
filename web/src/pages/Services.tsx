@@ -26,7 +26,7 @@ export function Services() {
     queryKey: ["services"],
     queryFn: () => call(api.listServices()),
     select: sort.rows,
-    refetchInterval: 3000,
+    refetchInterval: ({ state: { data } }) => data?.some((row) => row.running < row.desired) ? 3000 : 10_000,
   });
 
   const modules = useModules();

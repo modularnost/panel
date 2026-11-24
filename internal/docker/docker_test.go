@@ -2,16 +2,67 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
 )
+
+func TestStatsLimitsContainerStreams(t *testing.T) {
+	const containers = 2 * maxContainerStatsStreams
+	var active, peak atomic.Int32
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/_ping":
+			w.Header().Set("API-Version", "1.40")
+		case r.URL.Path == "/v1.40/containers/json":
+			items := make([]map[string]string, containers)
+			for i := range items {
+				items[i] = map[string]string{"Id": strconv.Itoa(i)}
+			}
+			_ = json.NewEncoder(w).Encode(items)
+		case strings.HasSuffix(r.URL.Path, "/stats"):
+			current := active.Add(1)
+			defer active.Add(-1)
+			for highest := peak.Load(); current > highest && !peak.CompareAndSwap(highest, current); highest = peak.Load() {
+			}
+			time.Sleep(50 * time.Millisecond)
+			_, _ = io.WriteString(w, "{}\n{}\n")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer daemon.Close()
+	t.Setenv("DOCKER_HOST", daemon.URL)
+	t.Setenv("DOCKER_API_VERSION", "")
+	t.Setenv("DOCKER_TLS_VERIFY", "")
+	t.Setenv("DOCKER_CERT_PATH", "")
+	c, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	stats, err := c.Stats(t.Context(), "")
+	if err != nil || len(stats) != containers {
+		t.Fatalf("got %d samples, err=%v", len(stats), err)
+	}
+	for _, st := range stats {
+		if st.Err != "" {
+			t.Fatal(st.Err)
+		}
+	}
+	if got := peak.Load(); got < 2 || got > maxContainerStatsStreams {
+		t.Fatalf("peak concurrent streams = %d, want between 2 and %d", got, maxContainerStatsStreams)
+	}
+}
 
 func TestServicesNegotiatesDockerAPIVersion(t *testing.T) {
 	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

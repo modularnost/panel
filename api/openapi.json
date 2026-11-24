@@ -937,6 +937,10 @@
             "description": "The compose file; services missing from it are removed",
             "type": "string"
           },
+          "environment": {
+            "description": "Compose variables, one NAME=value per line; omit to keep saved values, or send an empty string to clear them",
+            "type": "string"
+          },
           "registry_host": {
             "description": "Saved registry host; omit to keep the current selection, or send an empty string to clear it",
             "maxLength": 255,
@@ -958,6 +962,10 @@
             "format": "int64",
             "minimum": 0,
             "type": "integer"
+          },
+          "environment": {
+            "description": "Saved Compose variables; visible to admins only",
+            "type": "string"
           },
           "healthy": {
             "type": "boolean"

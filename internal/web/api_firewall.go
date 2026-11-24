@@ -117,9 +117,13 @@ func (s *Server) firewallSpec(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) currentFirewallSpec(ctx context.Context) (firewall.Spec, error) {
+	return s.fwSpec.get(ctx, s.loadFirewallSpec)
+}
+
+func (s *Server) loadFirewallSpec(ctx context.Context) (firewall.Spec, time.Time, error) {
 	nodes, err := s.Docker.Nodes(ctx)
 	if err != nil {
-		return firewall.Spec{}, err
+		return firewall.Spec{}, time.Time{}, err
 	}
 	known := map[string]bool{}
 	for _, n := range nodes {
@@ -128,21 +132,30 @@ func (s *Server) currentFirewallSpec(ctx context.Context) (firewall.Spec, error)
 		}
 	}
 	if err := s.DB.PruneFirewallPeers(peerLife, known); err != nil {
-		return firewall.Spec{}, err
+		return firewall.Spec{}, time.Time{}, err
 	}
 	pending, err := s.DB.FirewallPeers()
 	if err != nil {
-		return firewall.Spec{}, err
+		return firewall.Spec{}, time.Time{}, err
 	}
+	now := time.Now()
+	expires := now.Add(firewallSpecTTL)
 	var addrs []string
 	for _, p := range pending {
+		until := p.CreatedAt.Add(peerLife)
+		if !until.After(now) {
+			continue
+		}
+		if until.Before(expires) {
+			expires = until
+		}
 		addrs = append(addrs, p.Address)
 	}
 	ports, err := s.DB.FirewallPorts()
 	if err != nil {
-		return firewall.Spec{}, err
+		return firewall.Spec{}, time.Time{}, err
 	}
-	return buildFirewallSpec(s.Firewall, nodes, addrs, ports), nil
+	return buildFirewallSpec(s.Firewall, nodes, addrs, ports), expires, nil
 }
 
 // buildFirewallSpec: the panel and the web are always allowed, so are the ports
@@ -231,6 +244,7 @@ func (s *Server) registerFirewall(api huma.API) {
 		if err := s.DB.AddFirewallPeer(a.String()); err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
+		s.fwSpec.invalidate()
 		return &struct{ Body apiFirewallPeer }{apiFirewallPeer{a.String(), time.Now()}}, nil
 	})
 
@@ -244,6 +258,7 @@ func (s *Server) registerFirewall(api huma.API) {
 		if err := s.DB.DeleteFirewallPeer(in.Address); err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
+		s.fwSpec.invalidate()
 		return nil, nil
 	})
 }
@@ -340,6 +355,7 @@ func (s *Server) registerFirewallPorts(api huma.API, admin huma.Middlewares) {
 		if err := s.DB.AddFirewallPort(store.FirewallPort{Port: b.Port, Proto: b.Proto, Note: b.Note}); err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
+		s.fwSpec.invalidate()
 		return &struct{ Body apiFirewallPort }{apiFirewallPort{Port: b.Port, Proto: b.Proto, Note: b.Note}}, nil
 	})
 
@@ -354,6 +370,7 @@ func (s *Server) registerFirewallPorts(api huma.API, admin huma.Middlewares) {
 		if err := s.DB.DeleteFirewallPort(in.Port, in.Proto); err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
+		s.fwSpec.invalidate()
 		return nil, nil
 	})
 }
