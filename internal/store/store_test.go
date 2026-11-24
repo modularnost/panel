@@ -278,9 +278,24 @@ func TestBackupIsAReadableCopy(t *testing.T) {
 		t.Fatalf("path %q: %v", path, err)
 	}
 	copyPath := dir + "/copy.db"
-	if err := db.Backup(copyPath); err != nil {
+	conn, err := db.Conn(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer conn.Close()
+	result := make(chan error, 1)
+	go func() { result <- db.Backup(copyPath) }()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		conn.Close()
+		<-result
+		t.Fatal("backup waited for the panel database connection")
+	}
+	conn.Close()
 	cp, err := Open(copyPath)
 	if err != nil {
 		t.Fatal(err)
