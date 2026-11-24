@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"modularnost/internal/agent"
@@ -61,5 +62,28 @@ func TestManifestFetchCarriesTheToken(t *testing.T) {
 	}
 	if gotName != "hello" || !r.ValidToken("hello", gotToken) {
 		t.Fatalf("module got name %q token %q", gotName, gotToken)
+	}
+}
+
+func TestRegistryStopsAtRedirects(t *testing.T) {
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.URL.Path == "/action/example" {
+			w.Header().Set("Location", "/other")
+			w.WriteHeader(http.StatusTemporaryRedirect)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	r := NewRegistry(nil, "secret")
+	m := Module{Name: "example", BaseURL: srv.URL}
+	if _, err := r.Act(t.Context(), m, "/action/example", nil, Viewer{}); err == nil {
+		t.Error("action accepted a redirect response")
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("sent %d requests, want 1", got)
 	}
 }

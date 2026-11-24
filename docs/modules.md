@@ -3,7 +3,8 @@
 A module is an ordinary Swarm service that the panel discovers by labels and
 renders as one of its own pages. It is not a plugin inside the binary: it
 crashes and upgrades separately, and can be written in any language as long as
-it answers over HTTP.
+it answers over HTTP. Module endpoints must respond directly to the panel's
+requests. The panel treats `3xx` responses as errors.
 
 The panel gives a module two things: places in its own screens (a menu entry,
 a tab on a service, an action on the services list), and the right to ask the
