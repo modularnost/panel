@@ -56,11 +56,14 @@ func Routes(secret, node string, dk *docker.Client) http.Handler {
 // Collector gathers stats from every agent, falling back to the local socket
 // when no agents are deployed (a single-node cluster does not need them).
 type Collector struct {
-	service string // swarm service name of the agent, e.g. "panel_agent"
-	port    string
-	secret  string
-	local   *docker.Client
-	http    *http.Client
+	service    string // swarm service name of the agent, e.g. "panel_agent"
+	port       string
+	secret     string
+	local      *docker.Client
+	http       *http.Client
+	samplesMu  sync.Mutex
+	samples    map[string]*statsSample
+	collecting int
 }
 
 func NewCollector(service, port, secret string, local *docker.Client) *Collector {
@@ -72,6 +75,10 @@ func NewCollector(service, port, secret string, local *docker.Client) *Collector
 
 // Stats returns stats for the whole cluster, or for one service when named.
 func (c *Collector) Stats(ctx context.Context, service string) ([]docker.TaskStats, error) {
+	return c.sample(ctx, service, c.collect)
+}
+
+func (c *Collector) collect(ctx context.Context, service string) ([]docker.TaskStats, error) {
 	addrs := c.agents(ctx)
 	if len(addrs) == 0 {
 		// No agents: this is the only node we can see anyway.
