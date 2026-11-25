@@ -1,12 +1,9 @@
 package docker
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +14,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
-	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 )
@@ -25,230 +21,160 @@ import (
 const buildKitImage = "moby/buildkit:v0.35.1@sha256:baf6138eb8c37644800c7c913fba051e840ebb9ba13eaf92d92ef9a1712d0b4c"
 const buildKitName = "modularnost-builder-buildkit"
 const buildKitLabel = "panel.builder.buildkit"
-const buildKitReadyFile = "etc/buildkit/.panel-ready"
 
-type BuildKitTLS struct {
-	CA                 string `json:"ca" writeOnly:"true"`
-	ServerCertificate  string `json:"server_certificate" writeOnly:"true"`
-	ServerKey          string `json:"server_key" writeOnly:"true"`
-	RegistryCA         string `json:"registry_ca" writeOnly:"true"`
-	RegistryClientCert string `json:"registry_client_certificate" writeOnly:"true"`
-	RegistryClientKey  string `json:"registry_client_key" writeOnly:"true"`
+// The worker has SYS_ADMIN, so only reviewed recipe and startup files may run.
+func approvedBuildKitRecipe(bundle ModuleBundle) ([][]byte, error) {
+	files := []struct{ path, hash string }{
+		{"buildkit-worker.json", "c771f614eb3a08798a3e7235b6baf8d3aa0cf5a0936c08d7a1ca37cb0cc9c4d0"},
+		{"scripts/buildkitd.toml", "1026da1778a87142fb0542f3afa2fdbfdad0033cf1fbfa70a18d755391db08d4"},
+		{"scripts/buildkitd-network.sh", "a6d660c4e545f55063f69e3173ca57359d1a2ab387a5a914e38f448a02b404e3"},
+	}
+	result := make([][]byte, 0, len(files))
+	for _, file := range files {
+		raw := bytes.ReplaceAll(bundle.Files[file.path], []byte("\r\n"), []byte("\n"))
+		if fmt.Sprintf("%x", sha256.Sum256(raw)) != file.hash {
+			return nil, fmt.Errorf("%w: unapproved BuildKit worker file %s", errdefs.ErrInvalidArgument, file.path)
+		}
+		result = append(result, raw)
+	}
+	return result, nil
 }
 
-func (in BuildKitTLS) Validate() error {
-	if !validBuildKitPair(in.CA, in.ServerCertificate, in.ServerKey, "buildkitd", x509.ExtKeyUsageServerAuth) ||
-		!validBuildKitPair(in.RegistryCA, in.RegistryClientCert, in.RegistryClientKey, "", x509.ExtKeyUsageClientAuth) {
-		return errors.New("invalid BuildKit server or registry client TLS certificate")
-	}
-	return nil
-}
-
-func validBuildKitPair(ca, cert, key, hostname string, usage x509.ExtKeyUsage) bool {
-	pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
-	if err != nil || pair.Leaf == nil {
-		return false
-	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM([]byte(ca)) {
-		return false
-	}
-	intermediates := x509.NewCertPool()
-	for _, raw := range pair.Certificate[1:] {
-		if leaf, err := x509.ParseCertificate(raw); err == nil {
-			intermediates.AddCert(leaf)
-		}
-	}
-	_, err = pair.Leaf.Verify(x509.VerifyOptions{Roots: roots, Intermediates: intermediates, DNSName: hostname, KeyUsages: []x509.ExtKeyUsage{usage}})
-	return err == nil
-}
-
-const buildKitConfig = `
-[worker.oci]
-  networkMode = "bridge"
-[dns]
-  nameservers = ["1.1.1.1", "8.8.8.8"]
-[grpc]
-  address = ["unix:///run/buildkit/buildkitd.sock", "tcp://0.0.0.0:1234"]
-  [grpc.tls]
-    ca = "/etc/buildkit/tls/buildkit-ca.pem"
-    cert = "/etc/buildkit/tls/buildkit-server.pem"
-    key = "/etc/buildkit/tls/buildkit-server-key.pem"
-[registry."registry:5000"]
-  ca = ["/etc/buildkit/tls/registry-ca.pem"]
-  [[registry."registry:5000".keypair]]
-    cert = "/etc/buildkit/tls/registry-client.pem"
-    key = "/etc/buildkit/tls/registry-client-key.pem"
-`
-
-const buildKitStartup = `set -eu
-iptables -C INPUT -i buildkit0 -j DROP 2>/dev/null || iptables -I INPUT -i buildkit0 -j DROP
-iptables -N CNI-ADMIN 2>/dev/null || iptables -F CNI-ADMIN
-for subnet in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 192.168.0.0/16 198.18.0.0/15 224.0.0.0/3 ${BUILDKIT_BLOCKED_SUBNETS:?}; do
-	iptables -A CNI-ADMIN -i buildkit0 -d "$subnet" -j DROP
-done
-ip6tables -C INPUT -i buildkit0 -j DROP 2>/dev/null || ip6tables -I INPUT -i buildkit0 -j DROP
-ip6tables -C FORWARD -i buildkit0 -j DROP 2>/dev/null || ip6tables -I FORWARD -i buildkit0 -j DROP
-exec /usr/bin/buildkitd-entrypoint
-`
-
-func buildKitFiles(in BuildKitTLS) ([]byte, error) {
-	var buf bytes.Buffer
-	out := tar.NewWriter(&buf)
-	for _, dir := range []string{"etc/buildkit", "etc/buildkit/tls"} {
-		if err := out.WriteHeader(&tar.Header{Name: dir, Typeflag: tar.TypeDir, Mode: 0o700}); err != nil {
-			return nil, err
-		}
-	}
-	for name, content := range map[string]string{
-		"etc/buildkit/buildkitd.toml":              buildKitConfig,
-		"etc/buildkit/tls/buildkit-ca.pem":         in.CA,
-		"etc/buildkit/tls/buildkit-server.pem":     in.ServerCertificate,
-		"etc/buildkit/tls/buildkit-server-key.pem": in.ServerKey,
-		"etc/buildkit/tls/registry-ca.pem":         in.RegistryCA,
-		"etc/buildkit/tls/registry-client.pem":     in.RegistryClientCert,
-		"etc/buildkit/tls/registry-client-key.pem": in.RegistryClientKey,
-	} {
-		if err := out.WriteHeader(&tar.Header{Name: name, Size: int64(len(content)), Mode: 0o600}); err != nil {
-			return nil, err
-		}
-		if _, err := out.Write([]byte(content)); err != nil {
-			return nil, err
-		}
-	}
-	if err := out.WriteHeader(&tar.Header{Name: buildKitReadyFile, Mode: 0o600}); err != nil {
-		return nil, err
-	}
-	if err := out.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (c *Client) ProvisionBuildKit(ctx context.Context, overlay string, in BuildKitTLS) (_ string, err error) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	if err := in.Validate(); err != nil {
-		return "", fmt.Errorf("%w: %s", errdefs.ErrInvalidArgument, err)
+func (c *Client) ProvisionBuildKit(ctx context.Context, bundle ModuleBundle, overlay, node, volume string) (_ string, err error) {
+	files, err := approvedBuildKitRecipe(bundle)
+	if err != nil {
+		return "", err
 	}
 	buildNetwork, err := c.api.NetworkInspect(ctx, overlay, client.NetworkInspectOptions{Scope: "swarm"})
 	if err != nil {
 		return "", err
 	}
 	n := buildNetwork.Network
-	if n.Name != overlay || n.Driver != "overlay" || !n.Internal || !n.Attachable {
-		return "", fmt.Errorf("%w: the build overlay must be internal and attachable", errdefs.ErrInvalidArgument)
+	if n.Name != overlay || n.Driver != "overlay" || n.Internal || n.Ingress {
+		return "", fmt.Errorf("%w: BuildKit needs a dedicated build overlay that allows internet egress", errdefs.ErrInvalidArgument)
 	}
-	recipe := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join([]string{buildKitImage, buildKitStartup, buildKitConfig, n.ID,
-		in.CA, in.ServerCertificate, in.ServerKey, in.RegistryCA, in.RegistryClientCert, in.RegistryClientKey}, "\n"))))
-	existing, err := c.api.ContainerInspect(ctx, buildKitName, client.ContainerInspectOptions{})
+	recipe := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join([]string{buildKitImage, n.ID, node, volume}, "\n"))))
+	existing, err := c.service(ctx, buildKitName)
 	if err == nil {
-		if existing.Container.Config == nil || existing.Container.Config.Labels[buildKitLabel] != recipe {
-			return "", fmt.Errorf("%w: a different BuildKit container already exists", errdefs.ErrConflict)
+		if existing.Spec.Labels[buildKitLabel] != recipe {
+			return "", fmt.Errorf("%w: a different BuildKit worker already exists", errdefs.ErrConflict)
 		}
-		running := existing.Container.State != nil && existing.Container.State.Running
-		_, statErr := c.api.ContainerStatPath(ctx, buildKitName, client.ContainerStatPathOptions{Path: "/" + buildKitReadyFile})
-		if errdefs.IsNotFound(statErr) && !running {
-			if err := c.RemoveBuildKit(ctx, buildKitName); err != nil {
-				return "", err
-			}
-			err = errdefs.ErrNotFound
-		} else {
-			if statErr != nil {
-				return "", statErr
-			}
-			if existing.Container.NetworkSettings == nil || existing.Container.NetworkSettings.Networks[overlay] == nil {
-				if _, err := c.api.NetworkConnect(ctx, n.ID, client.NetworkConnectOptions{Container: buildKitName, EndpointConfig: &network.EndpointSettings{Aliases: []string{"buildkitd"}}}); err != nil {
-					return "", err
-				}
-			}
-			if !running {
-				if _, err := c.api.ContainerStart(ctx, buildKitName, client.ContainerStartOptions{}); err != nil {
-					return "", err
-				}
-			}
-			return "", c.waitForBuildKit(ctx, buildKitName)
-		}
+		return "", c.waitForBuildKit(ctx)
 	}
 	if !errdefs.IsNotFound(err) {
 		return "", err
 	}
+
+	networks, err := c.Networks(ctx)
+	if err != nil {
+		return "", err
+	}
 	var subnets []string
-	for _, name := range []string{"bridge", "docker_gwbridge", overlay} {
-		details, err := c.api.NetworkInspect(ctx, name, client.NetworkInspectOptions{})
-		if err != nil {
-			return "", err
+	for _, net := range networks {
+		if net.Driver != "overlay" {
+			continue
 		}
-		for _, ipam := range details.Network.IPAM.Config {
-			if ipam.Subnet.IsValid() && ipam.Subnet.Addr().Is4() {
-				subnets = append(subnets, ipam.Subnet.String())
+		for _, addr := range net.Subnets {
+			if addr.Subnet != "" {
+				subnets = append(subnets, addr.Subnet)
 			}
 		}
 	}
-	volume, err := c.api.VolumeCreate(ctx, client.VolumeCreateOptions{Driver: "local", Name: buildKitName})
+	gateway, err := c.api.NetworkInspect(ctx, "docker_gwbridge", client.NetworkInspectOptions{})
 	if err != nil {
 		return "", err
 	}
-	if volume.Volume.Driver != "local" || len(volume.Volume.Options) != 0 {
-		return "", fmt.Errorf("%w: BuildKit storage requires a standard local volume", errdefs.ErrConflict)
+	for _, addr := range gateway.Network.IPAM.Config {
+		if addr.Subnet.IsValid() {
+			subnets = append(subnets, addr.Subnet.String())
+		}
 	}
-	if pull, err := c.api.ImagePull(ctx, buildKitImage, client.ImagePullOptions{}); err != nil {
-		return "", err
-	} else {
-		defer pull.Close()
-		if err := pull.Wait(ctx); err != nil {
+	var secrets []*swarm.SecretReference
+	for alias, target := range map[string]string{
+		"builder_buildkit_ca":                  "buildkit-ca.pem",
+		"builder_buildkit_server":              "buildkit-server.pem",
+		"builder_buildkit_server_key":          "buildkit-server-key.pem",
+		"builder_registry_ca":                  "registry-ca.pem",
+		"builder_buildkit_registry_client":     "registry-client.pem",
+		"builder_buildkit_registry_client_key": "registry-client-key.pem",
+	} {
+		secret, err := c.secretReference(ctx, alias)
+		if err != nil {
+			return "", fmt.Errorf("read BuildKit secret %s: %w", alias, err)
+		}
+		secrets = append(secrets, &swarm.SecretReference{SecretID: secret.ID, SecretName: secret.Spec.Name,
+			File: &swarm.SecretReferenceFileTarget{Name: "/etc/buildkit/tls/" + target, UID: "0", GID: "0", Mode: 0o400}})
+	}
+	var configs []*swarm.ConfigReference
+	for i, target := range []string{"/etc/buildkit/buildkitd.toml", "/etc/buildkit/network.sh"} {
+		data := files[i+1]
+		hash := sha256.Sum256(data)
+		name := fmt.Sprintf("modularnost-buildkit-config-%x", hash[:8])
+		config, err := c.configReference(ctx, name)
+		if errdefs.IsNotFound(err) {
+			config.ID, err = c.CreateConfig(ctx, name, data)
+		} else if err == nil && !bytes.Equal(config.Spec.Data, data) {
+			return "", fmt.Errorf("%w: a worker config with different contents already exists", errdefs.ErrConflict)
+		}
+		if err != nil {
 			return "", err
 		}
+		configs = append(configs, &swarm.ConfigReference{ConfigID: config.ID, ConfigName: name,
+			File: &swarm.ConfigReferenceFileTarget{Name: target, UID: "0", GID: "0", Mode: 0o444}})
 	}
-	created, err := c.api.ContainerCreate(ctx, client.ContainerCreateOptions{
-		Name: buildKitName,
-		Config: &container.Config{Image: buildKitImage, Entrypoint: []string{"/bin/sh", "-ec"},
-			Cmd: []string{buildKitStartup}, Env: []string{"BUILDKIT_BLOCKED_SUBNETS=" + strings.Join(subnets, " ")},
-			Labels: map[string]string{buildKitLabel: recipe}},
-		HostConfig: &container.HostConfig{NetworkMode: "bridge", Privileged: true, RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
-			Mounts: []mount.Mount{{Type: mount.TypeVolume, Source: buildKitName, Target: "/var/lib/buildkit"}}},
-	})
+	one := uint64(1)
+	out, err := c.api.ServiceCreate(ctx, client.ServiceCreateOptions{Spec: swarm.ServiceSpec{
+		Annotations:  swarm.Annotations{Name: buildKitName, Labels: map[string]string{buildKitLabel: recipe}},
+		UpdateConfig: &swarm.UpdateConfig{Order: swarm.UpdateOrderStopFirst},
+		Mode:         swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &one}},
+		TaskTemplate: swarm.TaskSpec{
+			Placement: &swarm.Placement{Constraints: []string{"node.id==" + node}},
+			Networks:  []swarm.NetworkAttachmentConfig{{Target: n.ID, Aliases: []string{"buildkitd"}}},
+			ContainerSpec: &swarm.ContainerSpec{
+				Image: buildKitImage, Command: []string{"/bin/sh"}, Args: []string{"/etc/buildkit/network.sh"},
+				Env:           []string{"BUILDKIT_BLOCKED_SUBNETS=" + strings.Join(subnets, " ")},
+				CapabilityAdd: []string{"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE"},
+				Privileges:    &swarm.Privileges{Seccomp: &swarm.SeccompOpts{Mode: swarm.SeccompModeUnconfined}, AppArmor: &swarm.AppArmorOpts{Mode: swarm.AppArmorModeDisabled}},
+				Healthcheck: &container.HealthConfig{
+					Test:     []string{"CMD-SHELL", "buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers >/dev/null 2>&1 && nc -z 127.0.0.1 1234"},
+					Interval: 5 * time.Second, Timeout: 5 * time.Second, StartPeriod: 5 * time.Second, Retries: 3,
+				},
+				Mounts:  []mount.Mount{{Type: mount.TypeVolume, Source: volume, Target: "/var/lib/buildkit"}},
+				Configs: configs, Secrets: secrets,
+			},
+		},
+	}, QueryRegistry: true})
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		if err != nil {
-			err = errors.Join(err, c.RemoveBuildKit(ctx, created.ID))
+	if err := c.waitForBuildKit(ctx); err != nil {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		return "", errors.Join(err, c.RemoveService(cleanup, out.ID))
+	}
+	return out.ID, nil
+}
+
+func (c *Client) buildKitTask(ctx context.Context) (string, error) {
+	tasks, err := c.api.ContainerList(ctx, client.ContainerListOptions{Filters: make(client.Filters).Add("label", "com.docker.swarm.service.name="+buildKitName)})
+	if err != nil {
+		return "", err
+	}
+	for _, task := range tasks.Items {
+		if exec.CommandContext(ctx, "docker", "exec", task.ID, "buildctl", "--addr", "unix:///run/buildkit/buildkitd.sock", "debug", "workers").Run() == nil {
+			return task.ID, nil
 		}
-	}()
-	files, err := buildKitFiles(in)
-	if err != nil {
-		return "", err
 	}
-	if _, err := c.api.CopyToContainer(ctx, created.ID, client.CopyToContainerOptions{DestinationPath: "/", Content: bytes.NewReader(files)}); err != nil {
-		return "", err
-	}
-	if _, err := c.api.NetworkConnect(ctx, n.ID, client.NetworkConnectOptions{Container: created.ID, EndpointConfig: &network.EndpointSettings{Aliases: []string{"buildkitd"}}}); err != nil {
-		return "", err
-	}
-	if _, err := c.api.ContainerStart(ctx, created.ID, client.ContainerStartOptions{}); err != nil {
-		return "", err
-	}
-	return created.ID, c.waitForBuildKit(ctx, created.ID)
+	return "", errors.New("BuildKit worker is not ready")
 }
 
-func (c *Client) RemoveBuildKit(ctx context.Context, id string) error {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
-	defer cancel()
-	_, err := c.api.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true})
-	if errdefs.IsNotFound(err) {
-		return nil
-	}
-	return err
-}
-
-func (c *Client) waitForBuildKit(ctx context.Context, id string) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+func (c *Client) waitForBuildKit(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
-		if err := exec.CommandContext(ctx, "docker", "exec", id, "buildctl", "--addr", "unix:///run/buildkit/buildkitd.sock", "debug", "workers").Run(); err == nil {
+		if _, err := c.buildKitTask(ctx); err == nil {
 			return nil
 		}
 		select {
@@ -286,7 +212,11 @@ printf 'FROM scratch\nLABEL org.opencontainers.image.title="Modularnost registry
 buildctl --addr unix:///run/buildkit/buildkitd.sock build --frontend dockerfile.v0 --local context="$dir" --local dockerfile="$dir" --output type=image,name=registry:5000/modularnost/install-probe:setup,push=true --metadata-file "$dir/metadata.json" >&2
 cat "$dir/metadata.json"
 `
-	out, err := exec.CommandContext(ctx, "docker", "exec", buildKitName, "sh", "-ec", build).Output()
+	task, err := c.buildKitTask(ctx)
+	if err != nil {
+		return "", err
+	}
+	out, err := exec.CommandContext(ctx, "docker", "exec", task, "sh", "-ec", build).Output()
 	if err != nil {
 		return "", fmt.Errorf("publish the BuildKit registry probe: %w", err)
 	}
@@ -334,6 +264,7 @@ func (c *Client) EnsureBuilderSecrets(ctx context.Context, inputs map[string]str
 	for name, value := range inputs {
 		switch name {
 		case "builder_buildkit_ca", "builder_buildkit_client", "builder_buildkit_client_key",
+			"builder_buildkit_server", "builder_buildkit_server_key", "builder_buildkit_registry_client", "builder_buildkit_registry_client_key",
 			"builder_registry_ca", "builder_registry_cert", "builder_registry_key",
 			"builder_pull_cert", "builder_pull_key", "builder_pull_client", "builder_pull_client_key", "builder_pull_users":
 		default:

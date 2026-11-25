@@ -90,15 +90,15 @@ func (s *Server) managedRegistryInputs(ctx context.Context, id string, in Manage
 		isBuild := name == in.BuildNetwork
 		found := slices.ContainsFunc(nets, func(n docker.Network) bool { return n.Name == name })
 		matches := slices.ContainsFunc(nets, func(n docker.Network) bool {
-			return n.Name == name && n.Driver == "overlay" && !n.Protected && (!isBuild || n.Internal)
+			return n.Name == name && n.Driver == "overlay" && !n.Protected
 		})
 		if matches {
 			continue
 		}
 		if !provision || found {
-			return entry, docker.ManagedRegistry{}, problem(http.StatusConflict, "registry_network_unavailable", "Select an internal attachable build overlay and a separate private routing overlay")
+			return entry, docker.ManagedRegistry{}, problem(http.StatusConflict, "registry_network_unavailable", "Select a dedicated build overlay and a separate private routing overlay")
 		}
-		if _, err := s.Docker.CreateNetwork(ctx, docker.NewNetwork{Name: name, Internal: true, Attachable: true}); err != nil {
+		if _, err := s.Docker.CreateNetwork(ctx, docker.NewNetwork{Name: name, Internal: !isBuild, Attachable: true}); err != nil {
 			return entry, docker.ManagedRegistry{}, backendProblem(http.StatusBadGateway, "registry_network_unavailable", err)
 		}
 	}

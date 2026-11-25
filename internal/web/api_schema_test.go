@@ -97,7 +97,6 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 
 		"ManagedRegistryProvisionBody": managedRegistryProvisionBody{},
 		"ManagedBuilderInstallBody":    managedBuilderInstallBody{},
-		"BuildKitTLS":                  docker.BuildKitTLS{},
 		"CatalogEntry":                 catalogEntry{},
 		"CatalogScreenshot":            catalogScreenshot{},
 		"CatalogInstall":               apiCatalogInstall{},

@@ -20,10 +20,9 @@ import (
 
 type managedBuilderInstallBody struct {
 	ManagedRegistryPlan
-	Worker      string             `json:"worker" pattern:"^[a-z0-9]+$" maxLength:"64"`
-	Username    string             `json:"username"`
-	Token       string             `json:"token" writeOnly:"true"`
-	BuildKitTLS docker.BuildKitTLS `json:"buildkit_tls" writeOnly:"true"`
+	Worker   string `json:"worker" pattern:"^[a-z0-9]+$" maxLength:"64"`
+	Username string `json:"username"`
+	Token    string `json:"token" writeOnly:"true"`
 }
 
 type managedBuilderInstall struct {
@@ -79,9 +78,6 @@ func (s *Server) installManagedBuilder(ctx context.Context, in *managedBuilderIn
 		}
 		return "", problem(http.StatusConflict, "module_unavailable", "A different Builder installation already exists")
 	}
-	if err := in.Body.BuildKitTLS.Validate(); err != nil {
-		return "", problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
-	}
 	self, err := s.Docker.Self(ctx)
 	if err != nil || self.Service == "" || self.Network == "" {
 		return "", problem(http.StatusConflict, "module_unavailable", "Builder requires the panel to run on a Swarm overlay")
@@ -90,7 +86,27 @@ func (s *Server) installManagedBuilder(ctx context.Context, in *managedBuilderIn
 	if err != nil {
 		return "", problem(http.StatusConflict, "builder_tls_unavailable", "Create the Builder module’s three BuildKit client secrets first")
 	}
-	worker, err := s.Docker.ProvisionBuildKit(ctx, plan.BuildNetwork, in.Body.BuildKitTLS)
+	s.volumeMu.Lock()
+	defer s.volumeMu.Unlock()
+	dataNode, data, err := s.ensureModuleVolume(ctx, "builder:module", "modularnost-builder-data", &catalogVolumeSelection{Node: plan.Node})
+	if errors.Is(err, errModuleStorage) {
+		return "", problem(http.StatusConflict, "module_unavailable", err.Error())
+	}
+	if err != nil {
+		return "", volumeProblem(err)
+	}
+	workerNode, workerVolume, err := s.ensureModuleVolume(ctx, "builder:worker", "modularnost-builder-buildkit-data", &catalogVolumeSelection{Node: plan.Node})
+	if errors.Is(err, errModuleStorage) {
+		return "", problem(http.StatusConflict, "module_unavailable", err.Error())
+	}
+	if err != nil {
+		return "", volumeProblem(err)
+	}
+	bundle, err := s.Docker.ReadModuleBundle(ctx, entry.Install.Image)
+	if err != nil {
+		return "", backendProblem(http.StatusBadGateway, "module_bundle_unavailable", err)
+	}
+	worker, err := s.Docker.ProvisionBuildKit(ctx, bundle, plan.BuildNetwork, workerNode, workerVolume)
 	if err != nil {
 		if errdefs.IsInvalidArgument(err) {
 			return "", problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
@@ -122,7 +138,7 @@ func (s *Server) installManagedBuilder(ctx context.Context, in *managedBuilderIn
 			}
 		}
 		if worker != "" {
-			if e := s.Docker.RemoveBuildKit(cleanup, worker); e != nil {
+			if e := s.Docker.RemoveService(cleanup, worker); e != nil {
 				log.Printf("rolling back BuildKit: %v", e)
 			}
 		}
@@ -137,15 +153,6 @@ func (s *Server) installManagedBuilder(ctx context.Context, in *managedBuilderIn
 		Username: in.Body.Username, Token: in.Body.Token,
 	}}); err != nil {
 		return "", err
-	}
-	s.volumeMu.Lock()
-	defer s.volumeMu.Unlock()
-	dataNode, data, err := s.ensureModuleVolume(ctx, "builder:module", "modularnost-builder-data", &catalogVolumeSelection{Node: plan.Node})
-	if errors.Is(err, errModuleStorage) {
-		return "", problem(http.StatusConflict, "module_unavailable", err.Error())
-	}
-	if err != nil {
-		return "", volumeProblem(err)
 	}
 	serviceID, err = s.Docker.CreateService(ctx, docker.NewService{
 		Name: name, Image: entry.Install.Image, NodeID: dataNode, Networks: []string{self.Network, plan.BuildNetwork}, Secrets: refs,

@@ -32,7 +32,7 @@ digests. Supported service settings are `image`, `command`, `entrypoint`,
 
 An administrator can provision the registry and its pull proxy for an approved
 Builder stack before deploying Builder. Configure encrypted registry credentials
-on the panel. Choose an internal Swarm overlay for build traffic and a separate
+on the panel. Choose a dedicated Swarm overlay for build traffic and a separate
 private overlay for the pull route. Provisioning creates missing overlays. Supply the Builder bundle's external TLS
 and bcrypt-user secrets using the
 [Builder installation guide](https://github.com/modularnost/builder_module/blob/main/docs/install.md).
@@ -186,31 +186,19 @@ On an unsuccessful install it removes unused configs created by the attempt.
 
 ## Install Builder from the catalog
 
-Use **Modules → Catalog → Set up Builder**. Review the version and permissions
-in the catalog card. Prepare the registry with the build and pull overlay names.
-The panel creates missing overlays. Existing build overlays must be internal
-and attachable. Set up private DNS, TLS trust on the worker, and the registry
-secrets described above.
+Use **Modules → Catalog → Set up Builder**. Review the version and permissions,
+choose separate build and pull overlays, and set up private DNS and worker TLS
+trust as described above. The panel provisions missing overlays. The worker's
+dedicated build overlay allows internet egress for base image pulls.
 
-Supply the Swarm secrets from the Builder installation guide. Upload a JSON
-object mapping their names to PEM or bcrypt-user file contents when preparing
-the registry. Leave the upload empty to use pre-created Swarm secrets. Use the
-same inputs when retrying.
-Upload a JSON file whose string fields contain the following PEM files. The
-panel installs the BuildKit daemon on its Swarm manager with a local cache.
-The daemon and registry keep their storage across retries.
+Prepare the registry secrets and the BuildKit client and server secrets
+described in the Builder bundle's worker recipe and installation guide. You
+can upload a JSON object mapping Swarm secret names to their PEM or bcrypt-user
+file contents. Omit entries to use existing Swarm secrets. Use the same inputs
+when retrying. The panel retains the registry and BuildKit cache volumes.
 
-| JSON field | PEM file |
-| --- | --- |
-| `ca` | `buildkit-ca.pem` |
-| `server_certificate` | `buildkit-server.pem` with the DNS name `buildkitd` |
-| `server_key` | `buildkit-server-key.pem` |
-| `registry_ca` | `registry-ca.pem` |
-| `registry_client_certificate` | `registry-client.pem` |
-| `registry_client_key` | `registry-client-key.pem` |
-
-**Verify and install** starts BuildKit, builds a small probe image and checks
-the authenticated pull on the selected worker. The panel waits for Builder's
-approved manifest and confirms its TLS connection to BuildKit. Use the same
-registry inputs and TLS files when retrying. Reuse a working registry rather
-than replacing its volumes.
+**Verify and install** starts the isolated BuildKit service on its storage
+node, builds and pushes a probe, and verifies an authenticated pull from the
+selected Swarm worker. It saves the encrypted registry credential, deploys
+Builder, waits for the approved manifest, and checks Builder's mTLS connection
+to BuildKit.

@@ -4,22 +4,7 @@ import { api, call } from "../api/client";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 
-type Install = Parameters<typeof api.installManagedBuilder>[1];
 type Field = "endpoint" | "build_network" | "pull_network" | "pull_entrypoint" | "worker" | "username" | "token";
-
-async function readBuildKitTLS(file: File | null): Promise<Install["buildkit_tls"]> {
-  if (!file || file.size > 200 * 1024) throw new Error("Choose a BuildKit TLS JSON file under 200 KB.");
-  const data: unknown = await file.text().then(JSON.parse).catch(() => null);
-  const keys = ["ca", "server_certificate", "server_key", "registry_ca", "registry_client_certificate", "registry_client_key"] as const;
-  function isTLS(value: unknown): value is Install["buildkit_tls"] {
-    if (!value || typeof value !== "object") return false;
-    const fields = value as Record<string, unknown>;
-    return keys.every((key) => typeof fields[key] === "string" && fields[key].trim().length > 0);
-  }
-  if (!isTLS(data)) throw new Error("The TLS file must contain the six PEM fields in the installation guide.");
-  const { ca, server_certificate, server_key, registry_ca, registry_client_certificate, registry_client_key } = data;
-  return { ca, server_certificate, server_key, registry_ca, registry_client_certificate, registry_client_key };
-}
 
 export function BuilderSetup({ version, revision, docs, permissions, onInstalled }: {
   version: string;
@@ -28,7 +13,6 @@ export function BuilderSetup({ version, revision, docs, permissions, onInstalled
   permissions: string[];
   onInstalled: () => void;
 }) {
-  const fileID = useId();
   const secretFileID = useId();
   const registryTitle = useId();
   const installTitle = useId();
@@ -37,7 +21,6 @@ export function BuilderSetup({ version, revision, docs, permissions, onInstalled
     pull_entrypoint: "", worker: "", username: "builder-pull", token: "",
   });
   const [secretFile, setSecretFile] = useState<File | null>(null);
-  const [tlsFile, setTLSFile] = useState<File | null>(null);
   const { endpoint, build_network, pull_network, pull_entrypoint, worker, username, token } = inputs;
   const plan = {
     version, revision, endpoint: endpoint.trim(), build_network: build_network.trim(),
@@ -60,10 +43,9 @@ export function BuilderSetup({ version, revision, docs, permissions, onInstalled
   const install = useMutation({
     mutationFn: async () => call(api.installManagedBuilder("builder", {
       ...plan, worker: worker.trim(), username: username.trim(),
-      token, buildkit_tls: await readBuildKitTLS(tlsFile),
+      token,
     })),
     onSuccess: () => {
-      setTLSFile(null);
       setInputs((current) => ({ ...current, token: "" }));
       onInstalled();
     },
@@ -107,9 +89,6 @@ export function BuilderSetup({ version, revision, docs, permissions, onInstalled
         {field("worker", "Swarm worker ID")}
         {field("username", "Registry username")}
         {field("token", "Registry pull token")}
-        <label htmlFor={fileID}>BuildKit TLS JSON file</label>
-        <input id={fileID} name="buildkit_tls" type="file" accept=".json,application/json" required
-          disabled={busy} onChange={(event) => setTLSFile(event.target.files?.[0] ?? null)} />
         <Button disabled={busy}>{install.isPending ? "Installing Builder…" : "Verify and install"}</Button>
         {install.isError && <p className="error" role="alert">{install.error.message}</p>}
       </form>

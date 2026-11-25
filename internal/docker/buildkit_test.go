@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"math/big"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -20,7 +21,12 @@ import (
 	"github.com/moby/moby/client"
 )
 
-func makeBuildKitTLS(t *testing.T) (BuildKitTLS, string, string) {
+type buildKitFixtureTLS struct {
+	CA, ServerCertificate, ServerKey                  string
+	RegistryCA, RegistryClientCert, RegistryClientKey string
+}
+
+func makeBuildKitTLS(t *testing.T) (buildKitFixtureTLS, string, string) {
 	t.Helper()
 	pub, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -53,20 +59,13 @@ func makeBuildKitTLS(t *testing.T) (BuildKitTLS, string, string) {
 	cl, clKey := issue(3, nil, x509.ExtKeyUsageClientAuth)
 	registryCert, registryKey := issue(4, []string{"registry"}, x509.ExtKeyUsageServerAuth)
 	rootPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca}))
-	return BuildKitTLS{CA: rootPEM, ServerCertificate: server, ServerKey: serverKey, RegistryCA: rootPEM, RegistryClientCert: cl, RegistryClientKey: clKey}, registryCert, registryKey
+	return buildKitFixtureTLS{CA: rootPEM, ServerCertificate: server, ServerKey: serverKey, RegistryCA: rootPEM, RegistryClientCert: cl, RegistryClientKey: clKey}, registryCert, registryKey
 }
 
-func TestBuildKitTLS(t *testing.T) {
-	in, _, _ := makeBuildKitTLS(t)
-	if err := in.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := buildKitFiles(in); err != nil {
-		t.Fatal(err)
-	}
-	in.RegistryClientCert, in.RegistryClientKey = in.ServerCertificate, in.ServerKey
-	if err := in.Validate(); err == nil {
-		t.Fatal("accepted a server-only certificate as a registry client")
+func TestBuildKitRejectsUnapprovedRecipe(t *testing.T) {
+	bundle := ModuleBundle{Files: map[string][]byte{"buildkit-worker.json": []byte(`{"schema_version":1,"image":"untrusted"}`)}}
+	if _, err := approvedBuildKitRecipe(bundle); err == nil {
+		t.Fatal("accepted an unapproved worker recipe")
 	}
 }
 
@@ -81,25 +80,47 @@ func TestProvisionBuildKitOnSwarm(t *testing.T) {
 	t.Cleanup(func() { _ = c.Close() })
 	ctx := t.Context()
 	overlay := "builder-fixture-" + rand.Text()
-	id, err := c.CreateNetwork(ctx, NewNetwork{Name: overlay, Internal: true, Attachable: true})
+	id, err := c.CreateNetwork(ctx, NewNetwork{Name: overlay, Attachable: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = c.RemoveNetwork(context.Background(), id) })
 	creds, registryCert, registryKey := makeBuildKitTLS(t)
 	startBuildKitTestRegistry(t, c, overlay, creds.RegistryCA, registryCert, registryKey)
-	worker, err := c.ProvisionBuildKit(ctx, overlay, creds)
+	if err := c.EnsureBuilderSecrets(ctx, map[string]string{
+		"builder_buildkit_ca": creds.CA, "builder_buildkit_server": creds.ServerCertificate, "builder_buildkit_server_key": creds.ServerKey,
+		"builder_registry_ca": creds.RegistryCA, "builder_buildkit_registry_client": creds.RegistryClientCert, "builder_buildkit_registry_client_key": creds.RegistryClientKey,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	bundle := ModuleBundle{Files: make(map[string][]byte)}
+	for _, path := range []string{"buildkit-worker.json", "scripts/buildkitd.toml", "scripts/buildkitd-network.sh"} {
+		data, err := os.ReadFile(filepath.Join(os.Getenv("PANEL_SWARM_BUILDKIT_BUNDLE"), path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		bundle.Files[path] = data
+	}
+	node, err := c.LocalSwarmNode(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	volume := "builder-fixture-cache-" + rand.Text()
+	if _, err := c.CreateLocalVolume(ctx, volume); err != nil {
+		t.Fatal(err)
+	}
+	worker, err := c.ProvisionBuildKit(ctx, bundle, overlay, node, volume)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if worker == "" {
-		t.Fatal("test requires a disposable daemon without an existing managed BuildKit container")
+		t.Fatal("test requires a disposable daemon without an existing worker")
 	}
 	defer func() {
-		_ = c.RemoveBuildKit(context.Background(), worker)
-		_ = c.RemoveLocalVolume(context.Background(), buildKitName)
+		_ = c.RemoveService(context.Background(), worker)
+		_ = c.RemoveLocalVolume(context.Background(), volume)
 	}()
-	if id, err := c.ProvisionBuildKit(ctx, overlay, creds); err != nil || id != "" {
+	if id, err := c.ProvisionBuildKit(ctx, bundle, overlay, node, volume); err != nil || id != "" {
 		t.Fatalf("retry replaced BuildKit: %q %v", id, err)
 	}
 	verifyBuilderFixtureClient(t, c, id, creds)
@@ -158,7 +179,7 @@ func startBuildKitTestRegistry(t *testing.T, c *Client, overlay, ca, cert, key s
 	}
 }
 
-func verifyBuilderFixtureClient(t *testing.T, c *Client, overlay string, creds BuildKitTLS) {
+func verifyBuilderFixtureClient(t *testing.T, c *Client, overlay string, creds buildKitFixtureTLS) {
 	t.Helper()
 	ctx := t.Context()
 	inputs := map[string]string{"builder_buildkit_ca": creds.CA, "builder_buildkit_client": creds.RegistryClientCert, "builder_buildkit_client_key": creds.RegistryClientKey}

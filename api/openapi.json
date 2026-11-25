@@ -31,44 +31,6 @@
         ],
         "type": "object"
       },
-      "BuildKitTLS": {
-        "additionalProperties": false,
-        "properties": {
-          "ca": {
-            "type": "string",
-            "writeOnly": true
-          },
-          "registry_ca": {
-            "type": "string",
-            "writeOnly": true
-          },
-          "registry_client_certificate": {
-            "type": "string",
-            "writeOnly": true
-          },
-          "registry_client_key": {
-            "type": "string",
-            "writeOnly": true
-          },
-          "server_certificate": {
-            "type": "string",
-            "writeOnly": true
-          },
-          "server_key": {
-            "type": "string",
-            "writeOnly": true
-          }
-        },
-        "required": [
-          "ca",
-          "server_certificate",
-          "server_key",
-          "registry_ca",
-          "registry_client_certificate",
-          "registry_client_key"
-        ],
-        "type": "object"
-      },
       "CatalogEntry": {
         "additionalProperties": false,
         "properties": {
@@ -611,10 +573,6 @@
             "minLength": 1,
             "type": "string"
           },
-          "buildkit_tls": {
-            "$ref": "#/components/schemas/BuildKitTLS",
-            "writeOnly": true
-          },
           "endpoint": {
             "maxLength": 255,
             "minLength": 1,
@@ -655,7 +613,6 @@
           "worker",
           "username",
           "token",
-          "buildkit_tls",
           "version",
           "revision",
           "endpoint",
