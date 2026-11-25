@@ -154,7 +154,10 @@ running services and can rewrite the installer-managed Compose when
 Portainer.
 
 Expand a version under **Release notes** to read its formatted changelog.
-For the installer command, expand **Manual update**.
+Expand **Manual update** for a SQLite backup command and the installer command.
+Run the backup on the node that holds the database volume. Keep the backup
+directory outside that volume. If a migration ran, restoring the old image
+also requires restoring the pre-update database.
 
 When upgrading across a change to the internal token format, redeploy the
 whole panel stack on the same version, including the agents and firewall.

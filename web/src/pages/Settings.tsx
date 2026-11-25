@@ -23,7 +23,7 @@ export function Settings() {
           <div className="settings-row">
             <div>
               <h2 id="settings-appearance">Appearance</h2>
-              <p className="muted">Accent color · Saved in this browser</p>
+              <p className="muted">Accent color</p>
             </div>
             <Swatches value={seed} onChange={choose} />
           </div>

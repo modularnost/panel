@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { call, api, retryableQueryError } from "../api/client";
 import { RefreshWarning } from "../components/RefreshWarning";
 import { formatTime } from "../format";
-import { installCommand, updateInProgress, useUpdates } from "../updates";
+import { backupCommand, installCommand, updateInProgress, useUpdates } from "../updates";
 import { Button } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
@@ -42,10 +42,11 @@ export function Updates() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["updates"] }),
   });
   const { confirm } = useDialogs();
-  const update = async (tag: string) => {
+  const update = async (tag: string, stackFile: boolean) => {
+    const redeploy = stackFile ? "" : " Update the image tags in your Compose file before redeploying the stack later.";
     const ok = await confirm({
       title: `Update the panel to ${tag}?`,
-      message: "The panel restarts during the update. Back up the database volume first if you may need to roll back after a migration.",
+      message: `The panel backs up its database and restarts during the update.${redeploy}`,
       action: "Update",
     });
     if (ok) apply.mutate(tag);
@@ -78,13 +79,20 @@ export function Updates() {
       <div className="settings-row">
         <div>
           <p className="settings-version">{u.current}</p>
-          <p className="muted">Installed version{u.checked_at && ` · Checked ${formatTime(u.checked_at)}`}</p>
+          <p className="muted">Installed version</p>
         </div>
         {u.enabled && u.release_build && (
-          <Button variant="tonal" onClick={() => check.mutate()} disabled={check.isPending}>
-            <Icon name="refresh" size={18} />
-            {check.isPending ? "Checking…" : "Check now"}
-          </Button>
+          <div className="settings-inline settings-check">
+            {u.checked_at && (
+              <span className="muted">
+                Last checked for updates <time dateTime={u.checked_at}>{formatTime(u.checked_at)}</time>
+              </span>
+            )}
+            <Button variant="tonal" onClick={() => check.mutate()} disabled={check.isPending}>
+              <Icon name="refresh" size={18} />
+              {check.isPending ? "Checking…" : "Check now"}
+            </Button>
+          </div>
         )}
       </div>
       {check.isError && <Banner tone="error">{check.error.message}</Banner>}
@@ -105,7 +113,7 @@ export function Updates() {
               {newest.prerelease && <Chip>Pre-release</Chip>}
             </div>
           </div>
-          <Button onClick={() => update(newest.tag)} disabled={busy}>
+          <Button onClick={() => update(newest.tag, u.stack_file)} disabled={busy}>
             <Icon name="arrow_downward" size={18} />
             {apply.isPending ? "Starting update…" : `Update to ${newest.tag}`}
           </Button>
@@ -134,19 +142,17 @@ export function Updates() {
       )}
       {newest && (
         <>
-          {!u.stack_file && (
-            <Banner tone="warning">
-              The stack file will still point to the old image after the update.
-              Run the installer on the Swarm manager to add the missing mount.
-            </Banner>
-          )}
           <details className="settings-disclosure">
             <summary><Icon name="chevron_right" size={18} /> Manual update</summary>
             <div className="settings-disclosure-body">
+              <p>On the node running the panel, create a copy of the database before updating.</p>
               <p className="muted">
-                Back up the database volume before updating. Rolling back after a migration requires restoring that backup.
+                This example uses the default volume <code>panel_panel-data</code> and database <code>modularnost.db</code>.
+                Adjust those names if your deployment uses different ones.
               </p>
-              <p>Run on the Swarm manager:</p>
+              <pre><code>{backupCommand}</code></pre>
+              <p className="muted">After a database migration, rolling back also requires restoring this copy.</p>
+              <p>For installer-managed deployments, run the update on the Swarm manager.</p>
               <pre><code>{installCommand(newest.tag)}</code></pre>
             </div>
           </details>
