@@ -1,12 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { LinkButton } from "../components/Button";
-import { Banner } from "../components/Banner";
 import { api, call, retryableQueryError } from "../api/client";
 import { RefreshWarning } from "../components/RefreshWarning";
-import { atLeast, useMe } from "../auth";
+import { useMe } from "../auth";
 import { modulePath, slot, useModules } from "../modules";
-import { useUpdates } from "../updates";
 import { Chip } from "../components/Chip";
 import { Table } from "../components/Table";
 import { useTableSort } from "../components/TableSort";
@@ -20,8 +18,6 @@ export function Services() {
     deploy: (s) => s.last_deploy_at ? Date.parse(s.last_deploy_at) : undefined,
     updated: (s) => s.swarm_updated_at ? Date.parse(s.swarm_updated_at) : undefined,
   });
-  const updates = useUpdates(atLeast(me.data?.role, "admin"));
-  const newest = updates.data?.releases[0];
   const services = useQuery({
     queryKey: ["services"],
     queryFn: () => call(api.listServices()),
@@ -39,11 +35,6 @@ export function Services() {
 
   return (
     <>
-      {newest && (
-        <Banner>
-          {newest.tag} is available. <Link to="/settings">What changed</Link>
-        </Banner>
-      )}
       <RefreshWarning error={services.error} />
       <h1>Services</h1>
       {actions.length > 0 && (
