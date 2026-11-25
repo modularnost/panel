@@ -95,10 +95,11 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"ModuleInstall":          apiModuleInstall{},
 		"ModuleInstalled":        apiModuleInstalled{},
 
-		"CatalogEntry":            catalogEntry{},
-		"CatalogScreenshot":       catalogScreenshot{},
-		"CatalogInstall":          apiCatalogInstall{},
-		"ModuleCatalogOutputBody": moduleCatalogOutput{}.Body,
+		"CatalogEntry":               catalogEntry{},
+		"CatalogScreenshot":          catalogScreenshot{},
+		"CatalogInstall":             apiCatalogInstall{},
+		"ModuleCatalogOutputBody":    moduleCatalogOutput{}.Body,
+		"CatalogPreflightOutputBody": catalogPreflightOutput{}.Body,
 
 		"UserCreate":            apiUserCreate{},
 		"UserPatch":             apiUserPatch{},
