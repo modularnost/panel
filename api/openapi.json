@@ -110,6 +110,18 @@
         ],
         "type": "object"
       },
+      "CatalogPreflightOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "panel_network": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "panel_network"
+        ],
+        "type": "object"
+      },
       "CatalogScreenshot": {
         "additionalProperties": false,
         "properties": {
@@ -2485,6 +2497,63 @@
           }
         ],
         "summary": "Install the approved module version"
+      }
+    },
+    "/api/v1/module-catalog/{id}/preflight": {
+      "post": {
+        "operationId": "preflight-catalog-module",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogInstall"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPreflightOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify Builder installation prerequisites and read the approved deployment bundle"
       }
     },
     "/api/v1/modules": {

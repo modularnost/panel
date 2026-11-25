@@ -71,6 +71,29 @@ func TestCatalogSkipsUnsupportedInstallKinds(t *testing.T) {
 	}
 }
 
+func TestCatalogBuilderStack(t *testing.T) {
+	const entry = `{"schema_version":1,"modules":[{
+		"id":"builder","title":"Builder","summary":"Builds and deploys apps","maintainer":"Modularnost",
+		"source_url":"https://github.com/modularnost/builder_module","requires":{"contract":3},
+		"permissions":["service:read","service:create"],"install":{"kind":"builder_stack","version":"0.1.0",
+		"image":"ghcr.io/modularnost/builder-module@sha256:5ad2ee64fa1c76ac720162f914d16e595b23053ede126d39ac2e27c21a189c61"}
+	}]}`
+	entries, err := decodeCatalog([]byte(entry))
+	if err != nil || len(entries) != 1 || entries[0].Install.Kind != CatalogBuilderStack {
+		t.Fatalf("expected the official digest-pinned Builder stack, got %v, %v", entries, err)
+	}
+	for _, test := range []struct{ old, new string }{
+		{`"id":"builder"`, `"id":"other"`},
+		{"modularnost/builder-module@", "other/builder-module@"},
+		{"builder-module@", "builder-module:latest@"},
+		{`"kind":"builder_stack"`, `"kind":"builder_stack","port":8080`},
+	} {
+		if _, err := decodeCatalog([]byte(strings.Replace(entry, test.old, test.new, 1))); err == nil {
+			t.Errorf("accepted %s", test.new)
+		}
+	}
+}
+
 func TestCatalogKeepsLastGoodSnapshot(t *testing.T) {
 	var reply atomic.Value
 	reply.Store("invalid")

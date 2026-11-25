@@ -29,6 +29,7 @@ import (
 const catalogBase = "https://raw.githubusercontent.com/modularnost/module-catalog/main/"
 const catalogInterval = time.Hour
 const maxCatalogBytes = 1 << 20
+const CatalogBuilderStack = "builder_stack"
 
 type CatalogScreenshot struct {
 	Path string `json:"path"`
@@ -73,7 +74,7 @@ func (i *CatalogInstall) UnmarshalJSON(data []byte) error {
 }
 
 func (i CatalogInstall) supported() bool {
-	return i.Kind == "manual" || i.Kind == "swarm_service"
+	return i.Kind == "manual" || i.Kind == "swarm_service" || i.Kind == CatalogBuilderStack
 }
 
 type CatalogEntry struct {
@@ -282,6 +283,10 @@ func (e CatalogEntry) valid() bool {
 	switch i.Kind {
 	case "manual":
 		return catalogHTTPS(i.InstructionsURL) && i.Image == "" && i.Version == "" && i.Port == 0 && i.DataVolume == nil
+	case CatalogBuilderStack:
+		return e.ID == "builder" && strings.HasPrefix(i.Image, "ghcr.io/modularnost/builder-module@") &&
+			catalogImage.MatchString(i.Image) && catalogVersion.MatchString(i.Version) &&
+			i.Port == 0 && i.DataVolume == nil && i.InstructionsURL == ""
 	case "swarm_service":
 		_, err := reference.Parse(i.Image)
 		return err == nil && catalogImage.MatchString(i.Image) && catalogVersion.MatchString(i.Version) &&
