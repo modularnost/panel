@@ -168,6 +168,10 @@ Mixed versions cannot authenticate to each other during the rollout.
 path of the pre-update database copy. If Swarm rolls the service back,
 check whether the database needs restoring before retrying.
 
+The panel checks the release image in the registry before starting an update.
+When the panel and agents use the same image repository, both use the same
+verified digest.
+
 After a successful self-update, the panel keeps the current rollback copy
 and the two most recent older copies from confirmed updates. It prunes older
 copies it created in the `<database>.update-backups` directory. Backups made
