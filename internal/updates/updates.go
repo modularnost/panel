@@ -61,7 +61,7 @@ func New(current string, enabled bool) *Checker {
 
 // Run checks now and then every interval, until ctx ends.
 func (c *Checker) Run(ctx context.Context, every time.Duration) {
-	if !c.enabled {
+	if !c.canCheck() {
 		return
 	}
 	for {
@@ -78,7 +78,7 @@ func (c *Checker) Run(ctx context.Context, every time.Duration) {
 
 // Refresh fetches the release list. A failure keeps the previous answer.
 func (c *Checker) Refresh(ctx context.Context) error {
-	if !c.enabled {
+	if !c.canCheck() {
 		return nil
 	}
 	list, err := c.fetch(ctx)
@@ -90,6 +90,11 @@ func (c *Checker) Refresh(ctx context.Context) error {
 	}
 	c.releases, c.checkedAt, c.lastErr = list, time.Now(), ""
 	return nil
+}
+
+func (c *Checker) canCheck() bool {
+	_, release := parse(c.current)
+	return c.enabled && release
 }
 
 func (c *Checker) fetch(ctx context.Context) ([]Release, error) {

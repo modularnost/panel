@@ -19,6 +19,7 @@ type apiStackResult struct {
 
 type apiStackCompose struct {
 	Compose      string  `json:"compose" doc:"The compose file; services missing from it are removed"`
+	Environment  *string `json:"environment,omitempty" doc:"Compose variables, one NAME=value per line; omit to keep saved values, or send an empty string to clear them"`
 	RegistryHost *string `json:"registry_host,omitempty" maxLength:"255" doc:"Saved registry host; omit to keep the current selection, or send an empty string to clear it"`
 }
 
@@ -74,24 +75,31 @@ func (s *Server) registerStackActions(api huma.API) {
 		}
 		defer s.lockStack(in.Name)()
 		stored, _ := s.DB.Stack(in.Name)
-		host := stored.RegistryHost
-		if in.Body.RegistryHost != nil {
-			host = *in.Body.RegistryHost
+		stored.Name, stored.Compose = in.Name, in.Body.Compose
+		if in.Body.Environment != nil {
+			stored.Environment = *in.Body.Environment
 		}
-		auth, err := s.registryCredentials(host)
+		values, err := docker.ParseStackEnvironment(stored.Environment)
+		if err != nil {
+			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", err.Error())
+		}
+		if in.Body.RegistryHost != nil {
+			stored.RegistryHost = *in.Body.RegistryHost
+		}
+		auth, err := s.registryCredentials(stored.RegistryHost)
 		if err != nil {
 			return nil, err
 		}
 		me, _ := ctx.Value(ctxKey{}).(store.User)
+		stored.UpdatedBy = me.Username
 		finish, _ := s.DB.StartDeploy(store.DeployEvent{
 			StackName: in.Name, Source: "api", TriggeredBy: me.Username})
-		out, err := s.Docker.DeployStack(ctx, in.Name, in.Body.Compose, auth)
+		out, err := s.Docker.DeployStack(ctx, stored.Name, stored.Compose, values, auth)
 		finish("", "", err)
 		if err != nil {
 			return nil, backendProblem(http.StatusBadGateway, "deploy_failed", err)
 		}
-		// Only a file that actually deployed is kept.
-		if err := s.DB.SaveStack(in.Name, in.Body.Compose, me.Username, host); err != nil {
+		if err := s.DB.SaveStack(stored); err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return &stackResultOutput{Body: apiStackResult{Name: in.Name, Output: out}}, nil
@@ -115,7 +123,11 @@ func (s *Server) registerStackActions(api huma.API) {
 			auth, authErr := s.registryCredentials(st.RegistryHost)
 			err = authErr
 			if err == nil {
-				out, err = s.Docker.DeployStack(ctx, in.Name, st.Compose, auth)
+				var values map[string]string
+				values, err = docker.ParseStackEnvironment(st.Environment)
+				if err == nil {
+					out, err = s.Docker.DeployStack(ctx, in.Name, st.Compose, values, auth)
+				}
 			}
 		} else {
 			var done []docker.Deploy

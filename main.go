@@ -76,9 +76,9 @@ func syncStackFile(dk *docker.Client, path string) {
 // firewallMode runs the node firewall: the same binary, one per node, with the
 // host's network and NET_ADMIN and no Docker socket (ADR 9). It listens on
 // nothing; it asks the panel what to allow.
-func firewallMode(mode string) {
+func firewallMode(ctx context.Context, mode string) {
 	if mode == "firewall-clear" {
-		if err := firewall.Clear(context.Background()); err != nil {
+		if err := firewall.Clear(ctx); err != nil {
 			log.Fatalf("firewall: %v", err)
 		}
 		log.Print("firewall: the chain is gone")
@@ -93,7 +93,7 @@ func firewallMode(mode string) {
 		node, _ = os.Hostname()
 	}
 	log.Printf("modularnost %s: firewall for node %q, rules from %s", version, node, core)
-	firewall.Run(context.Background(), core, secret, node, 30*time.Second)
+	firewall.Run(ctx, core, secret, node, 30*time.Second)
 }
 
 func main() {
@@ -103,13 +103,13 @@ func main() {
 		}
 		return
 	}
-	if mode := os.Getenv("PANEL_MODE"); mode == "firewall" || mode == "firewall-clear" {
-		firewallMode(mode)
-		return
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if mode := os.Getenv("PANEL_MODE"); mode == "firewall" || mode == "firewall-clear" {
+		firewallMode(ctx, mode)
+		return
+	}
 
 	dk, err := docker.New()
 	if err != nil {

@@ -209,22 +209,17 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	}, func(ctx context.Context, in *struct {
 		ID string `path:"id"`
 	}) (*serviceOutput, error) {
-		svcs, err := s.Docker.Services(ctx)
+		sv, err := s.apiFindService(ctx, in.ID)
 		if err != nil {
-			return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
+			return nil, err
 		}
-		for _, sv := range svcs {
-			if sv.ID == in.ID || sv.Name == in.ID {
-				deploys, err := s.DB.LastDeployments(ctx)
-				if err != nil {
-					return nil, backendProblem(http.StatusInternalServerError, "internal", err)
-				}
-				view := toAPIService(sv, true)
-				view.LastDeployAt = deploys.ForService(sv.Name, sv.Stack)
-				return &serviceOutput{Body: view}, nil
-			}
+		lastDeploy, err := s.DB.LastServiceDeployment(ctx, sv.Name, sv.Stack)
+		if err != nil {
+			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
-		return nil, problem(http.StatusNotFound, "not_found", "no such service")
+		view := toAPIService(sv, true)
+		view.LastDeployAt = lastDeploy
+		return &serviceOutput{Body: view}, nil
 	})
 	s.registerStacks(api, viewer)
 	s.registerLogs(api, viewer)
