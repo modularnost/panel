@@ -65,41 +65,16 @@ func (s *Server) registerUpdateApply(api huma.API) {
 			return nil, problem(http.StatusConflict, "update_in_progress", "the Swarm service is already updating")
 		}
 		image := strings.TrimPrefix(tag, "v")
-		panelTarget := docker.ImageRepo(rollout.Image) + ":" + image
-		auth, _ := s.serviceRegistryAuth(panelTarget, nil)
-		insp, err := s.Docker.DistributionInspect(ctx, panelTarget, auth)
-		if err != nil {
-			return nil, problem(http.StatusUnprocessableEntity, "image_not_found",
-				fmt.Sprintf("cannot verify image in registry: %v", err))
-		}
-		targetTag := image
-		if digest := string(insp.Descriptor.Digest); digest != "" {
-			targetTag = image + "@" + digest
-		}
-
 		var agentRollout docker.Rollout
-		var agentTag string
 		if s.AgentService != "" {
-			var err error
 			agentRollout, err = s.Docker.ServiceRollout(ctx, s.AgentService)
 			if err != nil {
 				return nil, backendProblem(http.StatusBadGateway, "docker_unavailable", err)
 			}
-			if agentRollout.Image != "" {
-				agentTarget := docker.ImageRepo(agentRollout.Image) + ":" + image
-				agentAuth, _ := s.serviceRegistryAuth(agentTarget, nil)
-				agentInsp, err := s.Docker.DistributionInspect(ctx, agentTarget, agentAuth)
-				if err != nil {
-					return nil, problem(http.StatusUnprocessableEntity, "image_not_found",
-						fmt.Sprintf("cannot verify agent image in registry: %v", err))
-				}
-				agentTag = image
-				if digest := string(agentInsp.Descriptor.Digest); digest != "" {
-					agentTag = image + "@" + digest
-				}
-			} else {
-				agentTag = targetTag
-			}
+		}
+		targetTag, agentTag, err := s.verifyUpdateImages(ctx, image, rollout.Image, agentRollout.Image)
+		if err != nil {
+			return nil, err
 		}
 
 		if err := s.confirmPreviousUpdateBackup(ctx, self.Service, rollout); err != nil {
@@ -155,6 +130,34 @@ func (s *Server) registerUpdateApply(api huma.API) {
 		}()
 		return &updateStartedOutput{Body: apiUpdateStarted{Version: tag, Image: targetTag, Backup: backup}}, nil
 	})
+}
+
+func (s *Server) verifyUpdateImages(ctx context.Context, tag, panelImage, agentImage string) (string, string, error) {
+	panelRepo, agentRepo := docker.ImageRepo(panelImage), docker.ImageRepo(agentImage)
+	panelTag, err := s.verifyUpdateImage(ctx, panelRepo, tag)
+	if err != nil {
+		return "", "", problem(http.StatusUnprocessableEntity, "image_not_found",
+			fmt.Sprintf("cannot verify image in registry: %v", err))
+	}
+	if agentRepo == "" || agentRepo == panelRepo {
+		return panelTag, panelTag, nil
+	}
+	agentTag, err := s.verifyUpdateImage(ctx, agentRepo, tag)
+	if err != nil {
+		return "", "", problem(http.StatusUnprocessableEntity, "image_not_found",
+			fmt.Sprintf("cannot verify agent image in registry: %v", err))
+	}
+	return panelTag, agentTag, nil
+}
+
+func (s *Server) verifyUpdateImage(ctx context.Context, repo, tag string) (string, error) {
+	target := repo + ":" + tag
+	auth, _ := s.serviceRegistryAuth(target, nil)
+	insp, err := s.Docker.DistributionInspect(ctx, target, auth)
+	if digest := string(insp.Descriptor.Digest); digest != "" {
+		tag += "@" + digest
+	}
+	return tag, err
 }
 
 func (s *Server) failPanelUpdate(attempt store.PanelUpdate) {
