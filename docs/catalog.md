@@ -11,9 +11,10 @@ same control shows the installed version, Swarm service, and permissions. A
 ready module with a menu page has an **Open** action. Administrators see the
 catalog description on both tabs when the installed module is listed there.
 
-Nothing here is installed automatically. The panel does not read this file: it
-discovers whatever is running in your cluster by labels, and this page only
-answers "what exists".
+The catalog offers installation for supported Swarm service entries and links
+to guides for manual entries. The panel skips entries that use an installation
+kind it does not support so administrators can still install other modules.
+Installed modules are discovered from service labels in the cluster.
 
 ## Bundled examples
 

@@ -55,6 +55,27 @@ type CatalogInstall struct {
 	InstructionsURL string         `json:"instructions_url,omitempty"`
 }
 
+func (i *CatalogInstall) UnmarshalJSON(data []byte) error {
+	var header struct {
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal(data, &header); err != nil {
+		return err
+	}
+	*i = CatalogInstall{Kind: header.Kind}
+	if !i.supported() {
+		return nil
+	}
+	type install CatalogInstall
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode((*install)(i))
+}
+
+func (i CatalogInstall) supported() bool {
+	return i.Kind == "manual" || i.Kind == "swarm_service"
+}
+
 type CatalogEntry struct {
 	ID          string              `json:"id"`
 	Title       string              `json:"title"`
@@ -197,11 +218,12 @@ func (c *Catalog) refresh(ctx context.Context) error {
 }
 
 var (
-	catalogVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
-	catalogImage   = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*(?::[0-9]+)?/(?:[a-z0-9]+(?:[._-]+[a-z0-9]+)*/)*[a-z0-9]+(?:[._-]+[a-z0-9]+)*@sha256:[a-f0-9]{64}$`)
-	catalogMount   = regexp.MustCompile(`^/[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$`)
-	catalogShot    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*\.(png|jpg|jpeg|webp)$`)
-	catalogPerm    = regexp.MustCompile(`^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$`)
+	catalogVersion     = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
+	catalogImage       = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*(?::[0-9]+)?/(?:[a-z0-9]+(?:[._-]+[a-z0-9]+)*/)*[a-z0-9]+(?:[._-]+[a-z0-9]+)*@sha256:[a-f0-9]{64}$`)
+	catalogMount       = regexp.MustCompile(`^/[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$`)
+	catalogShot        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*\.(png|jpg|jpeg|webp)$`)
+	catalogPerm        = regexp.MustCompile(`^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$`)
+	catalogInstallKind = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 )
 
 func decodeCatalog(body []byte) ([]CatalogEntry, error) {
@@ -231,7 +253,9 @@ func decodeCatalog(body []byte) ([]CatalogEntry, error) {
 		}
 		seen[id] = true
 	}
-	return document.Entries, nil
+	return slices.DeleteFunc(document.Entries, func(entry CatalogEntry) bool {
+		return !entry.Install.supported()
+	}), nil
 }
 
 func (e CatalogEntry) valid() bool {
@@ -264,7 +288,7 @@ func (e CatalogEntry) valid() bool {
 			i.Port >= 0 && i.Port <= 65535 && i.InstructionsURL == "" &&
 			(i.DataVolume == nil || catalogMount.MatchString(i.DataVolume.MountPath))
 	default:
-		return false
+		return catalogInstallKind.MatchString(i.Kind)
 	}
 }
 
