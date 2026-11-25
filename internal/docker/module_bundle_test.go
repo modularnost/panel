@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -17,33 +18,35 @@ import (
 	"github.com/moby/moby/api/types/container"
 )
 
-func TestReadBuilderBundleFromDocker(t *testing.T) {
-	image := os.Getenv("PANEL_BUILDER_BUNDLE_IMAGE")
+func TestReadModuleBundleFromDocker(t *testing.T) {
+	image := os.Getenv("PANEL_MODULE_BUNDLE_IMAGE")
 	if image == "" {
-		t.Skip("set PANEL_BUILDER_BUNDLE_IMAGE to a Builder image pinned by digest")
+		t.Skip("set PANEL_MODULE_BUNDLE_IMAGE to a module image pinned by digest")
 	}
 	c, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	bundle, err := c.ReadBuilderBundle(t.Context(), image)
+	bundle, err := c.ReadModuleBundle(t.Context(), image)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(bundle.Stack, []byte("panel.module.name: builder")) ||
-		!bytes.Contains(bundle.RegistryPullConfig, []byte("basic_auth")) {
-		t.Fatal("deployment bundle does not contain the Builder stack and authenticated pull proxy")
+	for _, stack := range bundle.StackFiles {
+		if len(bundle.Files[stack]) == 0 {
+			t.Fatalf("missing stack file %q", stack)
+		}
 	}
+	t.Logf("stack files %v, encrypted registry credentials required: %t", bundle.StackFiles, bundle.RegistryCredentials)
 }
 
-func TestReadBuilderBundle(t *testing.T) {
-	const repo = "ghcr.io/modularnost/builder-module"
+func TestReadModuleBundle(t *testing.T) {
+	const repo = "ghcr.io/example/observability-module"
 	digest := "sha256:" + strings.Repeat("a", 64)
 	image := repo + "@" + digest
 	for _, bad := range []string{repo + ":edge", repo + ":edge@" + digest} {
 		var c Client
-		if _, err := c.ReadBuilderBundle(t.Context(), bad); err == nil {
+		if _, err := c.ReadModuleBundle(t.Context(), bad); err == nil {
 			t.Errorf("accepted %q", bad)
 		}
 	}
@@ -54,10 +57,11 @@ func TestReadBuilderBundle(t *testing.T) {
 		cancelCopy bool
 		wantErr    string
 	}{
-		{name: "valid", archive: builderBundleArchive(t, "", 0)},
-		{name: "duplicate file", archive: builderBundleArchive(t, "deploy/stack.yml", tar.TypeReg), wantErr: "invalid Builder bundle file"},
-		{name: "symlink", archive: builderBundleArchive(t, "deploy/stack.yml", tar.TypeSymlink), wantErr: "invalid Builder bundle file"},
-		{name: "missing files", archive: []byte{}, wantErr: "missing Builder bundle file"},
+		{name: "valid", archive: moduleBundleArchive(t, "", 0)},
+		{name: "duplicate file", archive: moduleBundleArchive(t, "deploy/stacks/app.yaml", tar.TypeReg), wantErr: "invalid module bundle file"},
+		{name: "symlink", archive: moduleBundleArchive(t, "deploy/assets/link", tar.TypeSymlink), wantErr: "invalid module bundle file"},
+		{name: "traversal", archive: moduleBundleArchive(t, "deploy/assets/../escape", tar.TypeReg), wantErr: "invalid module bundle"},
+		{name: "missing files", archive: []byte{}, wantErr: "missing module bundle manifest.json"},
 		{name: "canceled read", cancelCopy: true, wantErr: "context canceled"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -81,13 +85,13 @@ func TestReadBuilderBundle(t *testing.T) {
 					if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 						t.Error(err)
 					}
-					if lifecycle.Add(1) != 2 || input.Image != image || input.HostConfig.NetworkMode != "none" || !strings.HasPrefix(r.URL.Query().Get("name"), "panel-builder-bundle-") {
+					if lifecycle.Add(1) != 2 || input.Image != image || input.HostConfig.NetworkMode != "none" || !strings.HasPrefix(r.URL.Query().Get("name"), "panel-module-bundle-") {
 						t.Error("expected to create an isolated container from the same digest")
 					}
 					w.WriteHeader(http.StatusCreated)
 					_, _ = io.WriteString(w, `{"Id":"bundle-test"}`)
 				case r.Method == http.MethodGet && r.URL.Path == "/v1.51/containers/bundle-test/archive":
-					if lifecycle.Add(1) != 3 || r.URL.Query().Get("path") != "/usr/share/builder/deploy" {
+					if lifecycle.Add(1) != 3 || r.URL.Query().Get("path") != "/usr/share/modularnost/deploy" {
 						t.Error("expected to copy the deployment files from the stopped container")
 					}
 					if test.cancelCopy {
@@ -97,7 +101,7 @@ func TestReadBuilderBundle(t *testing.T) {
 					}
 					w.Header().Set("X-Docker-Container-Path-Stat", base64.StdEncoding.EncodeToString([]byte(`{"name":"deploy"}`)))
 					_, _ = w.Write(test.archive)
-				case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v1.51/containers/panel-builder-bundle-"):
+				case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v1.51/containers/panel-module-bundle-"):
 					if lifecycle.Add(1) != 4 || r.URL.Query().Get("v") != "1" {
 						t.Error("expected to remove the temporary container with its volumes")
 					}
@@ -117,7 +121,7 @@ func TestReadBuilderBundle(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer c.Close()
-			bundle, err := c.ReadBuilderBundle(ctx, image)
+			bundle, err := c.ReadModuleBundle(ctx, image)
 			if lifecycle.Load() != 4 {
 				t.Errorf("unexpected Docker lifecycle length %d", lifecycle.Load())
 			}
@@ -127,23 +131,28 @@ func TestReadBuilderBundle(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || string(bundle.Stack) != "deploy/stack.yml" || string(bundle.BuildKitNetwork) != "deploy/scripts/buildkitd-network.sh" {
-				t.Fatalf("unexpected Builder bundle: %v, %v", bundle, err)
+			if err != nil || !slices.Equal(bundle.StackFiles, []string{"stacks/app.yaml", "stacks/collector.yml"}) ||
+				string(bundle.Files["assets/settings.conf"]) != "example settings" || bundle.RegistryCredentials {
+				t.Fatalf("unexpected module bundle: %v, %v", bundle, err)
 			}
 		})
 	}
 }
 
-func builderBundleArchive(t *testing.T, extra string, extraType byte) []byte {
+func moduleBundleArchive(t *testing.T, extra string, extraType byte) []byte {
 	t.Helper()
 	var archive bytes.Buffer
 	w := tar.NewWriter(&archive)
-	for _, name := range []string{"deploy/stack.yml", "deploy/stack.registry-pull.yml", "deploy/scripts/buildkitd.sh",
-		"deploy/scripts/buildkitd-network.sh", "deploy/scripts/buildkitd.toml", "deploy/scripts/registry-pull.Caddyfile"} {
-		if err := w.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0644, Size: int64(len(name))}); err != nil {
+	for name, content := range map[string]string{
+		"deploy/manifest.json":        `{"schema_version":1,"stack_files":["stacks/app.yaml","stacks/collector.yml"]}`,
+		"deploy/stacks/app.yaml":      "services: {}\n",
+		"deploy/stacks/collector.yml": "services: {}\n",
+		"deploy/assets/settings.conf": "example settings",
+	} {
+		if err := w.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0644, Size: int64(len(content))}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := io.WriteString(w, name); err != nil {
+		if _, err := io.WriteString(w, content); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -156,4 +165,25 @@ func builderBundleArchive(t *testing.T, extra string, extraType byte) []byte {
 		t.Fatal(err)
 	}
 	return archive.Bytes()
+}
+
+func TestModuleBundleManifest(t *testing.T) {
+	for _, raw := range []string{
+		`{"schema_version":2,"stack_files":["stack.yml"]}`,
+		`{"schema_version":1,"stack_files":["missing.yml"]}`,
+		`{"schema_version":1,"stack_files":["stack.yml","stack.yml"]}`,
+		`{"schema_version":1,"stack_files":["/stack.yml"]}`,
+		`{"schema_version":1,"stack_files":["stack.yml"],"execute":"setup.sh"}`,
+	} {
+		if _, err := parseModuleBundleManifest(map[string][]byte{"manifest.json": []byte(raw), "stack.yml": []byte("services: {}\n")}); err == nil {
+			t.Errorf("accepted manifest %s", raw)
+		}
+	}
+	bundle, err := parseModuleBundleManifest(map[string][]byte{
+		"manifest.json": []byte(`{"schema_version":1,"stack_files":["stack.yml"],"registry_credentials":true}`),
+		"stack.yml":     []byte("services: {}\n"),
+	})
+	if err != nil || !bundle.RegistryCredentials {
+		t.Fatalf("expected a registry credential requirement, got %v, %v", bundle, err)
+	}
 }

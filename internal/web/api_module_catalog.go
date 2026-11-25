@@ -79,8 +79,8 @@ func (s *Server) catalogOutput() *moduleCatalogOutput {
 			Version: entry.Install.Version, Revision: entry.Revision(), Incompatibility: entry.Incompatibility(Version),
 			InstructionsURL: entry.Install.InstructionsURL, Screenshots: []catalogScreenshot{},
 		}
-		if entry.Install.Kind == modules.CatalogBuilderStack && card.Incompatibility == "" {
-			card.Incompatibility = "Builder stack installation is unavailable in this panel version"
+		if entry.Install.Kind == modules.CatalogSwarmStack && card.Incompatibility == "" {
+			card.Incompatibility = "Stack installation is unavailable in this panel version"
 		}
 		if entry.Install.DataVolume != nil {
 			card.MountPath = entry.Install.DataVolume.MountPath
@@ -126,19 +126,19 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 	})
 	huma.Register(api, huma.Operation{
 		OperationID: "preflight-catalog-module", Method: http.MethodPost, Path: "/api/v1/module-catalog/{id}/preflight",
-		Summary: "Verify Builder installation prerequisites and read the approved deployment bundle", Middlewares: admin, Security: signedIn,
+		Summary: "Verify module stack prerequisites and read the approved deployment bundle", Middlewares: admin, Security: signedIn,
 	}, func(ctx context.Context, in *catalogInstallInput) (*catalogPreflightOutput, error) {
 		entry, err := s.catalogEntryForInstall(in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if entry.Install.Kind != modules.CatalogBuilderStack {
-			return nil, problem(http.StatusUnprocessableEntity, "preflight_unavailable", "Preflight is available for Builder stack entries")
+		if entry.Install.Kind != modules.CatalogSwarmStack {
+			return nil, problem(http.StatusUnprocessableEntity, "preflight_unavailable", "Preflight is available for Swarm stack entries")
 		}
 		if err := in.Body.confirm(entry); err != nil {
 			return nil, err
 		}
-		return s.builderPreflight(ctx, entry.Install.Image)
+		return s.stackPreflight(ctx, entry.Install.Image)
 	})
 	huma.Register(api, huma.Operation{
 		OperationID: "refresh-module-catalog", Method: http.MethodPost, Path: "/api/v1/module-catalog/refresh",
@@ -163,7 +163,7 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 			return nil, problem(http.StatusUnprocessableEntity, "manual_install", "Follow this module's installation guide")
 		}
 		if entry.Install.Kind != "swarm_service" {
-			return nil, problem(http.StatusConflict, "module_incompatible", "This panel version cannot install Builder stacks")
+			return nil, problem(http.StatusConflict, "module_incompatible", "This panel version cannot install module stacks")
 		}
 		if err := in.Body.confirm(entry); err != nil {
 			return nil, err
@@ -183,10 +183,7 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 	})
 }
 
-func (s *Server) builderPreflight(ctx context.Context, image string) (*catalogPreflightOutput, error) {
-	if s.RegistryEncryption == nil {
-		return nil, problem(http.StatusServiceUnavailable, "registry_not_configured", "Enable encrypted registry credentials before installing Builder")
-	}
+func (s *Server) stackPreflight(ctx context.Context, image string) (*catalogPreflightOutput, error) {
 	self, err := s.Docker.Self(ctx)
 	if err != nil {
 		return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
@@ -196,11 +193,15 @@ func (s *Server) builderPreflight(ctx context.Context, image string) (*catalogPr
 		return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 	}
 	if self.Service == "" || !slices.Contains(networks, self.Network) {
-		return nil, problem(http.StatusConflict, "module_unavailable", "Builder requires a panel service on a Swarm overlay network")
+		return nil, problem(http.StatusConflict, "module_unavailable", "Module stacks require a panel service on a Swarm overlay network")
 	}
-	if _, err := s.Docker.ReadBuilderBundle(ctx, image); err != nil {
-		log.Printf("reading Builder deployment bundle: %v", err)
-		return nil, problem(http.StatusBadGateway, "builder_bundle_unavailable", "Could not read the approved Builder deployment bundle. Check that the image can be pulled on this node")
+	bundle, err := s.Docker.ReadModuleBundle(ctx, image)
+	if err != nil {
+		log.Printf("reading module deployment bundle: %v", err)
+		return nil, problem(http.StatusBadGateway, "module_bundle_unavailable", "Could not read the approved module deployment bundle. Check that the image can be pulled on this node")
+	}
+	if bundle.RegistryCredentials && s.RegistryEncryption == nil {
+		return nil, problem(http.StatusServiceUnavailable, "registry_not_configured", "This module stack requires encrypted registry credentials")
 	}
 	out := &catalogPreflightOutput{}
 	out.Body.PanelNetwork = self.Network

@@ -56,7 +56,7 @@ func TestCatalogSkipsUnsupportedInstallKinds(t *testing.T) {
 	const builder = `{
 		"id":"builder","title":"Builder","summary":"Builds and deploys apps","maintainer":"Modularnost",
 		"source_url":"https://example.org/builder","requires":{"contract":3},
-		"permissions":["service:create"],"install":{"kind":"swarm_stack","bundle":{"version":1}}
+		"permissions":["service:create"],"install":{"kind":"future_stack","bundle":{"version":1}}
 	}`
 	body := strings.TrimSuffix(catalogFixture, "]}") + "," + builder + "]}"
 	entries, err := decodeCatalog([]byte(body))
@@ -71,22 +71,25 @@ func TestCatalogSkipsUnsupportedInstallKinds(t *testing.T) {
 	}
 }
 
-func TestCatalogBuilderStack(t *testing.T) {
+func TestCatalogSwarmStack(t *testing.T) {
 	const entry = `{"schema_version":1,"modules":[{
 		"id":"builder","title":"Builder","summary":"Builds and deploys apps","maintainer":"Modularnost",
 		"source_url":"https://github.com/modularnost/builder_module","requires":{"contract":3},
-		"permissions":["service:read","service:create"],"install":{"kind":"builder_stack","version":"0.1.0",
+		"permissions":["service:read","service:create"],"install":{"kind":"swarm_stack","version":"0.1.0",
 		"image":"ghcr.io/modularnost/builder-module@sha256:5ad2ee64fa1c76ac720162f914d16e595b23053ede126d39ac2e27c21a189c61"}
 	}]}`
 	entries, err := decodeCatalog([]byte(entry))
-	if err != nil || len(entries) != 1 || entries[0].Install.Kind != CatalogBuilderStack {
-		t.Fatalf("expected the official digest-pinned Builder stack, got %v, %v", entries, err)
+	if err != nil || len(entries) != 1 || entries[0].Install.Kind != CatalogSwarmStack {
+		t.Fatalf("expected a digest-pinned Swarm stack, got %v, %v", entries, err)
+	}
+	other := strings.Replace(entry, `"id":"builder"`, `"id":"observability"`, 1)
+	other = strings.Replace(other, "ghcr.io/modularnost/builder-module@", "registry.example.org/acme/observability@", 1)
+	if entries, err := decodeCatalog([]byte(other)); err != nil || len(entries) != 1 || entries[0].ID != "observability" {
+		t.Fatalf("expected another module to use the same install format, got %v, %v", entries, err)
 	}
 	for _, test := range []struct{ old, new string }{
-		{`"id":"builder"`, `"id":"other"`},
-		{"modularnost/builder-module@", "other/builder-module@"},
 		{"builder-module@", "builder-module:latest@"},
-		{`"kind":"builder_stack"`, `"kind":"builder_stack","port":8080`},
+		{`"kind":"swarm_stack"`, `"kind":"swarm_stack","port":8080`},
 	} {
 		if _, err := decodeCatalog([]byte(strings.Replace(entry, test.old, test.new, 1))); err == nil {
 			t.Errorf("accepted %s", test.new)

@@ -2553,7 +2553,7 @@
             "bearer": []
           }
         ],
-        "summary": "Verify Builder installation prerequisites and read the approved deployment bundle"
+        "summary": "Verify module stack prerequisites and read the approved deployment bundle"
       }
     },
     "/api/v1/modules": {
