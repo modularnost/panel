@@ -65,7 +65,7 @@ export function ServiceNetworks() {
       {state && networks.data && <>
         {state.attachments.length + (draft?.add.length ?? 0) > 0 ? (
           <Table scrollLabel="Service networks">
-            <thead><tr><th scope="col">Network</th><th scope="col">Aliases</th>{canEdit && <th scope="col">Actions</th>}</tr></thead>
+            <thead><tr><th scope="col">Network</th><th scope="col">Aliases</th>{canEdit && <th scope="col" className="service-network-actions">Actions</th>}</tr></thead>
             <tbody>
               {state.attachments.map((a) => {
                 const n = net(a.id);
@@ -76,7 +76,7 @@ export function ServiceNetworks() {
                     {removing && <> <Chip>Pending disconnection</Chip></>}
                   </th>
                   <td>{a.automatic ? "Automatic" : a.aliases.join(", ") || "—"}</td>
-                  {canEdit && <td>{n && !n.protected && !a.automatic && (
+                  {canEdit && <td className="service-network-actions">{n && !n.protected && !a.automatic && (
                     <Button variant="text" disabled={change.isPending} onClick={() => toggle(a.id, "remove")}>
                       {removing ? "Undo" : "Disconnect…"}
                     </Button>
@@ -86,7 +86,7 @@ export function ServiceNetworks() {
               {draft?.add.map((networkID) => <tr key={networkID}>
                 <th scope="row">{nameOf(networkID)} <Chip>Pending connection</Chip></th>
                 <td>—</td>
-                <td><Button variant="text" disabled={change.isPending} onClick={() => toggle(networkID, "add")}>Undo</Button></td>
+                <td className="service-network-actions"><Button variant="text" disabled={change.isPending} onClick={() => toggle(networkID, "add")}>Undo</Button></td>
               </tr>)}
             </tbody>
           </Table>
