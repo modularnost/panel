@@ -48,7 +48,7 @@ func TestStackPreflightReadsApprovedImage(t *testing.T) {
 	}
 	defer dk.Close()
 	s := Server{Docker: dk}
-	_, err = s.stackPreflight(t.Context(), "ghcr.io/example/observability-module@"+digest)
+	_, _, _, err = s.prepareCatalogStack(t.Context(), modules.CatalogEntry{Install: modules.CatalogInstall{Image: "ghcr.io/example/observability-module@" + digest}})
 	var p *apiProblem
 	if !errors.As(err, &p) || p.status != http.StatusBadGateway || p.Detail.Code != "module_bundle_unavailable" {
 		t.Fatalf("unexpected preflight result: %v", err)
