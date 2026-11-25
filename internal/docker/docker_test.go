@@ -93,6 +93,73 @@ func TestServicesNegotiatesDockerAPIVersion(t *testing.T) {
 	}
 }
 
+func TestServicesWithLabelScopesTaskReads(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		svcCount  int
+		taskReads int32
+	}{
+		{"empty", 0, 0},
+		{"matching", 2, 1},
+		{"removed", 2, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var taskReads atomic.Int32
+			daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var filters map[string]map[string]bool
+				if raw := r.URL.Query().Get("filters"); raw != "" {
+					if err := json.Unmarshal([]byte(raw), &filters); err != nil {
+						t.Errorf("decode filters: %v", err)
+					}
+				}
+				switch r.URL.Path {
+				case "/_ping":
+					w.Header().Set("API-Version", "1.40")
+				case "/v1.40/services":
+					if !filters["label"]["panel.module=true"] {
+						t.Errorf("unexpected service filters: %v", filters)
+					}
+					if tc.svcCount == 0 {
+						_, _ = io.WriteString(w, `[]`)
+						return
+					}
+					_, _ = io.WriteString(w, `[{"ID":"a","Spec":{"Name":"one","TaskTemplate":{"ContainerSpec":{"Image":"module:1"}}}},{"ID":"b","Spec":{"Name":"two","TaskTemplate":{"ContainerSpec":{"Image":"module:2"}}}}]`)
+				case "/v1.40/tasks":
+					read := taskReads.Add(1)
+					if !filters["desired-state"]["running"] || (read == 1 && (!filters["service"]["a"] || !filters["service"]["b"])) ||
+						(read == 2 && len(filters["service"]) != 0) {
+						t.Errorf("unexpected task filters: %v", filters)
+					}
+					if tc.name == "removed" && read == 1 {
+						http.NotFound(w, r)
+						return
+					}
+					_, _ = io.WriteString(w, `[{"ServiceID":"a","DesiredState":"running","Status":{"State":"running"}}]`)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer daemon.Close()
+			t.Setenv("DOCKER_HOST", daemon.URL)
+			t.Setenv("DOCKER_API_VERSION", "")
+			t.Setenv("DOCKER_TLS_VERIFY", "")
+			t.Setenv("DOCKER_CERT_PATH", "")
+			c, err := New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.Close()
+			services, err := c.ServicesWithLabel(t.Context(), "panel.module", "true")
+			if err != nil || len(services) != tc.svcCount || taskReads.Load() != tc.taskReads {
+				t.Fatalf("services = %+v, err = %v, task reads = %d", services, err, taskReads.Load())
+			}
+			if tc.svcCount > 0 && (services[0].Running != 1 || services[1].Running != 0) {
+				t.Errorf("incorrect running counts: %+v", services)
+			}
+		})
+	}
+}
+
 func TestPickNetwork(t *testing.T) {
 	all := []string{"traefik-public", "ingress", "panel_default"}
 	for _, c := range []struct {
