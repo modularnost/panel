@@ -38,6 +38,47 @@ func TestFailedMigrationRollsBackSchema(t *testing.T) {
 	}
 }
 
+func TestDeploymentIndexUpgradesStackEnvironmentDatabase(t *testing.T) {
+	path := t.TempDir() + "/existing.db"
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer old.Close()
+	files, err := migrations.ReadDir("migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := 0
+	for _, file := range files {
+		if strings.Contains(file.Name(), "deploy_events_successful") {
+			continue
+		}
+		version++
+		if err := applyMigration(old, file.Name(), version); err != nil {
+			t.Fatal(err)
+		}
+		if file.Name() == "0011_stack_environment.sql" {
+			break
+		}
+	}
+	if version != 11 {
+		t.Fatalf("fixture schema version = %d, want 11", version)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var index string
+	if err := db.QueryRow(`SELECT name FROM sqlite_schema WHERE name = 'deploy_events_successful_by_target'`).Scan(&index); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLastDeployments(t *testing.T) {
 	db, err := Open(t.TempDir() + "/test.db")
 	if err != nil {
@@ -60,6 +101,13 @@ func TestLastDeployments(t *testing.T) {
 	}
 	if latest := times.ForService("external_web", "external"); latest != nil {
 		t.Fatalf("expected unknown deployment time, got %v", latest)
+	}
+	for _, target := range [][2]string{{"app_web", "app"}, {"app_web", ""}, {"external_web", "external"}} {
+		latest, err := db.LastServiceDeployment(t.Context(), target[0], target[1])
+		want := times.ForService(target[0], target[1])
+		if err != nil || (latest == nil) != (want == nil) || (latest != nil && !latest.Equal(*want)) {
+			t.Errorf("LastServiceDeployment(%q) = %v, %v, want %v", target, latest, err, want)
+		}
 	}
 }
 
@@ -142,8 +190,11 @@ func TestWebhookAndDeployRoundtrip(t *testing.T) {
 		t.Fatalf("deploys: %v %+v", err, events)
 	}
 
-	if err := db.DeleteWebhook(w.ID); err != nil {
-		t.Fatal(err)
+	if found, err := db.DeleteWebhook(w.ID); err != nil || !found {
+		t.Fatalf("delete webhook = %t, %v", found, err)
+	}
+	if found, err := db.DeleteWebhook(w.ID); err != nil || found {
+		t.Fatalf("delete missing webhook = %t, %v", found, err)
 	}
 	if hooks, _ := db.Webhooks(); len(hooks) != 0 {
 		t.Fatalf("not deleted: %+v", hooks)
@@ -278,9 +329,24 @@ func TestBackupIsAReadableCopy(t *testing.T) {
 		t.Fatalf("path %q: %v", path, err)
 	}
 	copyPath := dir + "/copy.db"
-	if err := db.Backup(copyPath); err != nil {
+	conn, err := db.Conn(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer conn.Close()
+	result := make(chan error, 1)
+	go func() { result <- db.Backup(copyPath) }()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		conn.Close()
+		<-result
+		t.Fatal("backup waited for the panel database connection")
+	}
+	conn.Close()
 	cp, err := Open(copyPath)
 	if err != nil {
 		t.Fatal(err)

@@ -327,6 +327,11 @@ socket, exactly as before — no agent to deploy.
 The built-in agent reads local Docker stats. Its endpoint stays on the
 overlay network and requires a token derived from the shared secret.
 
+### Resource sizing
+
+Use [the resource sizing guide](docs/resource-tuning.md) to measure panel and
+agent usage and choose limits for your cluster.
+
 ## Roles
 
 | | viewer | operator | admin |

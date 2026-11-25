@@ -213,12 +213,12 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 		if err != nil {
 			return nil, err
 		}
-		deploys, err := s.DB.LastDeployments(ctx)
+		lastDeploy, err := s.DB.LastServiceDeployment(ctx, sv.Name, sv.Stack)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		view := toAPIService(sv, true)
-		view.LastDeployAt = deploys.ForService(sv.Name, sv.Stack)
+		view.LastDeployAt = lastDeploy
 		return &serviceOutput{Body: view}, nil
 	})
 	s.registerStacks(api, viewer)

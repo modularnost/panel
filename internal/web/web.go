@@ -43,6 +43,7 @@ type Server struct {
 	Secret   string
 	Firewall FirewallConfig
 	fw       firewallStates
+	fwSpec   firewallSpecCache
 	Pages    PageHub
 	Updates  *updates.Checker // nil: no release check
 	Shutdown context.Context  // cancellation closes event streams so other requests can drain
