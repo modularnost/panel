@@ -116,7 +116,7 @@ func (s *Server) registerManage(api huma.API) {
 
 	huma.Register(api, huma.Operation{
 		OperationID: "uninstall-module", Method: http.MethodDelete, Path: "/api/v1/modules/{name}",
-		Summary:       "Remove the module's service; its image and data are not touched",
+		Summary:       "Remove the module's service or managed stack; preserve image and data",
 		DefaultStatus: http.StatusNoContent, Middlewares: admin, Security: signedIn,
 	}, func(ctx context.Context, in *struct {
 		Name string `path:"name"`
@@ -127,7 +127,21 @@ func (s *Server) registerManage(api huma.API) {
 		if !ok {
 			return nil, problem(http.StatusNotFound, "not_found", "no such module")
 		}
-		if err := s.Docker.RemoveService(ctx, m.Service); err != nil {
+		service, found, err := s.Docker.Service(ctx, m.Service)
+		if err != nil {
+			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
+		}
+		if !found {
+			return nil, problem(http.StatusNotFound, "not_found", "no such module service")
+		}
+		stack := catalogStackName(m.Name)
+		if service.Stack == stack && service.Labels[catalogStackLabel] == stack && service.Name == stack+"_module" {
+			defer s.lockStack(stack)()
+			err = s.Docker.RemoveCatalogStack(ctx, stack)
+		} else {
+			err = s.Docker.RemoveService(ctx, service.ID)
+		}
+		if err != nil {
 			return nil, backendProblem(http.StatusBadGateway, "docker_error", err)
 		}
 		s.Modules.Forget()

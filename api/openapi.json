@@ -2675,7 +2675,7 @@
             "bearer": []
           }
         ],
-        "summary": "Remove the module's service; its image and data are not touched"
+        "summary": "Remove the module's service or managed stack; preserve image and data"
       }
     },
     "/api/v1/modules/{name}/action": {

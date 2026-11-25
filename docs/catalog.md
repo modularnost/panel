@@ -11,8 +11,8 @@ same control shows the installed version, Swarm service, and permissions. A
 ready module with a menu page has an **Open** action. Administrators see the
 catalog description on both tabs when the installed module is listed there.
 
-The catalog offers installation for supported Swarm service entries and links
-to guides for manual entries. The panel skips entries that use an installation
+The catalog offers installation for supported Swarm services and stacks and
+links to guides for manual entries. The panel skips entries that use an installation
 kind it does not support so administrators can still install other modules.
 Installed modules are discovered from service labels in the cluster.
 
@@ -21,6 +21,13 @@ panel finds its Swarm overlay, validates the bundle manifest and file paths
 from the approved image digest, and checks any registry credential requirement
 declared by the bundle. The preflight response reports the panel's overlay
 network.
+
+Stack installation currently supports stateless Compose services. The entry
+point is a service named `module` listening on port `8080`. The panel assigns
+the approved catalog image to that service, joins it to the panel overlay, and
+waits for all services and the module manifest. Sidecar images use SHA-256
+digests. Supported service settings are `image`, `command`, `entrypoint`,
+`environment` with literal values, and `healthcheck`.
 
 ## Bundled examples
 

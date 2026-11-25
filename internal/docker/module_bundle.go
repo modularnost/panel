@@ -31,9 +31,7 @@ type ModuleBundle struct {
 
 // ReadModuleBundle reads the deployment files without running image code.
 func (c *Client) ReadModuleBundle(ctx context.Context, image string) (_ ModuleBundle, err error) {
-	named, parseErr := reference.ParseNormalizedNamed(image)
-	pinned, ok := named.(reference.Canonical)
-	if parseErr != nil || !ok || pinned.Name()+"@"+pinned.Digest().String() != image || pinned.Digest().Algorithm() != "sha256" {
+	if !digestPinnedImage(image) {
 		return ModuleBundle{}, errors.New("module image must be pinned by sha256 digest")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -73,6 +71,12 @@ func (c *Client) ReadModuleBundle(ctx context.Context, image string) (_ ModuleBu
 	}
 	defer result.Content.Close()
 	return decodeModuleBundle(result.Content)
+}
+
+func digestPinnedImage(image string) bool {
+	named, err := reference.ParseNormalizedNamed(image)
+	pinned, ok := named.(reference.Canonical)
+	return err == nil && ok && pinned.Name()+"@"+pinned.Digest().String() == image && pinned.Digest().Algorithm() == "sha256"
 }
 
 var bundlePath = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$`)
