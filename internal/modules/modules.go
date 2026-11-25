@@ -285,7 +285,7 @@ func (r *Registry) list(ctx context.Context, requireFresh bool) ([]Module, error
 }
 
 func (r *Registry) discover(ctx context.Context) ([]Module, error) {
-	svcs, err := r.dk.Services(ctx)
+	svcs, err := r.dk.ServicesWithLabel(ctx, LabelEnabled, "true")
 	if err != nil {
 		return nil, err
 	}

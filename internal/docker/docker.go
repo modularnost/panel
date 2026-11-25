@@ -68,18 +68,38 @@ func splitImage(img string) (name, digest string) {
 }
 
 func (c *Client) Services(ctx context.Context) ([]Service, error) {
-	list, err := c.api.ServiceList(ctx, client.ServiceListOptions{})
+	return c.listServices(ctx, nil)
+}
+
+func (c *Client) ServicesWithLabel(ctx context.Context, key, value string) ([]Service, error) {
+	return c.listServices(ctx, make(client.Filters).Add("label", key+"="+value))
+}
+
+func (c *Client) listServices(ctx context.Context, filters client.Filters) ([]Service, error) {
+	list, err := c.api.ServiceList(ctx, client.ServiceListOptions{Filters: filters})
 	if err != nil {
 		return nil, err
 	}
-	tasks, err := c.api.TaskList(ctx, client.TaskListOptions{
-		Filters: make(client.Filters).Add("desired-state", string(swarm.TaskStateRunning)),
-	})
+	out := make([]Service, 0, len(list.Items))
+	if len(list.Items) == 0 {
+		return out, nil
+	}
+	taskFilters := make(client.Filters).Add("desired-state", string(swarm.TaskStateRunning))
+	if len(filters) > 0 {
+		for _, svc := range list.Items {
+			taskFilters.Add("service", svc.ID)
+		}
+	}
+	tasks, err := c.api.TaskList(ctx, client.TaskListOptions{Filters: taskFilters})
+	if len(filters) > 0 && errdefs.IsNotFound(err) {
+		// A removed service can invalidate the whole filter between the two reads.
+		delete(taskFilters, "service")
+		tasks, err = c.api.TaskList(ctx, client.TaskListOptions{Filters: taskFilters})
+	}
 	if err != nil {
 		return nil, err
 	}
 	running, scheduled := runningTasks(tasks.Items), scheduledTasks(tasks.Items)
-	out := make([]Service, 0, len(list.Items))
 	for _, s := range list.Items {
 		out = append(out, serviceView(s, running, scheduled))
 	}
