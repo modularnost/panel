@@ -91,7 +91,6 @@
 
 .settings-disclosure {
   min-inline-size: 0;
-  border-block-start: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .settings-disclosure > summary {
