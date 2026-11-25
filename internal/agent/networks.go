@@ -71,6 +71,10 @@ func registerNetworkRoutes(mux *http.ServeMux, dk *docker.Client, auth func(http
 }
 
 func (c *Collector) LocalRequest(ctx context.Context, addr netip.Addr, method, path string, input, output any) error {
+	return c.nodeRequest(ctx, c.http, addr, method, path, input, output)
+}
+
+func (c *Collector) nodeRequest(ctx context.Context, httpClient *http.Client, addr netip.Addr, method, path string, input, output any) error {
 	if !addr.IsValid() {
 		return errors.New("node agent unavailable")
 	}
@@ -88,7 +92,7 @@ func (c *Collector) LocalRequest(ctx context.Context, addr netip.Addr, method, p
 	}
 	req.Header.Set("X-Panel-Token", Token(c.secret))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.http.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
