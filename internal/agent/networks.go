@@ -21,7 +21,7 @@ type NetworkCreated struct {
 	ID string `json:"id"`
 }
 
-func agentNetworkResponse(w http.ResponseWriter, value any, err error) {
+func localOperationResponse(w http.ResponseWriter, value any, err error) {
 	if err != nil {
 		switch {
 		case errdefs.IsNotFound(err):
@@ -33,7 +33,7 @@ func agentNetworkResponse(w http.ResponseWriter, value any, err error) {
 		case errors.Is(err, docker.ErrInvalidNetwork), errdefs.IsInvalidArgument(err):
 			w.WriteHeader(http.StatusUnprocessableEntity)
 		default:
-			log.Printf("agent network operation: %v", err)
+			log.Printf("agent local operation: %v", err)
 			w.WriteHeader(http.StatusBadGateway)
 		}
 		return
@@ -49,11 +49,11 @@ func agentNetworkResponse(w http.ResponseWriter, value any, err error) {
 func registerNetworkRoutes(mux *http.ServeMux, dk *docker.Client, auth func(http.HandlerFunc) http.HandlerFunc) {
 	mux.HandleFunc("GET /networks", auth(func(w http.ResponseWriter, r *http.Request) {
 		rows, err := dk.LocalNetworks(r.Context())
-		agentNetworkResponse(w, rows, err)
+		localOperationResponse(w, rows, err)
 	}))
 	mux.HandleFunc("GET /networks/{id}", auth(func(w http.ResponseWriter, r *http.Request) {
 		n, err := dk.LocalNetwork(r.Context(), r.PathValue("id"))
-		agentNetworkResponse(w, n, err)
+		localOperationResponse(w, n, err)
 	}))
 	mux.HandleFunc("POST /networks", auth(func(w http.ResponseWriter, r *http.Request) {
 		var in docker.NewLocalNetwork
@@ -63,14 +63,14 @@ func registerNetworkRoutes(mux *http.ServeMux, dk *docker.Client, auth func(http
 			return
 		}
 		id, err := dk.CreateLocalNetwork(r.Context(), in)
-		agentNetworkResponse(w, NetworkCreated{ID: id}, err)
+		localOperationResponse(w, NetworkCreated{ID: id}, err)
 	}))
 	mux.HandleFunc("DELETE /networks/{id}", auth(func(w http.ResponseWriter, r *http.Request) {
-		agentNetworkResponse(w, nil, dk.RemoveLocalNetwork(r.Context(), r.PathValue("id")))
+		localOperationResponse(w, nil, dk.RemoveLocalNetwork(r.Context(), r.PathValue("id")))
 	}))
 }
 
-func (c *Collector) NetworkRequest(ctx context.Context, addr netip.Addr, method, path string, input, output any) error {
+func (c *Collector) LocalRequest(ctx context.Context, addr netip.Addr, method, path string, input, output any) error {
 	if !addr.IsValid() {
 		return errors.New("node agent unavailable")
 	}
@@ -107,6 +107,6 @@ func (c *Collector) NetworkRequest(ctx context.Context, addr netip.Addr, method,
 	case http.StatusBadRequest, http.StatusUnprocessableEntity:
 		return docker.ErrInvalidNetwork
 	default:
-		return fmt.Errorf("node network request: %s", resp.Status)
+		return fmt.Errorf("node agent request: %s", resp.Status)
 	}
 }

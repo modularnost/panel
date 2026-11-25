@@ -249,7 +249,7 @@ func corePort(addr string) string {
 var errModuleExists = errors.New("a module with this name is already installed")
 var errModuleStorage = errors.New("the module storage node is unavailable")
 
-func (s *Server) deployModule(ctx context.Context, m moduleInstall, registryHost, auth string, entry *modules.CatalogEntry) (string, error) {
+func (s *Server) deployModule(ctx context.Context, m moduleInstall, registryHost, auth string, entry *modules.CatalogEntry, selection *catalogVolumeSelection) (string, error) {
 	m.Name, m.Image = strings.TrimSpace(m.Name), strings.TrimSpace(m.Image)
 	m.Port, m.Service = strings.TrimSpace(m.Port), strings.TrimSpace(m.Service)
 	m.Network = strings.TrimSpace(m.Network)
@@ -302,25 +302,15 @@ func (s *Server) deployModule(ctx context.Context, m moduleInstall, registryHost
 		labels[modules.LabelVersion] = entry.Install.Version
 		labels[modules.LabelCatalogApproval] = entry.ApprovalLabel()
 		if volume := entry.Install.DataVolume; volume != nil {
-			local, err := s.Docker.LocalSwarmNode(ctx)
+			s.volumeMu.Lock()
+			defer s.volumeMu.Unlock()
+			name := strings.ToLower(m.Name)
+			node, source, err := s.ensureModuleVolume(ctx, name, moduleVolumeName(name), selection)
 			if err != nil {
 				return "", err
 			}
-			if local == "" {
-				return "", errModuleStorage
-			}
-			spec.NodeID, err = s.DB.ModuleStorageNode(ctx, strings.ToLower(m.Name), local)
-			if err != nil {
-				return "", err
-			}
-			nodes, err := s.Docker.Nodes(ctx)
-			if err != nil {
-				return "", err
-			}
-			if !slices.ContainsFunc(nodes, func(node docker.Node) bool { return node.ID == spec.NodeID && node.Healthy() }) {
-				return "", errModuleStorage
-			}
-			spec.Mounts = []mount.Mount{{Type: mount.TypeVolume, Source: "modularnost-module-" + strings.ToLower(m.Name), Target: volume.MountPath}}
+			spec.NodeID = node
+			spec.Mounts = []mount.Mount{{Type: mount.TypeVolume, Source: source, Target: volume.MountPath}}
 		}
 	}
 	_, err = s.Docker.CreateService(ctx, spec)

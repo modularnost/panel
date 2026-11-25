@@ -104,7 +104,7 @@ func (s *Server) registerManage(api huma.API) {
 		if err != nil {
 			return nil, err
 		}
-		service, err := s.deployModule(ctx, m, b.RegistryHost, auth, nil)
+		service, err := s.deployModule(ctx, m, b.RegistryHost, auth, nil, nil)
 		if errors.Is(err, errModuleExists) {
 			return nil, problem(http.StatusConflict, "module_exists", err.Error())
 		}

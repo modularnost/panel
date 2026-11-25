@@ -107,6 +107,9 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"CatalogSecretInput":          catalogSecretInput{},
 		"ResourceCreatedOutputBody":   resourceCreatedOutput{}.Body,
 		"ResourceAttachmentInputBody": resourceAttachmentInput{}.Body,
+		"Volume":                      docker.Volume{},
+		"CatalogVolumeSelection":      catalogVolumeSelection{},
+		"ServiceVolumeInputBody":      serviceVolumeInput{}.Body,
 
 		"UserCreate":            apiUserCreate{},
 		"UserPatch":             apiUserPatch{},

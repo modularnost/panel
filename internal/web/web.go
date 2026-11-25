@@ -57,6 +57,7 @@ type Server struct {
 	updating   atomic.Bool
 	stackMu    sync.Mutex
 	moduleMu   sync.Mutex
+	volumeMu   sync.Mutex
 	stackLocks map[string]*stackLock
 
 	// TrustedProxies are the peers allowed to supply forwarding headers.

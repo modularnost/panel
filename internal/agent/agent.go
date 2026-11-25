@@ -40,6 +40,7 @@ func Routes(secret, node string, dk *docker.Client) http.Handler {
 		}
 	}
 	registerNetworkRoutes(mux, dk, auth)
+	registerVolumeRoutes(mux, dk, auth)
 	mux.HandleFunc("GET /stats", auth(func(w http.ResponseWriter, r *http.Request) {
 		stats, err := dk.Stats(r.Context(), r.FormValue("service"))
 		if err != nil {

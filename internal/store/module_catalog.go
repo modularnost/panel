@@ -29,3 +29,18 @@ func (d *DB) ModuleStorageNode(ctx context.Context, name, node string) (string, 
 		ON CONFLICT(name) DO UPDATE SET node = module_storage.node RETURNING node`, name, node).Scan(&stored)
 	return stored, err
 }
+
+func (d *DB) ModuleVolume(ctx context.Context, key, node, volume string) (string, string, error) {
+	var storedNode, storedVolume string
+	err := d.QueryRowContext(ctx, `INSERT INTO module_storage (name, node, volume_name) VALUES (?, ?, ?)
+		ON CONFLICT(name) DO UPDATE SET volume_name = CASE WHEN module_storage.volume_name = ''
+			THEN excluded.volume_name ELSE module_storage.volume_name END RETURNING node, volume_name`,
+		key, node, volume).Scan(&storedNode, &storedVolume)
+	return storedNode, storedVolume, err
+}
+
+func (d *DB) ModuleVolumeSelection(ctx context.Context, key string) (string, string, error) {
+	var node, volume string
+	err := d.QueryRowContext(ctx, "SELECT node, volume_name FROM module_storage WHERE name = ?", key).Scan(&node, &volume)
+	return node, volume, err
+}
