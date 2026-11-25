@@ -252,7 +252,8 @@ minute per client IP and returns `429` with `Retry-After` above that limit.
 Open **Networks** to view Swarm overlay networks and the local networks on each
 node. Admins can create networks and remove unused user-defined networks.
 For local networks, choose a node and a driver. A node whose agent is
-unavailable is marked in the inventory.
+unavailable is marked in the inventory. Click a container name in a network to
+see its addresses and endpoint ID.
 
 Open **Networks** on a service to review its connections and aliases. Admins
 can stage connections and disconnections and apply them together. For a stack

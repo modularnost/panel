@@ -36,10 +36,7 @@ func (c *Client) LocalNetwork(ctx context.Context, id string) (Network, error) {
 		return Network{}, errdefs.ErrNotFound
 	}
 	n := networkInfo(result.Network.Network, Self{})
-	for _, ep := range result.Network.Containers {
-		n.Containers = append(n.Containers, ep.Name)
-	}
-	slices.Sort(n.Containers)
+	n.setEndpoints(result.Network.Containers)
 	return n, nil
 }
 

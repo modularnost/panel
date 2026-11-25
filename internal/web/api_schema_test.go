@@ -60,6 +60,7 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"NetworkService":          docker.NetworkService{},
 		"NetworkSubnet":           docker.NetworkSubnet{},
 		"NetworkAttachment":       docker.NetworkAttachment{},
+		"NetworkEndpoint":         docker.NetworkEndpoint{},
 		"ServiceNetworkState":     docker.ServiceNetworkState{},
 		"NewNetwork":              docker.NewNetwork{},
 		"NewLocalNetwork":         docker.NewLocalNetwork{},

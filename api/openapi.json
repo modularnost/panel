@@ -577,6 +577,15 @@
           "encrypted": {
             "type": "boolean"
           },
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkEndpoint"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -696,6 +705,34 @@
         },
         "required": [
           "id"
+        ],
+        "type": "object"
+      },
+      "NetworkEndpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "endpoint_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipv4_address": {
+            "type": "string"
+          },
+          "ipv6_address": {
+            "type": "string"
+          },
+          "mac_address": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ],
         "type": "object"
       },

@@ -29,20 +29,30 @@ type NetworkService struct {
 	Stack string `json:"stack,omitempty"`
 }
 
+type NetworkEndpoint struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	EndpointID  string `json:"endpoint_id,omitempty"`
+	IPv4Address string `json:"ipv4_address,omitempty"`
+	IPv6Address string `json:"ipv6_address,omitempty"`
+	MACAddress  string `json:"mac_address,omitempty"`
+}
+
 type Network struct {
-	ID         string           `json:"id"`
-	Name       string           `json:"name"`
-	Driver     string           `json:"driver"`
-	Scope      string           `json:"scope"`
-	Stack      string           `json:"stack,omitempty"`
-	Internal   bool             `json:"internal"`
-	Attachable bool             `json:"attachable"`
-	Encrypted  bool             `json:"encrypted"`
-	Protected  bool             `json:"protected"`
-	ConfigOnly bool             `json:"config_only"`
-	Subnets    []NetworkSubnet  `json:"subnets" nullable:"false"`
-	Services   []NetworkService `json:"services" nullable:"false"`
-	Containers []string         `json:"containers" nullable:"false"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Driver     string            `json:"driver"`
+	Scope      string            `json:"scope"`
+	Stack      string            `json:"stack,omitempty"`
+	Internal   bool              `json:"internal"`
+	Attachable bool              `json:"attachable"`
+	Encrypted  bool              `json:"encrypted"`
+	Protected  bool              `json:"protected"`
+	ConfigOnly bool              `json:"config_only"`
+	Subnets    []NetworkSubnet   `json:"subnets" nullable:"false"`
+	Services   []NetworkService  `json:"services" nullable:"false"`
+	Containers []string          `json:"containers" nullable:"false"`
+	Endpoints  []NetworkEndpoint `json:"endpoints,omitempty"`
 }
 
 type NewNetwork struct {
@@ -143,13 +153,32 @@ func (c *Client) Network(ctx context.Context, id string) (Network, error) {
 		if err != nil {
 			return Network{}, err
 		}
-		for _, endpoint := range inspected.Network.Containers {
-			n.Containers = append(n.Containers, endpoint.Name)
-		}
-		slices.Sort(n.Containers)
+		n.setEndpoints(inspected.Network.Containers)
 		return n, nil
 	}
 	return Network{}, errdefs.ErrNotFound
+}
+
+func (n *Network) setEndpoints(containers map[string]network.EndpointResource) {
+	for id, endpoint := range containers {
+		entry := NetworkEndpoint{ID: id, Name: endpoint.Name, EndpointID: endpoint.EndpointID, MACAddress: endpoint.MacAddress.String()}
+		if endpoint.IPv4Address.IsValid() {
+			entry.IPv4Address = endpoint.IPv4Address.String()
+		}
+		if endpoint.IPv6Address.IsValid() {
+			entry.IPv6Address = endpoint.IPv6Address.String()
+		}
+		n.Endpoints = append(n.Endpoints, entry)
+	}
+	slices.SortFunc(n.Endpoints, func(a, b NetworkEndpoint) int {
+		if byName := strings.Compare(a.Name, b.Name); byName != 0 {
+			return byName
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	for _, endpoint := range n.Endpoints {
+		n.Containers = append(n.Containers, endpoint.Name)
+	}
 }
 
 func (c *Client) CreateNetwork(ctx context.Context, in NewNetwork) (string, error) {
