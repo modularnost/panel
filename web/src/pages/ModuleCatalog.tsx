@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { BuilderSetup } from "./BuilderSetup";
 import { createPortal } from "react-dom";
 import { Navigate, useNavigate, useOutletContext } from "react-router";
 import { atLeast, useMe } from "../auth";
@@ -16,6 +18,7 @@ export function ModuleCatalog() {
   const navigate = useNavigate();
   const tabActions = useOutletContext<HTMLDivElement | null>();
   const { confirm } = useDialogs();
+  const [builderSetup, setBuilderSetup] = useState(false);
   const query = useQuery({ ...moduleCatalogQuery, enabled: admin });
   const installed = useModules(admin);
   const refresh = useMutation({
@@ -105,6 +108,7 @@ export function ModuleCatalog() {
                 {!local && version && (
                   <Button type="button" disabled={catalog.state !== "ready" || !!module.incompatibility || install.isPending}
                     onClick={async () => {
+                      if (module.managed_builder) { setBuilderSetup((open) => !open); return; }
                       const permissions = module.permissions.map(permissionDescription).join(", ") || "none";
                       const storage = module.mount_path ? ` Data at ${module.mount_path} stays on the same Swarm node.` : "";
                       if (await confirm({
@@ -116,13 +120,20 @@ export function ModuleCatalog() {
                       }
                     }}
                   >
-                    {install.isPending && install.variables.id === module.id ? "Installing…" : "Install"}
+                    {module.managed_builder ? (builderSetup ? "Hide setup" : "Set up Builder") : install.isPending && install.variables.id === module.id ? "Installing…" : "Install"}
                   </Button>
                 )}
                 {module.instructions_url && (
                   <a className={`btn ${local || version ? "text" : "tonal"}`} href={module.instructions_url}>Installation guide</a>
                 )}
               </footer>
+              {!local && builderSetup && module.managed_builder && version && catalog.state === "ready" && !module.incompatibility && (
+                <BuilderSetup version={version} revision={module.revision} docs={module.docs_url}
+                  permissions={module.permissions.map(permissionDescription)} onInstalled={() => {
+                    void client.invalidateQueries({ queryKey: ["modules"] });
+                    navigate("/modules");
+                  }} />
+              )}
             </article>
           );
         })}

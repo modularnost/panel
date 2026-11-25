@@ -32,8 +32,8 @@ digests. Supported service settings are `image`, `command`, `entrypoint`,
 
 An administrator can provision the registry and its pull proxy for an approved
 Builder stack before deploying Builder. Configure encrypted registry credentials
-on the panel. Create an internal Swarm overlay for build traffic and a separate
-private overlay for the pull route. Supply the Builder bundle's external TLS
+on the panel. Choose a dedicated Swarm overlay for build traffic and a separate
+private overlay for the pull route. Provisioning creates missing overlays. Supply the Builder bundle's external TLS
 and bcrypt-user secrets using the
 [Builder installation guide](https://github.com/modularnost/builder_module/blob/main/docs/install.md).
 The panel installs the bundled mTLS registry and the TLS pull proxy. Both stay
@@ -183,3 +183,22 @@ and use `configs: [{source: caddy, target: /etc/caddy/Caddyfile}]` on a
 service. Paths are relative to the root of the approved bundle. The panel
 creates a version from that file and passes only its reference to Compose.
 On an unsuccessful install it removes unused configs created by the attempt.
+
+## Install Builder from the catalog
+
+Use **Modules → Catalog → Set up Builder**. Review the version and permissions,
+choose separate build and pull overlays, and set up private DNS and worker TLS
+trust as described above. The panel provisions missing overlays. The worker's
+dedicated build overlay allows internet egress for base image pulls.
+
+Prepare the registry secrets and the BuildKit client and server secrets
+described in the Builder bundle's worker recipe and installation guide. You
+can upload a JSON object mapping Swarm secret names to their PEM or bcrypt-user
+file contents. Omit entries to use existing Swarm secrets. Use the same inputs
+when retrying. The panel retains the registry and BuildKit cache volumes.
+
+**Verify and install** starts the isolated BuildKit service on its storage
+node, builds and pushes a probe, and verifies an authenticated pull from the
+selected Swarm worker. It saves the encrypted registry credential, deploys
+Builder, waits for the approved manifest, and checks Builder's mTLS connection
+to BuildKit.
