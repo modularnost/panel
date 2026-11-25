@@ -52,7 +52,7 @@ type Network struct {
 	Subnets    []NetworkSubnet   `json:"subnets" nullable:"false"`
 	Services   []NetworkService  `json:"services" nullable:"false"`
 	Containers []string          `json:"containers" nullable:"false"`
-	Endpoints  []NetworkEndpoint `json:"endpoints,omitempty"`
+	Endpoints  []NetworkEndpoint `json:"endpoints,omitempty" nullable:"false"`
 }
 
 type NewNetwork struct {

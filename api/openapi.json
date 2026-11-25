@@ -581,10 +581,7 @@
             "items": {
               "$ref": "#/components/schemas/NetworkEndpoint"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "id": {
             "type": "string"
