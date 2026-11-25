@@ -37,9 +37,17 @@
   gap: 12px 24px;
 }
 
+.settings-row > .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .settings-row h3,
 .settings-card > p,
 .settings-card > .banner,
+.settings-card > .form,
+.settings-card > .form h3,
 .settings-row p,
 .settings-row .swatches {
   margin: 0;
