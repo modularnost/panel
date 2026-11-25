@@ -44,8 +44,9 @@ type moduleCatalogOutput struct {
 }
 
 type apiCatalogInstall struct {
-	Version  string `json:"version" minLength:"1"`
-	Revision string `json:"revision" pattern:"^[a-f0-9]{64}$"`
+	Secrets  map[string]catalogSecretInput `json:"secrets,omitempty" doc:"Bindings for declared secret aliases"`
+	Version  string                        `json:"version" minLength:"1"`
+	Revision string                        `json:"revision" pattern:"^[a-f0-9]{64}$"`
 }
 
 type catalogInstallInput struct {
@@ -155,7 +156,7 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 	})
 	huma.Register(api, huma.Operation{
 		OperationID: "install-catalog-module", Method: http.MethodPost, Path: "/api/v1/module-catalog/{id}/install",
-		Summary: "Install the approved module version", DefaultStatus: http.StatusCreated, Middlewares: admin, Security: signedIn,
+		Summary: "Install the approved module version", DefaultStatus: http.StatusCreated, MaxBodyBytes: 4 << 20, Middlewares: admin, Security: signedIn,
 	}, func(ctx context.Context, in *catalogInstallInput) (*moduleInstalledOutput, error) {
 		entry, err := s.catalogEntryForInstall(in.ID)
 		if err != nil {
@@ -168,11 +169,14 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 			return nil, err
 		}
 		if entry.Install.Kind == modules.CatalogSwarmStack {
-			service, err := s.installCatalogStack(ctx, entry)
+			service, err := s.installCatalogStack(ctx, entry, in.Body.Secrets)
 			if err != nil {
 				return nil, err
 			}
 			return &moduleInstalledOutput{Body: apiModuleInstalled{Name: entry.ID, Service: service}}, nil
+		}
+		if len(in.Body.Secrets) > 0 {
+			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "Secret aliases require a catalog stack")
 		}
 		m := moduleInstall{Name: entry.ID, Image: entry.Install.Image}
 		if entry.Install.Port != 0 {

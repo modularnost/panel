@@ -87,3 +87,24 @@ A module you install is code running inside your cluster. Check:
 A module never gets `docker.sock`. Everything it can do to the cluster goes
 through the core's internal API, limited to the permissions in its manifest —
 which is what makes reading that list worth the minute it takes.
+## Swarm Secrets
+
+Administrators can list metadata and attachments at `GET /api/v1/secrets`
+and create an immutable version with `POST /api/v1/secrets`. Send a name and
+base64-encoded `data`; the response contains the ID. Secret bytes are accepted
+only when creating a version.
+
+Use `PUT /api/v1/services/{id}/secrets` with a `target` filename under
+`/run/secrets` and a `resource` name or ID. To rotate, create a new
+version and set the same target to its ID on each consumer. Omit `resource`
+to detach. `DELETE /api/v1/secrets/{id}` requires the secret to be unused.
+
+For a catalog stack, the digest-pinned bundle contains Compose files with
+a service named `module`. Declare secret aliases under top-level `secrets`
+with `external: true` and reference them only on the services that need them.
+In the confirmed catalog install request, send a `secrets` mapping keyed by
+those aliases. For each alias give either `{"existing":"secret-id-or-name"}`
+or `{"create":{"name":"new-version","data":"base64-value"}}`. Docker mounts
+the selected secret. The panel sends only references to Compose and removes
+unused secrets it created if deployment fails. Uninstall leaves secrets
+available for explicit deletion.

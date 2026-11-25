@@ -20,13 +20,17 @@ import (
 type catalogCompose struct {
 	Version  string                    `yaml:"version,omitempty"`
 	Services map[string]catalogService `yaml:"services"`
+	Secrets  map[string]struct {
+		External bool `yaml:"external"`
+	} `yaml:"secrets,omitempty"`
 }
 
 type catalogService struct {
-	Image       string            `yaml:"image,omitempty"`
-	Command     any               `yaml:"command,omitempty"`
-	Entrypoint  any               `yaml:"entrypoint,omitempty"`
-	Environment map[string]string `yaml:"environment,omitempty"`
+	Secrets     []catalogSecretMount `yaml:"secrets,omitempty"`
+	Image       string               `yaml:"image,omitempty"`
+	Command     any                  `yaml:"command,omitempty"`
+	Entrypoint  any                  `yaml:"entrypoint,omitempty"`
+	Environment map[string]string    `yaml:"environment,omitempty"`
 	Healthcheck *struct {
 		Test        any    `yaml:"test,omitempty"`
 		Interval    string `yaml:"interval,omitempty"`
@@ -34,6 +38,14 @@ type catalogService struct {
 		StartPeriod string `yaml:"start_period,omitempty"`
 		Retries     int    `yaml:"retries,omitempty"`
 	} `yaml:"healthcheck,omitempty"`
+}
+
+type catalogSecretMount struct {
+	Source string  `yaml:"source"`
+	Target string  `yaml:"target"`
+	UID    string  `yaml:"uid,omitempty"`
+	GID    string  `yaml:"gid,omitempty"`
+	Mode   *uint32 `yaml:"mode,omitempty"`
 }
 
 func catalogComposeFragment(data []byte) ([]byte, error) {
@@ -49,6 +61,18 @@ func catalogComposeFragment(data []byte) ([]byte, error) {
 	for name := range fragment.Services {
 		if !ValidName(name) || len(name) > 32 {
 			return nil, fmt.Errorf("invalid module service name %q", name)
+		}
+	}
+	for name, secret := range fragment.Secrets {
+		if !ValidName(name) || !secret.External {
+			return nil, errors.New("catalog secret aliases must be declared external")
+		}
+	}
+	for _, service := range fragment.Services {
+		for _, ref := range service.Secrets {
+			if !ValidName(ref.Source) || !validAttachmentTarget(ref.Target, false) {
+				return nil, errors.New("catalog secret references require a source alias and a target filename")
+			}
 		}
 	}
 	fragment.Version = "3.9"
@@ -93,6 +117,7 @@ func RenderCatalogStack(ctx context.Context, bundle ModuleBundle, spec CatalogSt
 func protectCatalogStack(rendered []byte, spec CatalogStack) (string, int, error) {
 	var document struct {
 		Services map[string]map[string]any `yaml:"services"`
+		Secrets  map[string]map[string]any `yaml:"secrets"`
 	}
 	if err := yaml.Unmarshal(rendered, &document); err != nil {
 		return "", 0, err
@@ -119,10 +144,14 @@ func protectCatalogStack(rendered []byte, spec CatalogStack) (string, int, error
 	}
 	env["PANEL_CORE_URL"] = spec.CoreURL
 	primary["environment"] = env
-	out, err := yaml.Marshal(map[string]any{
+	protected := map[string]any{
 		"version": "3.9", "services": document.Services,
 		"networks": map[string]any{"panel": map[string]any{"external": true, "name": spec.PanelNetwork}},
-	})
+	}
+	if len(document.Secrets) > 0 {
+		protected["secrets"] = document.Secrets
+	}
+	out, err := yaml.Marshal(protected)
 	return strings.ReplaceAll(string(out), "$", "$$"), len(document.Services), err
 }
 
