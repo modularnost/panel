@@ -33,4 +33,11 @@ test("fetch failures and malformed proxy responses produce readable errors", asy
   await expect(call(Promise.reject({ status: 502, error: "<html>Bad Gateway</html>" }))).rejects.toMatchObject({
     status: 502, message: "Request failed (HTTP 502).",
   });
+  const problemResponse = new Response(JSON.stringify({ error: { code: "volume_conflict", message: "the volume is in use" } }), {
+    status: 409,
+    headers: { "Content-Type": "application/json" },
+  });
+  await expect(call(Promise.reject(problemResponse))).rejects.toMatchObject({
+    status: 409, message: "the volume is in use",
+  });
 });

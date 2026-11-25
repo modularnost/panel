@@ -30,13 +30,43 @@ func (c *Client) LocalVolumes(ctx context.Context) ([]Volume, error) {
 	}
 	out := make([]Volume, 0, len(list.Items))
 	for _, v := range list.Items {
+		if _, anonymous := v.Labels["com.docker.volume.anonymous"]; anonymous {
+			continue
+		}
 		out = append(out, Volume{Name: v.Name, Driver: v.Driver, CreatedAt: v.CreatedAt, Labels: v.Labels})
 	}
 	return out, nil
 }
 
+func validVolumeName(name string) bool { return len(name) <= 64 && nameRe.MatchString(name) }
+
+type ServiceVolume struct {
+	Name     string `json:"name"`
+	Node     string `json:"node"`
+	Target   string `json:"target"`
+	ReadOnly bool   `json:"read_only"`
+}
+
+func (c *Client) ServiceVolumes(ctx context.Context, service string) ([]ServiceVolume, error) {
+	s, err := c.service(ctx, service)
+	if err != nil {
+		return nil, err
+	}
+	out := []ServiceVolume{}
+	if s.Spec.TaskTemplate.ContainerSpec == nil {
+		return out, nil
+	}
+	node := volumeNode(s.Spec.TaskTemplate.Placement)
+	for _, m := range s.Spec.TaskTemplate.ContainerSpec.Mounts {
+		if m.Type == mount.TypeVolume {
+			out = append(out, ServiceVolume{Name: m.Source, Node: node, Target: m.Target, ReadOnly: m.ReadOnly})
+		}
+	}
+	return out, nil
+}
+
 func (c *Client) LocalVolume(ctx context.Context, name string) (Volume, error) {
-	if !ValidName(name) {
+	if !validVolumeName(name) {
 		return Volume{}, errdefs.ErrInvalidArgument
 	}
 	out, err := c.api.VolumeInspect(ctx, name, client.VolumeInspectOptions{})

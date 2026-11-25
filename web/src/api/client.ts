@@ -28,9 +28,18 @@ export async function call<T>(request: Promise<T>): Promise<T> {
   try {
     return await request;
   } catch (e) {
-    const failed = e as { status?: number; error?: Problem | null };
+    const failed = e as { status?: number; error?: Problem | null; clone?: () => Response };
     const status = failed.status ?? 0;
-    throw new ApiError(status, failed.error?.error?.message ??
+    let message = failed.error?.error?.message;
+    if (!message && typeof failed.clone === "function") {
+      try {
+        const problem = (await failed.clone().json()) as Problem;
+        message = problem?.error?.message;
+      } catch {
+        // Non-JSON error bodies fall back to the HTTP status message below.
+      }
+    }
+    throw new ApiError(status, message ??
       (status === 0 ? "Could not reach the panel." : `Request failed (HTTP ${status}).`));
   }
 }
