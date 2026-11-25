@@ -101,6 +101,13 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"ModuleCatalogOutputBody":    moduleCatalogOutput{}.Body,
 		"CatalogPreflightOutputBody": catalogPreflightOutput{}.Body,
 
+		"Config":                    docker.Config{},
+		"ConfigAttachment":          docker.ConfigAttachment{},
+		"ConfigValue":               configValue{},
+		"ConfigDetail":              configDetail{},
+		"ConfigCreatedOutputBody":   configCreatedOutput{}.Body,
+		"ConfigAttachmentInputBody": configAttachmentInput{}.Body,
+
 		"UserCreate":            apiUserCreate{},
 		"UserPatch":             apiUserPatch{},
 		"TokenCreate":           apiTokenCreate{},
