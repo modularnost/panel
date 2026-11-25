@@ -131,9 +131,21 @@ export function NetworkDetail() {
           <dt>Encrypted</dt><dd>{n.encrypted ? "Yes" : "No"}</dd>
         </dl>
         <h2>Services</h2>
-        {n.services.length ? <ul>{n.services.map((s) => <li key={s.id}><Link to={`/services/${s.id}/networks`}>{s.name}</Link></li>)}</ul> : <p>No service attachments.</p>}
+        {n.services.length > 0 ? (
+          <Table scrollLabel="Services">
+            <thead><tr><th scope="col">Service</th><th scope="col">Stack</th></tr></thead>
+            <tbody>
+              {n.services.map((service) => (
+                <tr key={service.id}>
+                  <th scope="row"><Link to={`/services/${service.id}/networks`}>{service.name}</Link></th>
+                  <td>{service.stack ? <Link to={`/stacks/${encodeURIComponent(service.stack)}`}>{service.stack}</Link> : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        ) : <p>No service attachments.</p>}
         {endpoints.length > 0 && <>
-          <h2>Containers on {nodeName || "the manager"}</h2>
+          <h2>Containers</h2>
           <Table scrollLabel="Containers">
             <thead><tr>
               <th scope="col">Container</th>
