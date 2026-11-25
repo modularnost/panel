@@ -239,11 +239,6 @@ pre {
   overflow-x: auto;
 }
 
-pre.notes {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .logbox,
 .output {
   border-radius: var(--md-sys-shape-medium);

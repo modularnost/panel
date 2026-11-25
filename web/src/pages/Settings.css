@@ -1,0 +1,164 @@
+.settings {
+  display: grid;
+  gap: 16px;
+  max-inline-size: 66rem;
+}
+
+.settings > h1 {
+  margin: 0;
+  font: var(--md-sys-typescale-headline-medium);
+}
+
+.settings-card {
+  display: grid;
+  gap: 16px;
+  min-inline-size: 0;
+  padding: clamp(16px, 3vw, 24px);
+  border-radius: var(--md-sys-shape-large);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.settings-card h2 {
+  margin: 0;
+  font: var(--md-sys-typescale-title-large);
+}
+
+.settings-row,
+.settings-inline,
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-row {
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.settings-row h3,
+.settings-card > p,
+.settings-card > .banner,
+.settings-row p,
+.settings-row .swatches {
+  margin: 0;
+}
+
+.settings-row .muted {
+  margin-block-start: 4px;
+}
+
+.settings-card > .chip {
+  justify-self: start;
+}
+
+.settings-version {
+  font: var(--md-sys-typescale-headline-small);
+  overflow-wrap: anywhere;
+}
+
+.settings-update,
+.settings-attempt {
+  padding: 16px;
+  border-radius: var(--md-sys-shape-large);
+}
+
+.settings-update {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.settings-attempt {
+  background: var(--md-sys-color-surface-container);
+}
+
+.settings-attempt > details {
+  margin-block-start: 8px;
+}
+
+.settings-releases {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-releases > h3 {
+  margin: 0 0 4px;
+}
+
+.settings-disclosure {
+  min-inline-size: 0;
+  border-radius: var(--md-sys-shape-medium);
+  background: var(--md-sys-color-surface-container);
+}
+
+.settings-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 48px;
+  padding: 8px 12px;
+  border-radius: inherit;
+  font: var(--md-sys-typescale-label-large);
+  list-style: none;
+  cursor: pointer;
+}
+
+.settings-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-disclosure > summary:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+
+.settings-disclosure > summary:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+}
+
+.settings-disclosure[open] > summary > .icon {
+  rotate: 90deg;
+}
+
+.settings-disclosure-body {
+  margin: 0;
+  padding: 0 16px 16px;
+  overflow-wrap: anywhere;
+}
+
+.settings-disclosure-body pre {
+  padding: 12px;
+  border-radius: var(--md-sys-shape-small);
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+.release-notes {
+  margin-block-end: 12px;
+  font: var(--md-sys-typescale-body-medium);
+}
+
+.release-notes > :first-child {
+  margin-block-start: 0;
+}
+
+.release-notes :is(h3, h4, h5, h6) {
+  margin: 16px 0 8px;
+  font: var(--md-sys-typescale-title-medium);
+}
+
+.release-notes li + li {
+  margin-block-start: 4px;
+}
+
+.release-notes blockquote {
+  margin-inline: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 3px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.release-notes .table {
+  border-radius: var(--md-sys-shape-small);
+  background: var(--md-sys-color-surface-container-high);
+}

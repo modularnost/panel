@@ -35,7 +35,7 @@ export function Registries() {
   }
 
   return (
-    <section aria-labelledby={heading}>
+    <section className="settings-card" aria-labelledby={heading}>
       <h2 id={heading}>Registries</h2>
       {saved.isPending && <p>Loading…</p>}
       {saved.isError && <p className="error" role="alert">{saved.error.message}</p>}
@@ -52,7 +52,7 @@ export function Registries() {
                 <td>{entry.username}</td>
                 <td>
                   {saved.data.configured && (
-                    <Button onClick={() => {
+                    <Button variant="text" onClick={() => {
                       setHost(entry.host);
                       setUsername(entry.username);
                       setToken("");
@@ -86,14 +86,16 @@ export function Registries() {
             autoComplete="new-password" required />
           {save.isError && <p className="error" role="alert">{save.error.message}</p>}
           {save.isSuccess && <p role="status">Credentials saved.</p>}
-          <Button disabled={save.isPending}>Save credentials</Button>
-          {editing && <Button type="button" onClick={() => {
-            setEditing(false);
-            setHost("");
-            setUsername("");
-            setToken("");
-            save.reset();
-          }}>Cancel</Button>}
+          <div className="settings-actions">
+            <Button variant="tonal" disabled={save.isPending}>Save credentials</Button>
+            {editing && <Button variant="text" type="button" onClick={() => {
+              setEditing(false);
+              setHost("");
+              setUsername("");
+              setToken("");
+              save.reset();
+            }}>Cancel</Button>}
+          </div>
         </form>
       )}
     </section>

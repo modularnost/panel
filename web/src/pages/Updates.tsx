@@ -7,6 +7,9 @@ import { installCommand, updateInProgress, useUpdates } from "../updates";
 import { Button } from "../components/Button";
 import { useDialogs } from "../components/Dialogs";
 import { Chip } from "../components/Chip";
+import { Banner } from "../components/Banner";
+import { Icon } from "../components/Icon";
+import { ReleaseNotes } from "./ReleaseNotes";
 
 const rolloutMessages = {
   requested: "Update requested. Waiting for Swarm.",
@@ -42,7 +45,7 @@ export function Updates() {
   const update = async (tag: string) => {
     const ok = await confirm({
       title: `Update the panel to ${tag}?`,
-      message: "It is unavailable for a few seconds while it restarts.",
+      message: "The panel restarts during the update. Back up the database volume first if you may need to roll back after a migration.",
       action: "Update",
     });
     if (ok) apply.mutate(tag);
@@ -50,7 +53,7 @@ export function Updates() {
   const rollbackToPrevious = async () => {
     const ok = await confirm({
       title: "Roll back to previous version?",
-      message: `The panel and agents will be restored to ${last?.original_image || "the previous image"}.`,
+      message: `The panel and agents will be restored to ${last?.original_image || "the previous image"}. Restore the database separately if required after a migration.`,
       action: "Roll back",
     });
     if (ok) rollback.mutate();
@@ -62,83 +65,110 @@ export function Updates() {
 
   if (updates.isPending) return <p>Loading…</p>;
   if (updates.isError && (updates.data === undefined || !retryableQueryError(updates.error))) {
-    return <p className="error">{updates.error.message}</p>;
+    return <Banner tone="error">{updates.error.message}</Banner>;
   }
   const u = updates.data;
   const newest = u.releases[0];
   const last = u.last_update;
+  const busy = apply.isPending || rollback.isPending || updateInProgress(last?.state);
 
   return (
     <>
       <RefreshWarning error={updates.error} />
-      <h2>Updates</h2>
-      <p>
-        Running <span className="mono">{u.current}</span>
-        {u.checked_at && <span className="muted"> · checked {formatTime(u.checked_at)}</span>}{" "}
+      <div className="settings-row">
+        <div>
+          <p className="settings-version">{u.current}</p>
+          <p className="muted">Installed version{u.checked_at && ` · Checked ${formatTime(u.checked_at)}`}</p>
+        </div>
         {u.enabled && u.release_build && (
-          <Button onClick={() => check.mutate()} disabled={check.isPending}>
+          <Button variant="tonal" onClick={() => check.mutate()} disabled={check.isPending}>
+            <Icon name="refresh" size={18} />
             {check.isPending ? "Checking…" : "Check now"}
           </Button>
         )}
-      </p>
-      {check.isError && <p className="error">{check.error.message}</p>}
-      {u.error && <p className="error">The last check failed: {u.error}</p>}
+      </div>
+      {check.isError && <Banner tone="error">{check.error.message}</Banner>}
+      {u.error && !check.isError && <Banner tone="error">The last check failed: {u.error}</Banner>}
       {!u.enabled && <p className="muted">The release check is off (PANEL_UPDATE_CHECK=off).</p>}
       {u.enabled && !u.release_build && (
-        <p className="muted">This is not a release build, so there is nothing to update to from here.</p>
+        <p className="muted">Automatic updates are available for release builds.</p>
       )}
-      {u.enabled && u.release_build && !newest && !u.error && <p>You are on the latest release.</p>}
-      <div role="status">
-        {last && <p><strong>{last.version}</strong> · {rolloutMessages[last.state]}</p>}
-      </div>
-      {last?.backup && (
-        <p className="muted">
-          Database backup on the panel volume: <span className="mono">{last.backup}</span>
-        </p>
-      )}
-      {apply.isError && <p className="error">{apply.error.message}</p>}
-      {rollback.isError && <p className="error">{rollback.error.message}</p>}
-      {last?.can_rollback && (
-        <p>
-          <Button
-            onClick={rollbackToPrevious}
-            disabled={rollback.isPending || apply.isPending || updateInProgress(last.state)}
-          >
-            {rollback.isPending ? "Rolling back…" : "Roll back to previous version"}
+      {u.enabled && u.release_build && !newest && !u.error && u.checked_at && <Chip tone="ok">Up to date</Chip>}
+      {apply.isError && <Banner tone="error">{apply.error.message}</Banner>}
+      {rollback.isError && <Banner tone="error">{rollback.error.message}</Banner>}
+      {newest && (
+        <div className="settings-row settings-update">
+          <div>
+            <h3>Update available</h3>
+            <div className="settings-inline">
+              <span className="settings-version">{newest.tag}</span>
+              {newest.prerelease && <Chip>Pre-release</Chip>}
+            </div>
+          </div>
+          <Button onClick={() => update(newest.tag)} disabled={busy}>
+            <Icon name="arrow_downward" size={18} />
+            {apply.isPending ? "Starting update…" : `Update to ${newest.tag}`}
           </Button>
-        </p>
+        </div>
       )}
-
+      {last && (
+        <div className="settings-attempt">
+          <div className="settings-row">
+            <div role="status">
+              <h3>Last update · {last.version}</h3>
+              <p className="muted">{rolloutMessages[last.state]}</p>
+            </div>
+            {last.can_rollback && (
+              <Button variant="outlined" onClick={rollbackToPrevious} disabled={busy}>
+                {rollback.isPending ? "Rolling back…" : "Roll back"}
+              </Button>
+            )}
+          </div>
+          {last.backup && (
+            <details className="settings-disclosure">
+              <summary><Icon name="chevron_right" size={18} /> Database backup</summary>
+              <p className="settings-disclosure-body"><code>{last.backup}</code></p>
+            </details>
+          )}
+        </div>
+      )}
       {newest && (
         <>
-          <p>
-            <Button onClick={() => update(newest.tag)} disabled={apply.isPending || updateInProgress(last?.state)}>
-              Update to {newest.tag}
-            </Button>
-          </p>
           {!u.stack_file && (
-            <p className="muted">
-              The installer's stack file is not mounted into the panel, so it will still name the old image after the
-              update: run the installer once to add the mount.
-            </p>
+            <Banner tone="warning">
+              The stack file will still point to the old image after the update.
+              Run the installer on the Swarm manager to add the missing mount.
+            </Banner>
           )}
-          <p className="muted">Or on the manager:</p>
-          <pre className="mono">{installCommand(newest.tag)}</pre>
-          <p className="muted">
-            Migrations only go forward: take a copy of the database volume first if you may need to roll back.
-          </p>
-          {u.releases.map((r) => (
-            <section key={r.tag}>
-              <h3>
-                <a href={r.url} target="_blank" rel="noreferrer">
-                  {r.tag}
-                </a>{" "}
-                {r.prerelease && <Chip>pre-release</Chip>}{" "}
-                <span className="muted">{formatTime(r.published_at)}</span>
-              </h3>
-              <pre className="notes">{r.body || "No release notes."}</pre>
-            </section>
-          ))}
+          <details className="settings-disclosure">
+            <summary><Icon name="chevron_right" size={18} /> Manual update</summary>
+            <div className="settings-disclosure-body">
+              <p className="muted">
+                Back up the database volume before updating. Rolling back after a migration requires restoring that backup.
+              </p>
+              <p>Run on the Swarm manager:</p>
+              <pre><code>{installCommand(newest.tag)}</code></pre>
+            </div>
+          </details>
+          <section className="settings-releases" aria-labelledby="settings-release-notes">
+            <h3 id="settings-release-notes">Release notes</h3>
+            {u.releases.map((r) => (
+              <details className="settings-disclosure" key={r.tag}>
+                <summary>
+                  <Icon name="chevron_right" size={18} />
+                  <span className="settings-inline">
+                    <strong>{r.tag}</strong>
+                    {r.prerelease && <Chip>Pre-release</Chip>}
+                    <time className="muted" dateTime={r.published_at}>{formatTime(r.published_at)}</time>
+                  </span>
+                </summary>
+                <div className="settings-disclosure-body">
+                  <ReleaseNotes body={r.body} />
+                  <a href={r.url} target="_blank" rel="noreferrer">View release on GitHub</a>
+                </div>
+              </details>
+            ))}
+          </section>
         </>
       )}
     </>
