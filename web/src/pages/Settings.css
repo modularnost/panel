@@ -85,28 +85,22 @@
   margin-block-start: 8px;
 }
 
-.settings-releases {
-  display: grid;
-  gap: 4px;
-}
-
 .settings-releases > h3 {
-  margin: 0 0 4px;
+  margin: 0 0 8px;
 }
 
 .settings-disclosure {
   min-inline-size: 0;
-  border-radius: var(--md-sys-shape-medium);
-  background: var(--md-sys-color-surface-container);
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .settings-disclosure > summary {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-block-size: 48px;
+  min-block-size: 56px;
   padding: 8px 12px;
-  border-radius: inherit;
+  border-radius: var(--md-sys-shape-small);
   font: var(--md-sys-typescale-label-large);
   list-style: none;
   cursor: pointer;
