@@ -1604,6 +1604,30 @@
         ],
         "type": "object"
       },
+      "ServiceVolume": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "node",
+          "target",
+          "read_only"
+        ],
+        "type": "object"
+      },
       "ServiceVolumeInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4231,10 +4255,20 @@
         "parameters": [
           {
             "in": "path",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
             "schema": {
-              "maxLength": 63,
+              "maxLength": 64,
               "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
               "type": "string"
             }
@@ -4270,10 +4304,20 @@
         "parameters": [
           {
             "in": "path",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
             "schema": {
-              "maxLength": 63,
+              "maxLength": 64,
               "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
               "type": "string"
             }
@@ -4316,10 +4360,20 @@
         "parameters": [
           {
             "in": "path",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
             "schema": {
-              "maxLength": 63,
+              "maxLength": 64,
               "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
               "type": "string"
             }
@@ -5309,6 +5363,53 @@
       }
     },
     "/api/v1/services/{id}/volumes": {
+      "get": {
+        "operationId": "list-service-volumes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceVolume"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List volumes mounted by a service"
+      },
       "post": {
         "operationId": "attach-service-volume",
         "parameters": [

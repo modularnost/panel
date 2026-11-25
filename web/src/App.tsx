@@ -27,7 +27,10 @@ const ModuleCatalog = lazy(() => import("./pages/ModuleCatalog").then((page) => 
 const Networks = lazy(() => import("./pages/Networks").then((page) => ({ default: page.Networks })));
 const NetworkDetail = lazy(() => import("./pages/Networks").then((page) => ({ default: page.NetworkDetail })));
 const NetworkNew = lazy(() => import("./pages/Networks").then((page) => ({ default: page.NetworkNew })));
+const Volumes = lazy(() => import("./pages/Volumes").then((page) => ({ default: page.Volumes })));
+const VolumeDetail = lazy(() => import("./pages/Volumes").then((page) => ({ default: page.VolumeDetail })));
 const ServiceNetworks = lazy(() => import("./pages/service/Networks").then((page) => ({ default: page.ServiceNetworks })));
+const ServiceVolumes = lazy(() => import("./pages/service/Volumes").then((page) => ({ default: page.ServiceVolumes })));
 const Nodes = lazy(() => import("./pages/Nodes").then((page) => ({ default: page.Nodes })));
 const Ports = lazy(() => import("./pages/Ports").then((page) => ({ default: page.Ports })));
 const Resources = lazy(() => import("./pages/Resources").then((page) => ({ default: page.Resources })));
@@ -97,6 +100,10 @@ function Shell() {
         <NavLink to="/networks" className="item">
           <Icon name="lan" />
           Networks
+        </NavLink>
+        <NavLink to="/volumes" className="item">
+          <Icon name="hard_drive" />
+          Volumes
         </NavLink>
         <NavLink to="/resources" className="item">
           <Icon name="monitoring" />
@@ -177,6 +184,7 @@ export function App() {
             <Route path="logs" element={<Logs />} />
             <Route path="deploys" element={<ServiceDeploys />} />
             <Route path="networks" element={<ServiceNetworks />} />
+            <Route path="volumes" element={<ServiceVolumes />} />
             <Route path="traefik" element={<Traefik />} />
             <Route path="webhooks" element={<ServiceWebhooks />} />
             <Route path="module/:name/*" element={<ModuleTab />} />
@@ -194,6 +202,8 @@ export function App() {
           <Route path="networks/new" element={<NetworkNew />} />
           <Route path="networks/:id" element={<NetworkDetail />} />
           <Route path="networks/node/:node/:id" element={<NetworkDetail />} />
+          <Route path="volumes" element={<Volumes />} />
+          <Route path="volumes/:node/:name" element={<VolumeDetail />} />
           <Route path="nodes" element={<Nodes />} />
           <Route path="ports" element={<Ports />} />
           <Route path="webhooks" element={<Webhooks />} />

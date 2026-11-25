@@ -22,8 +22,8 @@ type volumeNode struct {
 }
 
 type volumePath struct {
-	volumeNode
-	Name string `path:"name" pattern:"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$" maxLength:"63"`
+	Node string `path:"node" pattern:"^[a-z0-9]+$" maxLength:"64"`
+	Name string `path:"name" pattern:"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$" maxLength:"64"`
 }
 
 type serviceVolumeInput struct {
@@ -39,6 +39,9 @@ type serviceVolumeInput struct {
 type volumeOutput struct{ Body docker.Volume }
 type volumeListOutput struct {
 	Body []docker.Volume `nullable:"false"`
+}
+type serviceVolumeListOutput struct {
+	Body []docker.ServiceVolume `nullable:"false"`
 }
 
 func volumeProblem(err error) error {
@@ -205,6 +208,15 @@ func (s *Server) registerVolumes(api huma.API, viewer, admin huma.Middlewares) {
 			return nil, volumeProblem(err)
 		}
 		return nil, nil
+	})
+	huma.Register(api, huma.Operation{OperationID: "list-service-volumes", Method: http.MethodGet, Path: "/api/v1/services/{id}/volumes", Summary: "List volumes mounted by a service", Middlewares: viewer, Security: signedIn}, func(ctx context.Context, in *struct {
+		ID string `path:"id"`
+	}) (*serviceVolumeListOutput, error) {
+		rows, err := s.Docker.ServiceVolumes(ctx, in.ID)
+		if err != nil {
+			return nil, volumeProblem(err)
+		}
+		return &serviceVolumeListOutput{Body: rows}, nil
 	})
 	huma.Register(api, huma.Operation{OperationID: "attach-service-volume", Method: http.MethodPost, Path: "/api/v1/services/{id}/volumes", DefaultStatus: http.StatusNoContent, Summary: "Mount an existing local volume and pin the service to its node", Middlewares: admin, Security: signedIn}, func(ctx context.Context, in *serviceVolumeInput) (*struct{}, error) {
 		s.volumeMu.Lock()

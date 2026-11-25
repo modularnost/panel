@@ -110,6 +110,7 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"ResourceCreatedOutputBody":   resourceCreatedOutput{}.Body,
 		"ResourceAttachmentInputBody": resourceAttachmentInput{}.Body,
 		"Volume":                      docker.Volume{},
+		"ServiceVolume":               docker.ServiceVolume{},
 		"CatalogVolumeSelection":      catalogVolumeSelection{},
 		"ServiceVolumeInputBody":      serviceVolumeInput{}.Body,
 

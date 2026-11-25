@@ -371,6 +371,7 @@ pre {
 
 .sort-header > .btn {
   gap: 4px;
+  margin-inline-start: -12px;
   line-height: normal;
 }
 
@@ -465,8 +466,16 @@ pre {
   white-space: nowrap;
 }
 
-.service-network-actions > .btn.text {
+.service-network-actions > .btn.text,
+.table-actions > .btn.text:first-child {
   margin-inline-start: -12px;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .service-network-changes {
@@ -478,10 +487,11 @@ pre {
 }
 
 .network-heading {
+  align-items: center;
   justify-content: space-between;
 }
 
-.network-heading h1 {
+.network-heading :is(h1, h2) {
   margin: 0;
 }
 
