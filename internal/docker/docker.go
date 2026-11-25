@@ -88,6 +88,9 @@ func (c *Client) Services(ctx context.Context) ([]Service, error) {
 
 // Service reads only the service and its currently scheduled tasks.
 func (c *Client) Service(ctx context.Context, id string) (Service, bool, error) {
+	if !nameRe.MatchString(id) {
+		return Service{}, false, nil
+	}
 	s, err := c.service(ctx, id)
 	if errdefs.IsNotFound(err) {
 		return Service{}, false, nil
