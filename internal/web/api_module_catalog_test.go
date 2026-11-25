@@ -1,8 +1,6 @@
 package web
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"errors"
 	"io"
 	"net/http"
@@ -16,7 +14,7 @@ import (
 	"modularnost/internal/store"
 )
 
-func TestBuilderPreflightReadsApprovedImage(t *testing.T) {
+func TestStackPreflightReadsApprovedImage(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
 	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -27,7 +25,7 @@ func TestBuilderPreflightReadsApprovedImage(t *testing.T) {
 		case r.URL.Path == "/v1.51/networks":
 			_, _ = io.WriteString(w, `[{"Name":"panelnet","Driver":"overlay"}]`)
 		case r.URL.Path == "/v1.51/images/create":
-			if q := r.URL.Query(); q.Get("fromImage") != "ghcr.io/modularnost/builder-module" || q.Get("tag") != digest {
+			if q := r.URL.Query(); q.Get("fromImage") != "ghcr.io/example/observability-module" || q.Get("tag") != digest {
 				t.Errorf("unexpected image pull: %v", q)
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -49,18 +47,10 @@ func TestBuilderPreflightReadsApprovedImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dk.Close()
-	block, err := aes.NewCipher(make([]byte, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := Server{Docker: dk, RegistryEncryption: aead}
-	_, err = s.builderPreflight(t.Context(), "ghcr.io/modularnost/builder-module@"+digest)
+	s := Server{Docker: dk}
+	_, err = s.stackPreflight(t.Context(), "ghcr.io/example/observability-module@"+digest)
 	var p *apiProblem
-	if !errors.As(err, &p) || p.status != http.StatusBadGateway || p.Detail.Code != "builder_bundle_unavailable" {
+	if !errors.As(err, &p) || p.status != http.StatusBadGateway || p.Detail.Code != "module_bundle_unavailable" {
 		t.Fatalf("unexpected preflight result: %v", err)
 	}
 }
@@ -73,7 +63,7 @@ func TestModuleCatalogIsAdminOnlyAndStaleInstallsAreRefused(t *testing.T) {
 		s.Catalog = modules.NewCatalog(t.Context(), s.DB)
 	})
 	catalog := base + "/api/v1/module-catalog"
-	preflight := catalog + "/builder/preflight"
+	preflight := catalog + "/observability/preflight"
 	confirmation := `{"version":"0.1.0","revision":"` + strings.Repeat("a", 64) + `"}`
 	if status, _ := send(t, c, "GET", catalog, "", ""); status != http.StatusUnauthorized {
 		t.Fatalf("signed-out access returned %d", status)

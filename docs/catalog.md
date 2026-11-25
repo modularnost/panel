@@ -16,10 +16,11 @@ to guides for manual entries. The panel skips entries that use an installation
 kind it does not support so administrators can still install other modules.
 Installed modules are discovered from service labels in the cluster.
 
-For approved Builder stack entries, administrators can run installation
-preflight through the API. It checks registry encryption, finds the panel's
-Swarm overlay and reads the deployment bundle from the catalog image digest.
-It reports these prerequisites before any components are deployed.
+Administrators can run preflight for a `swarm_stack` entry through the API. The
+panel finds its Swarm overlay, validates the bundle manifest and file paths
+from the approved image digest, and checks any registry credential requirement
+declared by the bundle. The preflight response reports the panel's overlay
+network.
 
 ## Bundled examples
 
