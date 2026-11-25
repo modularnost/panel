@@ -28,6 +28,8 @@ func TestCatalogValidation(t *testing.T) {
 		{`"stats:read"`, `"stats:read","stats:read"`},
 		{`"https://example.org/metrics"`, `"javascript:alert(1)"`},
 		{`"permissions"`, `"unknown"`},
+		{`"kind":"swarm_service"`, `"kind":"swarm_service","unknown":true`},
+		{`"kind":"swarm_service"`, `"kind":""`},
 		{`"id":"metrics"`, `"screenshots":[{"path":"screenshots/other/a.png","alt":"A"}],"id":"metrics"`},
 	} {
 		if _, err := decodeCatalog([]byte(strings.Replace(catalogFixture, test.old, test.new, 1))); err == nil {
@@ -47,6 +49,25 @@ func TestCatalogValidation(t *testing.T) {
 	edited.Install.Version = "0.4.1"
 	if edited.Revision() == e.Revision() {
 		t.Fatal("install changes must invalidate confirmations")
+	}
+}
+
+func TestCatalogSkipsUnsupportedInstallKinds(t *testing.T) {
+	const builder = `{
+		"id":"builder","title":"Builder","summary":"Builds and deploys apps","maintainer":"Modularnost",
+		"source_url":"https://example.org/builder","requires":{"contract":3},
+		"permissions":["service:create"],"install":{"kind":"swarm_stack","bundle":{"version":1}}
+	}`
+	body := strings.TrimSuffix(catalogFixture, "]}") + "," + builder + "]}"
+	entries, err := decodeCatalog([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].ID != "metrics" {
+		t.Fatalf("expected only metrics, got %+v", entries)
+	}
+	if _, err := decodeCatalog([]byte(strings.Replace(body, `"id":"builder"`, `"id":"Metrics"`, 1))); err == nil {
+		t.Fatal("accepted duplicate IDs across install kinds")
 	}
 }
 
