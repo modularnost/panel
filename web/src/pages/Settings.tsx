@@ -16,26 +16,28 @@ export function Settings() {
   };
 
   return (
-    <div className="settings">
+    <>
       <h1>Settings</h1>
-      <section className="settings-card" aria-labelledby="settings-appearance">
-        <div className="settings-row">
-          <div>
-            <h2 id="settings-appearance">Appearance</h2>
-            <p className="muted">Accent color · Saved in this browser</p>
+      <div className="settings">
+        <section className="settings-card" aria-labelledby="settings-appearance">
+          <div className="settings-row">
+            <div>
+              <h2 id="settings-appearance">Appearance</h2>
+              <p className="muted">Accent color · Saved in this browser</p>
+            </div>
+            <Swatches value={seed} onChange={choose} />
           </div>
-          <Swatches value={seed} onChange={choose} />
-        </div>
-      </section>
-      {atLeast(me.data?.role, "admin") && (
-        <>
-          <section className="settings-card" aria-labelledby="settings-updates">
-            <h2 id="settings-updates">Updates</h2>
-            <Updates />
-          </section>
-          <Registries />
-        </>
-      )}
-    </div>
+        </section>
+        {atLeast(me.data?.role, "admin") && (
+          <>
+            <section className="settings-card" aria-labelledby="settings-updates">
+              <h2 id="settings-updates">Updates</h2>
+              <Updates />
+            </section>
+            <Registries />
+          </>
+        )}
+      </div>
+    </>
   );
 }

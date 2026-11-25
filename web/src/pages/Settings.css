@@ -4,11 +4,6 @@
   max-inline-size: 66rem;
 }
 
-.settings > h1 {
-  margin: 0;
-  font: var(--md-sys-typescale-headline-medium);
-}
-
 .settings-card {
   display: grid;
   gap: 16px;
