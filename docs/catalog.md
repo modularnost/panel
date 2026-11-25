@@ -32,8 +32,8 @@ digests. Supported service settings are `image`, `command`, `entrypoint`,
 
 An administrator can provision the registry and its pull proxy for an approved
 Builder stack before deploying Builder. Configure encrypted registry credentials
-on the panel. Create an internal Swarm overlay for build traffic and a separate
-private overlay for the pull route. Supply the Builder bundle's external TLS
+on the panel. Choose an internal Swarm overlay for build traffic and a separate
+private overlay for the pull route. Provisioning creates missing overlays. Supply the Builder bundle's external TLS
 and bcrypt-user secrets using the
 [Builder installation guide](https://github.com/modularnost/builder_module/blob/main/docs/install.md).
 The panel installs the bundled mTLS registry and the TLS pull proxy. Both stay
@@ -183,3 +183,34 @@ and use `configs: [{source: caddy, target: /etc/caddy/Caddyfile}]` on a
 service. Paths are relative to the root of the approved bundle. The panel
 creates a version from that file and passes only its reference to Compose.
 On an unsuccessful install it removes unused configs created by the attempt.
+
+## Install Builder from the catalog
+
+Use **Modules → Catalog → Set up Builder**. Review the version and permissions
+in the catalog card. Prepare the registry with the build and pull overlay names.
+The panel creates missing overlays. Existing build overlays must be internal
+and attachable. Set up private DNS, TLS trust on the worker, and the registry
+secrets described above.
+
+Supply the Swarm secrets from the Builder installation guide. Upload a JSON
+object mapping their names to PEM or bcrypt-user file contents when preparing
+the registry. Leave the upload empty to use pre-created Swarm secrets. Use the
+same inputs when retrying.
+Upload a JSON file whose string fields contain the following PEM files. The
+panel installs the BuildKit daemon on its Swarm manager with a local cache.
+The daemon and registry keep their storage across retries.
+
+| JSON field | PEM file |
+| --- | --- |
+| `ca` | `buildkit-ca.pem` |
+| `server_certificate` | `buildkit-server.pem` with the DNS name `buildkitd` |
+| `server_key` | `buildkit-server-key.pem` |
+| `registry_ca` | `registry-ca.pem` |
+| `registry_client_certificate` | `registry-client.pem` |
+| `registry_client_key` | `registry-client-key.pem` |
+
+**Verify and install** starts BuildKit, builds a small probe image and checks
+the authenticated pull on the selected worker. The panel waits for Builder's
+approved manifest and confirms its TLS connection to BuildKit. Use the same
+registry inputs and TLS files when retrying. Reuse a working registry rather
+than replacing its volumes.

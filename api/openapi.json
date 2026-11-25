@@ -31,6 +31,44 @@
         ],
         "type": "object"
       },
+      "BuildKitTLS": {
+        "additionalProperties": false,
+        "properties": {
+          "ca": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "registry_ca": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "registry_client_certificate": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "registry_client_key": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "server_certificate": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "server_key": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "ca",
+          "server_certificate",
+          "server_key",
+          "registry_ca",
+          "registry_client_certificate",
+          "registry_client_key"
+        ],
+        "type": "object"
+      },
       "CatalogEntry": {
         "additionalProperties": false,
         "properties": {
@@ -48,6 +86,9 @@
           },
           "maintainer": {
             "type": "string"
+          },
+          "managed_builder": {
+            "type": "boolean"
           },
           "mount_path": {
             "type": "string"
@@ -562,7 +603,68 @@
         ],
         "type": "object"
       },
-      "ManagedRegistryPlan": {
+      "ManagedBuilderInstallBody": {
+        "additionalProperties": false,
+        "properties": {
+          "build_network": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "buildkit_tls": {
+            "$ref": "#/components/schemas/BuildKitTLS",
+            "writeOnly": true
+          },
+          "endpoint": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pull_entrypoint": {
+            "description": "Traefik Swarm private TCP entry point; omit for an external passthrough router",
+            "maxLength": 63,
+            "type": "string"
+          },
+          "pull_network": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "username": {
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "worker": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "worker",
+          "username",
+          "token",
+          "buildkit_tls",
+          "version",
+          "revision",
+          "endpoint",
+          "build_network",
+          "pull_network"
+        ],
+        "type": "object"
+      },
+      "ManagedRegistryProvisionBody": {
         "additionalProperties": false,
         "properties": {
           "build_network": {
@@ -588,6 +690,14 @@
           "revision": {
             "pattern": "^[a-f0-9]{64}$",
             "type": "string"
+          },
+          "secrets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "PEM and bcrypt-user file contents keyed by their Builder Swarm secret names",
+            "type": "object",
+            "writeOnly": true
           },
           "version": {
             "minLength": 1,
@@ -3036,6 +3146,63 @@
         "summary": "Refresh the curated module catalog"
       }
     },
+    "/api/v1/module-catalog/{id}/builder": {
+      "post": {
+        "operationId": "install-managed-builder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManagedBuilderInstallBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleInstalled"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify the managed registry and install Builder and BuildKit from the approved recipe"
+      }
+    },
     "/api/v1/module-catalog/{id}/install": {
       "post": {
         "operationId": "install-catalog-module",
@@ -3168,7 +3335,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ManagedRegistryPlan"
+                "$ref": "#/components/schemas/ManagedRegistryProvisionBody"
               }
             }
           },

@@ -20,6 +20,7 @@ type catalogScreenshot struct {
 }
 
 type catalogEntry struct {
+	ManagedBuilder  bool                `json:"managed_builder,omitempty"`
 	ID              string              `json:"id"`
 	Title           string              `json:"title"`
 	Summary         string              `json:"summary"`
@@ -81,7 +82,8 @@ func (s *Server) catalogOutput() *moduleCatalogOutput {
 	}
 	for _, entry := range snapshot.Entries {
 		card := catalogEntry{
-			ID: entry.ID, Title: entry.Title, Summary: entry.Summary, Maintainer: entry.Maintainer,
+			ManagedBuilder: entry.ID == "builder" && entry.Install.Kind == modules.CatalogSwarmStack,
+			ID:             entry.ID, Title: entry.Title, Summary: entry.Summary, Maintainer: entry.Maintainer,
 			SourceURL: entry.SourceURL, DocsURL: entry.DocsURL, Permissions: entry.Permissions,
 			Version: entry.Install.Version, Revision: entry.Revision(), Incompatibility: entry.Incompatibility(Version),
 			InstructionsURL: entry.Install.InstructionsURL, Screenshots: []catalogScreenshot{},
@@ -123,6 +125,7 @@ func (in apiCatalogInstall) confirm(entry modules.CatalogEntry) error {
 func (s *Server) registerModuleCatalog(api huma.API) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
 	s.registerManagedRegistry(api, admin)
+	s.registerManagedBuilder(api, admin)
 	huma.Register(api, huma.Operation{
 		OperationID: "get-module-catalog", Method: http.MethodGet, Path: "/api/v1/module-catalog",
 		Summary: "Curated modules and catalog freshness", Middlewares: admin, Security: signedIn,

@@ -26,6 +26,7 @@ type NewService struct {
 	Ports        []string // published:target[/proto]
 	Networks     []string
 	Mounts       []mount.Mount
+	Secrets      []*swarm.SecretReference
 	NodeID       string
 	Labels       map[string]string
 	RegistryAuth string
@@ -100,7 +101,7 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 	spec := swarm.ServiceSpec{
 		Annotations: swarm.Annotations{Name: n.Name, Labels: n.Labels},
 		TaskTemplate: swarm.TaskSpec{
-			ContainerSpec: &swarm.ContainerSpec{Image: n.Image, Env: n.Env, Mounts: n.Mounts},
+			ContainerSpec: &swarm.ContainerSpec{Image: n.Image, Env: n.Env, Mounts: n.Mounts, Secrets: n.Secrets},
 			Networks:      nets,
 		},
 		Mode:         swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &n.Replicas}},
