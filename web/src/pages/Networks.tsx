@@ -130,7 +130,15 @@ export function NetworkDetail() {
         </dl>
         <h2>Services</h2>
         {n.services.length ? <ul>{n.services.map((s) => <li key={s.id}><Link to={`/services/${s.id}/networks`}>{s.name}</Link></li>)}</ul> : <p>No service attachments.</p>}
-        {n.containers.length > 0 && <><h2>Containers on {nodeName || "the manager"}</h2><ul>{n.containers.map((c) => <li key={c}>{c}</li>)}</ul></>}
+        {n.containers.length > 0 && <>
+          <h2>Containers on {nodeName || "the manager"}</h2>
+          <Table scrollLabel="Containers">
+            <thead><tr><th scope="col">Container</th></tr></thead>
+            <tbody>
+              {n.containers.map((name) => <tr key={name}><td>{name}</td></tr>)}
+            </tbody>
+          </Table>
+        </>}
         {admin && !n.protected && !n.stack && <>
           {(n.services.length > 0 || n.containers.length > 0) && <p>Disconnect the attached workloads before removing this network.</p>}
           <Button variant="danger" disabled={remove.isPending || n.services.length > 0 || n.containers.length > 0} onClick={async () => {
