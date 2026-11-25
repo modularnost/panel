@@ -9,6 +9,7 @@ import { useDialogs } from "../components/Dialogs";
 import { Select } from "../components/Select";
 import { Switch } from "../components/Switch";
 import { Table } from "../components/Table";
+import { useTableSort } from "../components/TableSort";
 import { TextField } from "../components/TextField";
 
 export const networksKey = ["networks"];
@@ -25,12 +26,19 @@ export function Networks() {
   const [node, setNode] = useState("");
   const nodes = useNetworkNodes();
   const inventory = [
-    ...(networks.data ?? []).map((network) => ({ network, nodeID: "", location: "Swarm" })),
-    ...(nodes.data ?? []).flatMap((node) => node.networks.map((network) => ({ network, nodeID: node.id, location: node.name }))),
+    ...(networks.data ?? []).map((network) => ({ ...network, nodeID: "", location: "Swarm" })),
+    ...(nodes.data ?? []).flatMap((node) => node.networks.map((network) => ({ ...network, nodeID: node.id, location: node.name }))),
   ];
-  const rows = inventory.filter(({ network: n, nodeID, location }) =>
-    (!node || node === (nodeID || "swarm")) && (!driver || n.driver === driver) &&
-    [n.name, n.stack, location].some((value) => value?.toLowerCase().includes(search.trim().toLowerCase())));
+  const sort = useTableSort<(typeof inventory)[number]>({
+    name: (n) => n.name,
+    driver: (n) => n.driver,
+    location: (n) => n.location,
+    subnets: (n) => n.subnets[0]?.subnet,
+    services: (n) => n.services.length,
+  });
+  const rows = sort.rows(inventory.filter((n) =>
+    (!node || node === (n.nodeID || "swarm")) && (!driver || n.driver === driver) &&
+    [n.name, n.stack, n.location].some((value) => value?.toLowerCase().includes(search.trim().toLowerCase()))));
   return (
     <>
       <header className="toolbar network-heading">
@@ -41,7 +49,7 @@ export function Networks() {
         <TextField label="Search networks" value={search} onChange={setSearch} />
         <Select label="Driver" value={driver} onChange={setDriver}>
           <option value="">All drivers</option>
-          {[...new Set(inventory.map(({ network }) => network.driver))].sort().map((d) => <option key={d}>{d}</option>)}
+          {[...new Set(inventory.map((n) => n.driver))].sort().map((d) => <option key={d}>{d}</option>)}
         </Select>
         <Select label="Location" value={node} onChange={setNode}>
           <option value="">All locations</option>
@@ -55,12 +63,18 @@ export function Networks() {
       {networks.isError && <p className="error" role="alert">{networks.error.message}</p>}
       {(networks.data || nodes.data) && (rows.length ? (
         <Table className="network-inventory" scrollLabel="Networks">
-          <thead><tr><th scope="col">Network</th><th scope="col">Driver</th><th scope="col">Location</th><th scope="col">Subnets</th><th scope="col">Services</th></tr></thead>
-          <tbody>{rows.map(({ network: n, nodeID, location }) => (
-            <tr key={nodeID + n.id}>
-              <th scope="row"><Link to={networkPath(n.id, nodeID)}>{n.name}</Link></th>
+          <thead><tr>
+            {sort.header("name", "Network")}
+            {sort.header("driver", "Driver")}
+            {sort.header("location", "Location")}
+            {sort.header("subnets", "Subnets")}
+            {sort.header("services", "Services")}
+          </tr></thead>
+          <tbody>{rows.map((n) => (
+            <tr key={n.nodeID + n.id}>
+              <th scope="row"><Link to={networkPath(n.id, n.nodeID)}>{n.name}</Link></th>
               <td>{n.driver}</td>
-              <td>{location}{n.protected && <> <Chip>System</Chip></>}{n.stack && !n.protected && <> <Chip>{n.stack}</Chip></>}</td>
+              <td>{n.location}{n.protected && <> <Chip>System</Chip></>}{n.stack && !n.protected && <> <Chip>{n.stack}</Chip></>}</td>
               <td className="mono">{n.subnets.map((s) => s.subnet).join(", ") || "—"}</td>
               <td>{n.services.length}</td>
             </tr>
