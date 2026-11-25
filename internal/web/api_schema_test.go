@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"modularnost/internal/docker"
 )
 
 // fill gives every settable field a non-zero value, so omitempty hides nothing.
@@ -54,6 +56,18 @@ func fill(v reflect.Value) {
 // still being in the JSON; this compares the two for every schema in the spec.
 func TestSchemasMatchResponseTypes(t *testing.T) {
 	types := map[string]any{
+		"Network":                 docker.Network{},
+		"NetworkService":          docker.NetworkService{},
+		"NetworkSubnet":           docker.NetworkSubnet{},
+		"NetworkAttachment":       docker.NetworkAttachment{},
+		"ServiceNetworkState":     docker.ServiceNetworkState{},
+		"NewNetwork":              docker.NewNetwork{},
+		"NewLocalNetwork":         docker.NewLocalNetwork{},
+		"NetworkChanges":          networkChanges{},
+		"NodeNetworkInventory":    nodeNetworkInventory{},
+		"NetworkCreatedBody":      networkCreated{}.Body,
+		"NetworkChangeResultBody": networkChangeResult{}.Body,
+
 		"User":                   apiUser{},
 		"Service":                apiService{},
 		"Stack":                  apiStack{},

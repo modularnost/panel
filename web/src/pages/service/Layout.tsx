@@ -49,6 +49,7 @@ export function ServiceLayout() {
         </Tab>
         <Tab icon="terminal" to="logs">Logs</Tab>
         <Tab icon="rocket_launch" to="deploys">Deploys</Tab>
+        <Tab icon="hub" to="networks">Networks</Tab>
         {admin && <Tab icon="alt_route" to="traefik">Traefik</Tab>}
         {admin && <Tab icon="webhook" to="webhooks">Webhooks</Tab>}
         {serviceTabs(modules.data, me.data?.role, s).map(({ module, contribution: c }) => (
