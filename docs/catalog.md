@@ -87,6 +87,7 @@ A module you install is code running inside your cluster. Check:
 A module never gets `docker.sock`. Everything it can do to the cluster goes
 through the core's internal API, limited to the permissions in its manifest —
 which is what makes reading that list worth the minute it takes.
+
 ## Swarm Secrets
 
 Administrators can list metadata and attachments at `GET /api/v1/secrets`
@@ -108,3 +109,28 @@ or `{"create":{"name":"new-version","data":"base64-value"}}`. Docker mounts
 the selected secret. The panel sends only references to Compose and removes
 unused secrets it created if deployment fails. Uninstall leaves secrets
 available for explicit deletion.
+
+## Named local volumes
+
+List local volumes and service attachments at `GET /api/v1/nodes/{node}/volumes`.
+Inspect, create or explicitly delete a volume by name on that node using
+`GET`, `PUT` or `DELETE /api/v1/nodes/{node}/volumes/{name}`. Deletion
+requires a volume with no service or container consumers.
+
+Mount an existing volume using `POST /api/v1/services/{id}/volumes` with
+`node`, `name`, an absolute `target`, and optional `read_only`. The panel
+pins the service to the selected node to keep the same data after redeploy.
+A worker must have a reachable panel agent to manage its local volumes.
+
+A catalog stack declares aliases under top-level `volumes`, for example
+`volumes: {data: {}}`. Attach the alias using the long form
+`{type: volume, source: data, target: /data}`. The confirmed install can
+include `volumes: {"data":{"node":"node-id","name":"existing-data"}}`.
+Omit the volume name to provision the catalog default on that node. The same
+service must use volumes on the same node. For a single-service catalog
+entry with persistence, use the singular `volume` selection.
+
+Subsequent installs reuse the recorded node and volume name. If a recorded
+node is unavailable or its volume is missing, installation stops. Volumes
+survive uninstall and failed installation and can be deleted explicitly once
+unused.

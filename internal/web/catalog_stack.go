@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -23,7 +24,7 @@ func catalogStackName(id string) string {
 	return fmt.Sprintf("modularnost-module-%x", hash[:8])
 }
 
-func (s *Server) prepareCatalogStack(ctx context.Context, entry modules.CatalogEntry) (string, int, string, error) {
+func (s *Server) prepareCatalogStack(ctx context.Context, entry modules.CatalogEntry, selected map[string]catalogVolumeSelection, install bool) (string, int, string, error) {
 	self, err := s.Docker.Self(ctx)
 	if err != nil {
 		return "", 0, "", backendProblem(http.StatusBadGateway, "docker_error", err)
@@ -56,6 +57,37 @@ func (s *Server) prepareCatalogStack(ctx context.Context, entry modules.CatalogE
 			catalogStackLabel:            catalogStackName(entry.ID),
 		},
 	}
+	aliases, err := bundle.CatalogVolumeAliases()
+	if err != nil {
+		return "", 0, "", problem(http.StatusUnprocessableEntity, "unsupported_stack", err.Error())
+	}
+	spec.Volumes = make(map[string]docker.CatalogVolume, len(aliases))
+	for alias := range selected {
+		if !slices.Contains(aliases, alias) {
+			return "", 0, "", problem(http.StatusUnprocessableEntity, "invalid_input", "Select volumes only for declared aliases")
+		}
+	}
+	for _, alias := range aliases {
+		key := catalogStackName(entry.ID) + "-" + alias
+		spec.Volumes[alias] = docker.CatalogVolume{Name: moduleVolumeName(key)}
+	}
+	if install && len(aliases) > 0 {
+		for _, alias := range aliases {
+			var selection *catalogVolumeSelection
+			if value, ok := selected[alias]; ok {
+				selection = &value
+			}
+			key := catalogStackName(entry.ID) + "-" + alias
+			node, name, err := s.ensureModuleVolume(ctx, key, spec.Volumes[alias].Name, selection)
+			if errors.Is(err, errModuleStorage) {
+				return "", 0, "", problem(http.StatusConflict, "module_unavailable", err.Error())
+			}
+			if err != nil {
+				return "", 0, "", volumeProblem(err)
+			}
+			spec.Volumes[alias] = docker.CatalogVolume{Name: name, Node: node}
+		}
+	}
 	compose, count, err := docker.RenderCatalogStack(ctx, bundle, spec)
 	if err != nil {
 		return "", 0, "", problem(http.StatusUnprocessableEntity, "unsupported_stack", err.Error())
@@ -63,11 +95,7 @@ func (s *Server) prepareCatalogStack(ctx context.Context, entry modules.CatalogE
 	return compose, count, self.Network, nil
 }
 
-func (s *Server) installCatalogStack(ctx context.Context, entry modules.CatalogEntry, secrets map[string]catalogSecretInput) (_ string, err error) {
-	compose, count, _, err := s.prepareCatalogStack(ctx, entry)
-	if err != nil {
-		return "", err
-	}
+func (s *Server) installCatalogStack(ctx context.Context, entry modules.CatalogEntry, secrets map[string]catalogSecretInput, volumes map[string]catalogVolumeSelection) (_ string, err error) {
 	name := catalogStackName(entry.ID)
 	s.moduleMu.Lock()
 	defer s.moduleMu.Unlock()
@@ -88,6 +116,12 @@ func (s *Server) installCatalogStack(ctx context.Context, entry modules.CatalogE
 	}
 	if slices.Contains(networks, name+"_default") {
 		return "", problem(http.StatusConflict, "module_unavailable", "An overlay network with this stack name already exists")
+	}
+	s.volumeMu.Lock()
+	defer s.volumeMu.Unlock()
+	compose, count, _, err := s.prepareCatalogStack(ctx, entry, volumes, true)
+	if err != nil {
+		return "", err
 	}
 	compose, created, err := s.bindCatalogSecrets(ctx, compose, secrets)
 	defer func() {

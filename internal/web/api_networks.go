@@ -61,6 +61,7 @@ func networkProblem(err error) error {
 func (s *Server) registerNetworks(api huma.API, viewer huma.Middlewares) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
 	s.registerLocalNetworks(api, viewer, admin)
+	s.registerVolumes(api, viewer, admin)
 	huma.Register(api, huma.Operation{OperationID: "list-networks", Method: http.MethodGet, Path: "/api/v1/networks", Summary: "Networks visible to the Swarm manager", Middlewares: viewer, Security: signedIn}, func(ctx context.Context, _ *struct{}) (*networkListOutput, error) {
 		networks, err := s.Docker.Networks(ctx)
 		if err != nil {

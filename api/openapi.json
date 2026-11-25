@@ -109,6 +109,15 @@
           "version": {
             "minLength": 1,
             "type": "string"
+          },
+          "volume": {
+            "$ref": "#/components/schemas/CatalogVolumeSelection"
+          },
+          "volumes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CatalogVolumeSelection"
+            },
+            "type": "object"
           }
         },
         "required": [
@@ -156,6 +165,24 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "CatalogVolumeSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Existing volume name. Omit to create the catalog default on this node",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$",
+            "type": "string"
+          },
+          "node": {
+            "pattern": "^[a-z0-9]{1,64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node"
+        ],
         "type": "object"
       },
       "Contribution": {
@@ -1364,6 +1391,34 @@
         ],
         "type": "object"
       },
+      "ServiceVolumeInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 63,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+            "type": "string"
+          },
+          "node": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+$",
+            "type": "string"
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "target": {
+            "maxLength": 4096,
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "name",
+          "target"
+        ],
+        "type": "object"
+      },
       "Stack": {
         "additionalProperties": false,
         "properties": {
@@ -1955,6 +2010,42 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "Volume": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "driver": {
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "name": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "node",
+          "services",
+          "name",
+          "driver"
+        ],
         "type": "object"
       },
       "Webhook": {
@@ -3602,6 +3693,190 @@
         "summary": "Make a node active, paused or drained"
       }
     },
+    "/api/v1/nodes/{node}/volumes": {
+      "get": {
+        "operationId": "list-node-volumes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Volume"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List local named volumes on a Swarm node"
+      }
+    },
+    "/api/v1/nodes/{node}/volumes/{name}": {
+      "delete": {
+        "operationId": "remove-node-volume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an unused local volume"
+      },
+      "get": {
+        "operationId": "get-node-volume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volume"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Inspect a local volume and its service attachments"
+      },
+      "put": {
+        "operationId": "create-node-volume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volume"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a local named volume on a node"
+      }
+    },
     "/api/v1/registries": {
       "get": {
         "operationId": "list-registries",
@@ -4501,6 +4776,55 @@
           }
         ],
         "summary": "Write the Traefik labels; an empty host and port take the service off Traefik"
+      }
+    },
+    "/api/v1/services/{id}/volumes": {
+      "post": {
+        "operationId": "attach-service-volume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceVolumeInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mount an existing local volume and pin the service to its node"
       }
     },
     "/api/v1/services/{id}/webhooks": {

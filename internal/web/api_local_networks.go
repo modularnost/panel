@@ -50,7 +50,7 @@ func (s *Server) registerLocalNetworks(api huma.API, viewer, admin huma.Middlewa
 				if node.ID == local {
 					rows, err = s.Docker.LocalNetworks(ctx)
 				} else {
-					err = s.agentNetworkRequest(ctx, addresses[node.ID], http.MethodGet, "/networks", nil, &rows)
+					err = s.agentLocalRequest(ctx, addresses[node.ID], http.MethodGet, "/networks", nil, &rows)
 				}
 				if err == nil {
 					row.Available = true
@@ -67,7 +67,7 @@ func (s *Server) registerLocalNetworks(api huma.API, viewer, admin huma.Middlewa
 	})
 	huma.Register(api, huma.Operation{OperationID: "get-node-network", Method: http.MethodGet, Path: "/api/v1/network-nodes/{node}/networks/{id}", Summary: "Details for a local network", Middlewares: viewer, Security: signedIn}, func(ctx context.Context, in *nodeNetworkPath) (*networkOutput, error) {
 		out := &networkOutput{}
-		err := s.withNetworkNode(ctx, in.Node, func() error {
+		err := s.withLocalNode(ctx, in.Node, func() error {
 			var err error
 			out.Body, err = s.Docker.LocalNetwork(ctx, in.ID)
 			return err
@@ -83,7 +83,7 @@ func (s *Server) registerLocalNetworks(api huma.API, viewer, admin huma.Middlewa
 	}) (*networkCreated, error) {
 		out := &networkCreated{}
 		result := &agent.NetworkCreated{}
-		err := s.withNetworkNode(ctx, in.Node, func() error {
+		err := s.withLocalNode(ctx, in.Node, func() error {
 			var err error
 			result.ID, err = s.Docker.CreateLocalNetwork(ctx, in.Body)
 			return err
@@ -95,7 +95,7 @@ func (s *Server) registerLocalNetworks(api huma.API, viewer, admin huma.Middlewa
 		return out, nil
 	})
 	huma.Register(api, huma.Operation{OperationID: "remove-node-network", Method: http.MethodDelete, Path: "/api/v1/network-nodes/{node}/networks/{id}", Summary: "Remove an unused local network on a node", Middlewares: admin, Security: signedIn}, func(ctx context.Context, in *nodeNetworkPath) (*struct{}, error) {
-		err := s.withNetworkNode(ctx, in.Node, func() error { return s.Docker.RemoveLocalNetwork(ctx, in.ID) }, http.MethodDelete, "/networks/"+in.ID, nil, nil)
+		err := s.withLocalNode(ctx, in.Node, func() error { return s.Docker.RemoveLocalNetwork(ctx, in.ID) }, http.MethodDelete, "/networks/"+in.ID, nil, nil)
 		if err != nil {
 			return nil, networkProblem(err)
 		}
@@ -103,14 +103,14 @@ func (s *Server) registerLocalNetworks(api huma.API, viewer, admin huma.Middlewa
 	})
 }
 
-func (s *Server) agentNetworkRequest(ctx context.Context, addr netip.Addr, method, path string, in, out any) error {
+func (s *Server) agentLocalRequest(ctx context.Context, addr netip.Addr, method, path string, in, out any) error {
 	if s.Metrics == nil {
 		return errdefs.ErrUnavailable
 	}
-	return s.Metrics.NetworkRequest(ctx, addr, method, path, in, out)
+	return s.Metrics.LocalRequest(ctx, addr, method, path, in, out)
 }
 
-func (s *Server) withNetworkNode(ctx context.Context, node string, local func() error, method, path string, in, out any) error {
+func (s *Server) withLocalNode(ctx context.Context, node string, local func() error, method, path string, in, out any) error {
 	current, err := s.Docker.LocalSwarmNode(ctx)
 	if err != nil {
 		return err
@@ -125,5 +125,5 @@ func (s *Server) withNetworkNode(ctx context.Context, node string, local func() 
 	if !addresses[node].IsValid() {
 		return errdefs.ErrUnavailable
 	}
-	return s.agentNetworkRequest(ctx, addresses[node], method, path, in, out)
+	return s.agentLocalRequest(ctx, addresses[node], method, path, in, out)
 }

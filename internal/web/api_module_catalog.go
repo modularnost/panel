@@ -44,9 +44,16 @@ type moduleCatalogOutput struct {
 }
 
 type apiCatalogInstall struct {
-	Secrets  map[string]catalogSecretInput `json:"secrets,omitempty" doc:"Bindings for declared secret aliases"`
-	Version  string                        `json:"version" minLength:"1"`
-	Revision string                        `json:"revision" pattern:"^[a-f0-9]{64}$"`
+	Secrets  map[string]catalogSecretInput     `json:"secrets,omitempty" doc:"Bindings for declared secret aliases"`
+	Volume   *catalogVolumeSelection           `json:"volume,omitempty"`
+	Volumes  map[string]catalogVolumeSelection `json:"volumes,omitempty"`
+	Version  string                            `json:"version" minLength:"1"`
+	Revision string                            `json:"revision" pattern:"^[a-f0-9]{64}$"`
+}
+
+type catalogVolumeSelection struct {
+	Node string `json:"node" pattern:"^[a-z0-9]{1,64}$"`
+	Name string `json:"name,omitempty" pattern:"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$" doc:"Existing volume name. Omit to create the catalog default on this node"`
 }
 
 type catalogInstallInput struct {
@@ -135,7 +142,7 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 		if err := in.Body.confirm(entry); err != nil {
 			return nil, err
 		}
-		_, _, network, err := s.prepareCatalogStack(ctx, entry)
+		_, _, network, err := s.prepareCatalogStack(ctx, entry, nil, false)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +176,10 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 			return nil, err
 		}
 		if entry.Install.Kind == modules.CatalogSwarmStack {
-			service, err := s.installCatalogStack(ctx, entry, in.Body.Secrets)
+			if in.Body.Volume != nil {
+				return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "Use the volumes mapping for a catalog stack")
+			}
+			service, err := s.installCatalogStack(ctx, entry, in.Body.Secrets, in.Body.Volumes)
 			if err != nil {
 				return nil, err
 			}
@@ -182,7 +192,10 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 		if entry.Install.Port != 0 {
 			m.Port = strconv.Itoa(entry.Install.Port)
 		}
-		service, err := s.deployModule(ctx, m, "", "", &entry)
+		if len(in.Body.Volumes) > 0 || in.Body.Volume != nil && entry.Install.DataVolume == nil {
+			return nil, problem(http.StatusUnprocessableEntity, "invalid_input", "This entry does not declare the selected volumes")
+		}
+		service, err := s.deployModule(ctx, m, "", "", &entry, in.Body.Volume)
 		if errors.Is(err, errModuleExists) || errors.Is(err, errModuleStorage) {
 			return nil, problem(http.StatusConflict, "module_unavailable", err.Error())
 		}
