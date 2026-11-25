@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { api, call } from "../api/client";
+import type { NetworkEndpoint } from "../api/generated";
 import { atLeast, useMe } from "../auth";
 import { Button, LinkButton } from "../components/Button";
 import { Chip } from "../components/Chip";
@@ -97,8 +98,6 @@ function networkPath(id: string, nodeID = "") {
 
 export function NetworkDetail() {
   const { id = "", node = "" } = useParams();
-  const [search] = useSearchParams();
-  const endpointID = search.get("endpoint");
   const nodes = useNetworkNodes();
   const nodeName = nodes.data?.find((n) => n.id === node)?.name ?? node;
   const admin = atLeast(useMe().data?.role, "admin");
@@ -114,23 +113,7 @@ export function NetworkDetail() {
     },
   });
   const n = detail.data;
-  if (n && endpointID !== null) {
-    const endpoint = n.endpoints?.find((item) => item.id === endpointID);
-    return <>
-      <p><Link to={networkPath(n.id, node)}>{n.name}</Link></p>
-      {endpoint ? <>
-        <h1>{endpoint.name}</h1>
-        <dl className="facts">
-          <dt>Network</dt><dd>{n.name}</dd>
-          <dt>Node</dt><dd>{nodeName || "Manager"}</dd>
-          <dt>Endpoint ID</dt><dd className="mono">{endpoint.endpoint_id || "—"}</dd>
-          <dt>IPv4 address</dt><dd className="mono">{endpoint.ipv4_address || "—"}</dd>
-          <dt>IPv6 address</dt><dd className="mono">{endpoint.ipv6_address || "—"}</dd>
-          <dt>MAC address</dt><dd className="mono">{endpoint.mac_address || "—"}</dd>
-        </dl>
-      </> : <p role="status">This endpoint is no longer visible in the network.</p>}
-    </>;
-  }
+  const endpoints: NetworkEndpoint[] = n?.endpoints ?? n?.containers.map((name) => ({ id: name, name })) ?? [];
   return (
     <>
       <p><Link to="/networks">Networks</Link></p>
@@ -149,14 +132,24 @@ export function NetworkDetail() {
         </dl>
         <h2>Services</h2>
         {n.services.length ? <ul>{n.services.map((s) => <li key={s.id}><Link to={`/services/${s.id}/networks`}>{s.name}</Link></li>)}</ul> : <p>No service attachments.</p>}
-        {n.containers.length > 0 && <>
+        {endpoints.length > 0 && <>
           <h2>Containers on {nodeName || "the manager"}</h2>
           <Table scrollLabel="Containers">
-            <thead><tr><th scope="col">Container</th></tr></thead>
+            <thead><tr>
+              <th scope="col">Container</th>
+              <th scope="col">IPv4</th>
+              <th scope="col">IPv6</th>
+              <th scope="col">MAC address</th>
+            </tr></thead>
             <tbody>
-              {n.endpoints?.length ? n.endpoints.map((endpoint) => (
-                <tr key={endpoint.id}><td><Link to={{ search: `?endpoint=${encodeURIComponent(endpoint.id)}` }}>{endpoint.name}</Link></td></tr>
-              )) : n.containers.map((name) => <tr key={name}><td>{name}</td></tr>)}
+              {endpoints.map((endpoint) => (
+                <tr key={endpoint.id}>
+                  <th scope="row">{endpoint.name}</th>
+                  <td className="mono">{endpoint.ipv4_address || "—"}</td>
+                  <td className="mono">{endpoint.ipv6_address || "—"}</td>
+                  <td className="mono">{endpoint.mac_address || "—"}</td>
+                </tr>
+              ))}
             </tbody>
           </Table>
         </>}
