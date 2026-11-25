@@ -247,6 +247,20 @@ proxy access logs can contain usable URLs, so protect those files and replace
 any webhook whose URL was exposed. The hook endpoint allows 60 requests per
 minute per client IP and returns `429` with `Retry-After` above that limit.
 
+### Networks
+
+Open **Networks** to view Swarm overlay networks and the local networks on each
+node. Admins can create networks and remove unused user-defined networks.
+For local networks, choose a node and a driver. A node whose agent is
+unavailable is marked in the inventory. The network details show IPv4, IPv6,
+and MAC addresses alongside the container names.
+
+Open **Networks** on a service to review its connections and aliases. Admins
+can stage connections and disconnections and apply them together. For a stack
+managed by the panel, review the updated Compose file before redeploying.
+For an external stack, change the source Compose file and redeploy it from
+the system that owns it.
+
 ### Private registry images
 
 In **Settings → Registries**, save a pull token for the registry hostname

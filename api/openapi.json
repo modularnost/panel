@@ -556,6 +556,217 @@
         ],
         "type": "object"
       },
+      "Network": {
+        "additionalProperties": false,
+        "properties": {
+          "attachable": {
+            "type": "boolean"
+          },
+          "config_only": {
+            "type": "boolean"
+          },
+          "containers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "driver": {
+            "type": "string"
+          },
+          "encrypted": {
+            "type": "boolean"
+          },
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkEndpoint"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "internal": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkService"
+            },
+            "type": "array"
+          },
+          "stack": {
+            "type": "string"
+          },
+          "subnets": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkSubnet"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "driver",
+          "scope",
+          "internal",
+          "attachable",
+          "encrypted",
+          "protected",
+          "config_only",
+          "subnets",
+          "services",
+          "containers"
+        ],
+        "type": "object"
+      },
+      "NetworkAttachment": {
+        "additionalProperties": false,
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "automatic": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "aliases"
+        ],
+        "type": "object"
+      },
+      "NetworkChangeResultBody": {
+        "additionalProperties": false,
+        "properties": {
+          "compose": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkChanges": {
+        "additionalProperties": false,
+        "properties": {
+          "add": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "preview": {
+            "type": "boolean"
+          },
+          "remove": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "version": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "add",
+          "remove"
+        ],
+        "type": "object"
+      },
+      "NetworkCreatedBody": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "NetworkEndpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "endpoint_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipv4_address": {
+            "type": "string"
+          },
+          "ipv6_address": {
+            "type": "string"
+          },
+          "mac_address": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "NetworkService": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "NetworkSubnet": {
+        "additionalProperties": false,
+        "properties": {
+          "gateway": {
+            "type": "string"
+          },
+          "subnet": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subnet"
+        ],
+        "type": "object"
+      },
       "NewFirewallPort": {
         "additionalProperties": false,
         "properties": {
@@ -580,6 +791,77 @@
         "required": [
           "port",
           "proto"
+        ],
+        "type": "object"
+      },
+      "NewLocalNetwork": {
+        "additionalProperties": false,
+        "properties": {
+          "attachable": {
+            "type": "boolean"
+          },
+          "driver": {
+            "enum": [
+              "bridge",
+              "macvlan",
+              "ipvlan"
+            ],
+            "type": "string"
+          },
+          "encrypted": {
+            "type": "boolean"
+          },
+          "gateway": {
+            "type": "string"
+          },
+          "internal": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "parent": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "subnet": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "driver",
+          "name"
+        ],
+        "type": "object"
+      },
+      "NewNetwork": {
+        "additionalProperties": false,
+        "properties": {
+          "attachable": {
+            "type": "boolean"
+          },
+          "encrypted": {
+            "type": "boolean"
+          },
+          "gateway": {
+            "type": "string"
+          },
+          "internal": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "subnet": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
         ],
         "type": "object"
       },
@@ -645,6 +927,33 @@
           "status",
           "availability",
           "firewall"
+        ],
+        "type": "object"
+      },
+      "NodeNetworkInventory": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "networks": {
+            "items": {
+              "$ref": "#/components/schemas/Network"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "available",
+          "networks"
         ],
         "type": "object"
       },
@@ -882,6 +1191,42 @@
           "running",
           "desired",
           "healthy"
+        ],
+        "type": "object"
+      },
+      "ServiceNetworkState": {
+        "additionalProperties": false,
+        "properties": {
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkAttachment"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "service",
+              "compose",
+              "external",
+              "system"
+            ],
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "source",
+          "attachments"
         ],
         "type": "object"
       },
@@ -2509,6 +2854,371 @@
         "summary": "The document of a module's ui page"
       }
     },
+    "/api/v1/network-nodes": {
+      "get": {
+        "operationId": "list-node-networks",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NodeNetworkInventory"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Local network inventory by Swarm node"
+      }
+    },
+    "/api/v1/network-nodes/{node}/networks": {
+      "post": {
+        "operationId": "create-node-network",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewLocalNetwork"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkCreatedBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a local network on a node"
+      }
+    },
+    "/api/v1/network-nodes/{node}/networks/{id}": {
+      "delete": {
+        "operationId": "remove-node-network",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove an unused local network on a node"
+      },
+      "get": {
+        "operationId": "get-node-network",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Network"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Details for a local network"
+      }
+    },
+    "/api/v1/networks": {
+      "get": {
+        "operationId": "list-networks",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Network"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Networks visible to the Swarm manager"
+      },
+      "post": {
+        "operationId": "create-network",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewNetwork"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkCreatedBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an overlay network"
+      }
+    },
+    "/api/v1/networks/{id}": {
+      "delete": {
+        "operationId": "remove-network",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove an unused overlay network"
+      },
+      "get": {
+        "operationId": "get-network",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Network"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Network details and attached workloads"
+      }
+    },
     "/api/v1/nodes": {
       "get": {
         "operationId": "list-nodes",
@@ -3133,6 +3843,106 @@
           }
         ],
         "summary": "Follow a service's logs, or one replica's"
+      }
+    },
+    "/api/v1/services/{id}/networks": {
+      "get": {
+        "operationId": "get-service-networks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceNetworkState"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Network attachments for a Swarm service"
+      },
+      "post": {
+        "operationId": "change-service-networks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkChangeResultBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview or apply changes to service network attachments"
       }
     },
     "/api/v1/services/{id}/redeploy": {

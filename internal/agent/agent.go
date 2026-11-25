@@ -30,11 +30,17 @@ func Token(secret string) string {
 func Routes(secret, node string, dk *docker.Client) http.Handler {
 	want := Token(secret)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /stats", func(w http.ResponseWriter, r *http.Request) {
-		if !hmac.Equal([]byte(r.Header.Get("X-Panel-Token")), []byte(want)) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+	auth := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if !hmac.Equal([]byte(r.Header.Get("X-Panel-Token")), []byte(want)) {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			next(w, r)
 		}
+	}
+	registerNetworkRoutes(mux, dk, auth)
+	mux.HandleFunc("GET /stats", auth(func(w http.ResponseWriter, r *http.Request) {
 		stats, err := dk.Stats(r.Context(), r.FormValue("service"))
 		if err != nil {
 			log.Printf("agent: collect stats: %v", err)
@@ -46,7 +52,7 @@ func Routes(secret, node string, dk *docker.Client) http.Handler {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(stats)
-	})
+	}))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})

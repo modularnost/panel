@@ -24,6 +24,10 @@ import { Icon } from "./components/Icon";
 
 const ModulePage = lazy(() => import("./pages/ModulePage").then((page) => ({ default: page.ModulePage })));
 const ModuleCatalog = lazy(() => import("./pages/ModuleCatalog").then((page) => ({ default: page.ModuleCatalog })));
+const Networks = lazy(() => import("./pages/Networks").then((page) => ({ default: page.Networks })));
+const NetworkDetail = lazy(() => import("./pages/Networks").then((page) => ({ default: page.NetworkDetail })));
+const NetworkNew = lazy(() => import("./pages/Networks").then((page) => ({ default: page.NetworkNew })));
+const ServiceNetworks = lazy(() => import("./pages/service/Networks").then((page) => ({ default: page.ServiceNetworks })));
 const Nodes = lazy(() => import("./pages/Nodes").then((page) => ({ default: page.Nodes })));
 const Ports = lazy(() => import("./pages/Ports").then((page) => ({ default: page.Ports })));
 const Resources = lazy(() => import("./pages/Resources").then((page) => ({ default: page.Resources })));
@@ -89,6 +93,10 @@ function Shell() {
         <NavLink to="/stacks" className="item">
           <Icon name="layers" />
           Stacks
+        </NavLink>
+        <NavLink to="/networks" className="item">
+          <Icon name="lan" />
+          Networks
         </NavLink>
         <NavLink to="/resources" className="item">
           <Icon name="monitoring" />
@@ -168,6 +176,7 @@ export function App() {
             <Route index element={<Overview />} />
             <Route path="logs" element={<Logs />} />
             <Route path="deploys" element={<ServiceDeploys />} />
+            <Route path="networks" element={<ServiceNetworks />} />
             <Route path="traefik" element={<Traefik />} />
             <Route path="webhooks" element={<ServiceWebhooks />} />
             <Route path="module/:name/*" element={<ModuleTab />} />
@@ -181,6 +190,10 @@ export function App() {
           </Route>
           <Route path="install-module" element={<ModuleInstall />} />
           <Route path="module/:name/*" element={<ModulePage />} />
+          <Route path="networks" element={<Networks />} />
+          <Route path="networks/new" element={<NetworkNew />} />
+          <Route path="networks/:id" element={<NetworkDetail />} />
+          <Route path="networks/node/:node/:id" element={<NetworkDetail />} />
           <Route path="nodes" element={<Nodes />} />
           <Route path="ports" element={<Ports />} />
           <Route path="webhooks" element={<Webhooks />} />
