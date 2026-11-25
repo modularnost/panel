@@ -392,7 +392,7 @@ func withSlot(line string, slotByTask map[string]int) string {
 		return line
 	}
 	slot := "?"
-	for _, kv := range strings.Split(attrs, ",") {
+	for kv := range strings.SplitSeq(attrs, ",") {
 		if id, found := strings.CutPrefix(kv, "com.docker.swarm.task.id="); found {
 			if n, known := slotByTask[id]; known {
 				slot = strconv.Itoa(n)
