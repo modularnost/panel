@@ -134,7 +134,7 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 		if err := in.Body.confirm(entry); err != nil {
 			return nil, err
 		}
-		_, _, network, err := s.prepareCatalogStack(ctx, entry)
+		_, _, network, _, _, err := s.prepareCatalogStack(ctx, entry)
 		if err != nil {
 			return nil, err
 		}

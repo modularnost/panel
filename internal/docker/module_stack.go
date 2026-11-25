@@ -18,15 +18,17 @@ import (
 )
 
 type catalogCompose struct {
-	Version  string                    `yaml:"version,omitempty"`
-	Services map[string]catalogService `yaml:"services"`
+	Version  string                         `yaml:"version,omitempty"`
+	Services map[string]catalogService      `yaml:"services"`
+	Configs  map[string]catalogConfigSource `yaml:"configs,omitempty"`
 }
 
 type catalogService struct {
-	Image       string            `yaml:"image,omitempty"`
-	Command     any               `yaml:"command,omitempty"`
-	Entrypoint  any               `yaml:"entrypoint,omitempty"`
-	Environment map[string]string `yaml:"environment,omitempty"`
+	Configs     []catalogConfigMount `yaml:"configs,omitempty"`
+	Image       string               `yaml:"image,omitempty"`
+	Command     any                  `yaml:"command,omitempty"`
+	Entrypoint  any                  `yaml:"entrypoint,omitempty"`
+	Environment map[string]string    `yaml:"environment,omitempty"`
 	Healthcheck *struct {
 		Test        any    `yaml:"test,omitempty"`
 		Interval    string `yaml:"interval,omitempty"`
@@ -34,6 +36,18 @@ type catalogService struct {
 		StartPeriod string `yaml:"start_period,omitempty"`
 		Retries     int    `yaml:"retries,omitempty"`
 	} `yaml:"healthcheck,omitempty"`
+}
+
+type catalogConfigSource struct {
+	File string `yaml:"file"`
+}
+
+type catalogConfigMount struct {
+	Source string  `yaml:"source"`
+	Target string  `yaml:"target"`
+	UID    string  `yaml:"uid,omitempty"`
+	GID    string  `yaml:"gid,omitempty"`
+	Mode   *uint32 `yaml:"mode,omitempty"`
 }
 
 func catalogComposeFragment(data []byte) ([]byte, error) {
@@ -51,6 +65,18 @@ func catalogComposeFragment(data []byte) ([]byte, error) {
 			return nil, fmt.Errorf("invalid module service name %q", name)
 		}
 	}
+	for alias, config := range fragment.Configs {
+		if !ValidName(alias) || !bundlePath.MatchString(config.File) {
+			return nil, errors.New("catalog configs must use relative bundle file paths")
+		}
+	}
+	for _, service := range fragment.Services {
+		for _, ref := range service.Configs {
+			if !ValidName(ref.Source) || !validConfigTarget(ref.Target) {
+				return nil, errors.New("catalog config references require a source alias and an absolute target")
+			}
+		}
+	}
 	fragment.Version = "3.9"
 	return yaml.Marshal(fragment)
 }
@@ -58,6 +84,7 @@ func catalogComposeFragment(data []byte) ([]byte, error) {
 type CatalogStack struct {
 	Image, PanelNetwork, CoreURL string
 	Labels                       map[string]string
+	ConfigNames                  map[string]string
 }
 
 // RenderCatalogStack compiles the supported subset without resolving the panel's environment.
@@ -72,6 +99,10 @@ func RenderCatalogStack(ctx context.Context, bundle ModuleBundle, spec CatalogSt
 		content, err := catalogComposeFragment(bundle.Files[file])
 		if err != nil {
 			return "", 0, fmt.Errorf("module Compose file %q: %w", file, err)
+		}
+		content, err = externalCatalogConfigs(content, spec.ConfigNames)
+		if err != nil {
+			return "", 0, err
 		}
 		dest := filepath.Join(dir, fmt.Sprintf("%d.yml", i))
 		if err := os.WriteFile(dest, content, 0600); err != nil {
@@ -93,6 +124,7 @@ func RenderCatalogStack(ctx context.Context, bundle ModuleBundle, spec CatalogSt
 func protectCatalogStack(rendered []byte, spec CatalogStack) (string, int, error) {
 	var document struct {
 		Services map[string]map[string]any `yaml:"services"`
+		Configs  map[string]map[string]any `yaml:"configs"`
 	}
 	if err := yaml.Unmarshal(rendered, &document); err != nil {
 		return "", 0, err
@@ -119,10 +151,14 @@ func protectCatalogStack(rendered []byte, spec CatalogStack) (string, int, error
 	}
 	env["PANEL_CORE_URL"] = spec.CoreURL
 	primary["environment"] = env
-	out, err := yaml.Marshal(map[string]any{
+	protected := map[string]any{
 		"version": "3.9", "services": document.Services,
 		"networks": map[string]any{"panel": map[string]any{"external": true, "name": spec.PanelNetwork}},
-	})
+	}
+	if len(document.Configs) > 0 {
+		protected["configs"] = document.Configs
+	}
+	out, err := yaml.Marshal(protected)
 	return strings.ReplaceAll(string(out), "$", "$$"), len(document.Services), err
 }
 
