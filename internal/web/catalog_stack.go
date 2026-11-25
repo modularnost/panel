@@ -63,7 +63,7 @@ func (s *Server) prepareCatalogStack(ctx context.Context, entry modules.CatalogE
 	return compose, count, self.Network, nil
 }
 
-func (s *Server) installCatalogStack(ctx context.Context, entry modules.CatalogEntry) (string, error) {
+func (s *Server) installCatalogStack(ctx context.Context, entry modules.CatalogEntry, secrets map[string]catalogSecretInput) (_ string, err error) {
 	compose, count, _, err := s.prepareCatalogStack(ctx, entry)
 	if err != nil {
 		return "", err
@@ -88,6 +88,17 @@ func (s *Server) installCatalogStack(ctx context.Context, entry modules.CatalogE
 	}
 	if slices.Contains(networks, name+"_default") {
 		return "", problem(http.StatusConflict, "module_unavailable", "An overlay network with this stack name already exists")
+	}
+	compose, created, err := s.bindCatalogSecrets(ctx, compose, secrets)
+	defer func() {
+		if err != nil && len(created) != 0 {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			s.removeCatalogSecrets(cleanup, name, created)
+		}
+	}()
+	if err != nil {
+		return "", err
 	}
 	// Remove only this new stack if deployment stops before readiness.
 	rollback := func(cause error) (string, error) {

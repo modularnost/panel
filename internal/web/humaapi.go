@@ -229,6 +229,7 @@ func (s *Server) registerAPI(mux *http.ServeMux) huma.API {
 	s.registerFirewall(api)
 	s.registerUsers(api)
 	s.registerServiceActions(api)
+	s.registerSecrets(api)
 	s.registerStackActions(api)
 	s.registerNetworks(api, viewer)
 	s.registerManage(api)
