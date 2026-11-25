@@ -55,7 +55,7 @@ func (s *Server) managedRegistryInputs(ctx context.Context, id string, in Manage
 	if id != "builder" || entry.Install.Kind != modules.CatalogSwarmStack {
 		return entry, docker.ManagedRegistry{}, problem(http.StatusUnprocessableEntity, "registry_unavailable", "Managed registry provisioning requires an approved Builder stack")
 	}
-	if err := in.CatalogInstall.confirm(entry); err != nil {
+	if err := in.confirm(entry); err != nil {
 		return entry, docker.ManagedRegistry{}, err
 	}
 	if s.RegistryEncryption == nil {
