@@ -28,10 +28,14 @@ func init() {
 	})
 }
 
-type DB struct{ *sql.DB }
+type DB struct {
+	*sql.DB
+	backupDSN string
+}
 
 func Open(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	dsn := path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -41,13 +45,31 @@ func Open(path string) (*DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	return &DB{db}, nil
+	d := &DB{DB: db}
+	file, err := d.Path()
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	if file != "" {
+		d.backupDSN = dsn
+	}
+	return d, nil
 }
 
 // Backup writes a consistent copy of the database to dest, which must not
 // exist yet. Migrations only go forward, so this is the way back.
 func (d *DB) Backup(dest string) error {
-	_, err := d.Exec("VACUUM INTO ?", dest)
+	source := d.DB
+	if d.backupDSN != "" {
+		var err error
+		source, err = sql.Open("sqlite", d.backupDSN)
+		if err != nil {
+			return err
+		}
+		defer source.Close()
+	}
+	_, err := source.Exec("VACUUM INTO ?", dest)
 	return err
 }
 
@@ -135,9 +157,16 @@ func (d *DB) CreateWebhook(w Webhook) (Webhook, error) {
 	return w, nil
 }
 
-func (d *DB) DeleteWebhook(id int64) error {
-	_, err := d.Exec(`DELETE FROM webhooks WHERE id=?`, id)
-	return err
+func (d *DB) DeleteWebhook(id int64) (bool, error) {
+	return deleted(d.Exec(`DELETE FROM webhooks WHERE id=?`, id))
+}
+
+func deleted(result sql.Result, err error) (bool, error) {
+	if err != nil {
+		return false, err
+	}
+	count, err := result.RowsAffected()
+	return count > 0, err
 }
 
 const webhookCols = `id, service_name, stack_name, action_type, created_at, last_triggered_at`
@@ -332,6 +361,23 @@ func (d *DB) Stack(name string) (Stack, bool) {
 	err := d.QueryRow(`SELECT name, compose, environment, updated_by, updated_at, registry_host FROM stacks WHERE name=?`,
 		name).Scan(&s.Name, &s.Compose, &s.Environment, &s.UpdatedBy, &s.UpdatedAt, &s.RegistryHost)
 	return s, err == nil
+}
+
+func (d *DB) StackNames(ctx context.Context) (map[string]bool, error) {
+	rows, err := d.QueryContext(ctx, `SELECT name FROM stacks`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	names := make(map[string]bool)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names[name] = true
+	}
+	return names, rows.Err()
 }
 
 func (d *DB) DeleteStack(name string) error {

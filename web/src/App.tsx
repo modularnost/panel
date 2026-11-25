@@ -1,9 +1,9 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call, retryableQueryError } from "./api/client";
 import { RefreshWarning } from "./components/RefreshWarning";
-import { modulePath } from "./modules";
+import { modulePath, useModules } from "./modules";
 import { atLeast, useMe } from "./auth";
 import { usePanelVersion, useUpdates } from "./updates";
 import { Deploys } from "./pages/Deploys";
@@ -38,12 +38,7 @@ function Shell() {
   const me = useMe();
   const queryClient = useQueryClient();
   const location = useLocation();
-  const modules = useQuery({
-    queryKey: ["modules"],
-    queryFn: () => call(api.listModules()),
-    refetchInterval: 10_000,
-    enabled: me.isSuccess,
-  });
+  const modules = useModules(me.isSuccess, true);
 
   const isAdmin = atLeast(me.data?.role, "admin");
   const updates = useUpdates(isAdmin);

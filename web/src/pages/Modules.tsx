@@ -47,7 +47,6 @@ export function InstalledModules() {
   const modules = useQuery({
     queryKey: ["modules"],
     queryFn: () => call(api.listModules()),
-    refetchInterval: 3000,
   });
   const uninstall = useMutation({
     mutationFn: (name: string) => call(api.uninstallModule(name)),

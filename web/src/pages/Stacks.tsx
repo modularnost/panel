@@ -24,7 +24,7 @@ export function Stacks() {
     queryKey: ["stacks"],
     queryFn: () => call(api.listStacks()),
     select: sort.rows,
-    refetchInterval: 3000,
+    refetchInterval: ({ state: { data } }) => data?.some((row) => row.running < row.desired) ? 3000 : 10_000,
   });
 
   if (stacks.isPending) return <p>Loading…</p>;
@@ -95,7 +95,7 @@ function ExpandedStack({ name }: { name: string }) {
   const stack = useQuery({
     queryKey: ["stack", name],
     queryFn: () => call(api.getStack(name)),
-    refetchInterval: 3000,
+    refetchInterval: ({ state: { data } }) => data && data.running < data.desired ? 3000 : 10_000,
   });
   if (stack.isPending) return <p role="status">Loading services…</p>;
   if (stack.isError && (stack.data === undefined || !retryableQueryError(stack.error))) {

@@ -190,8 +190,11 @@ func TestWebhookAndDeployRoundtrip(t *testing.T) {
 		t.Fatalf("deploys: %v %+v", err, events)
 	}
 
-	if err := db.DeleteWebhook(w.ID); err != nil {
-		t.Fatal(err)
+	if found, err := db.DeleteWebhook(w.ID); err != nil || !found {
+		t.Fatalf("delete webhook = %t, %v", found, err)
+	}
+	if found, err := db.DeleteWebhook(w.ID); err != nil || found {
+		t.Fatalf("delete missing webhook = %t, %v", found, err)
 	}
 	if hooks, _ := db.Webhooks(); len(hooks) != 0 {
 		t.Fatalf("not deleted: %+v", hooks)
@@ -326,9 +329,24 @@ func TestBackupIsAReadableCopy(t *testing.T) {
 		t.Fatalf("path %q: %v", path, err)
 	}
 	copyPath := dir + "/copy.db"
-	if err := db.Backup(copyPath); err != nil {
+	conn, err := db.Conn(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer conn.Close()
+	result := make(chan error, 1)
+	go func() { result <- db.Backup(copyPath) }()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		conn.Close()
+		<-result
+		t.Fatal("backup waited for the panel database connection")
+	}
+	conn.Close()
 	cp, err := Open(copyPath)
 	if err != nil {
 		t.Fatal(err)
