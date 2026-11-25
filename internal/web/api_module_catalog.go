@@ -143,12 +143,12 @@ func (s *Server) registerModuleCatalog(api huma.API) {
 		if err := in.Body.confirm(entry); err != nil {
 			return nil, err
 		}
-		_, _, network, err := s.prepareCatalogStack(ctx, entry, nil, false)
+		plan, err := s.prepareCatalogStack(ctx, entry, nil, false)
 		if err != nil {
 			return nil, err
 		}
 		out := &catalogPreflightOutput{}
-		out.Body.PanelNetwork = network
+		out.Body.PanelNetwork = plan.network
 		return out, nil
 	})
 	huma.Register(api, huma.Operation{

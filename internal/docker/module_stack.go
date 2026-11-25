@@ -18,16 +18,18 @@ import (
 )
 
 type catalogCompose struct {
-	Version  string                    `yaml:"version,omitempty"`
-	Services map[string]catalogService `yaml:"services"`
-	Volumes  map[string]struct{}       `yaml:"volumes,omitempty"`
+	Version  string                         `yaml:"version,omitempty"`
+	Services map[string]catalogService      `yaml:"services"`
+	Configs  map[string]catalogConfigSource `yaml:"configs,omitempty"`
+	Volumes  map[string]struct{}            `yaml:"volumes,omitempty"`
 	Secrets  map[string]struct {
 		External bool `yaml:"external"`
 	} `yaml:"secrets,omitempty"`
 }
 
 type catalogService struct {
-	Secrets     []catalogSecretMount `yaml:"secrets,omitempty"`
+	Configs     []catalogFileMount   `yaml:"configs,omitempty"`
+	Secrets     []catalogFileMount   `yaml:"secrets,omitempty"`
 	Volumes     []catalogVolumeMount `yaml:"volumes,omitempty"`
 	Image       string               `yaml:"image,omitempty"`
 	Command     any                  `yaml:"command,omitempty"`
@@ -42,7 +44,11 @@ type catalogService struct {
 	} `yaml:"healthcheck,omitempty"`
 }
 
-type catalogSecretMount struct {
+type catalogConfigSource struct {
+	File string `yaml:"file"`
+}
+
+type catalogFileMount struct {
 	Source string  `yaml:"source"`
 	Target string  `yaml:"target"`
 	UID    string  `yaml:"uid,omitempty"`
@@ -77,12 +83,22 @@ func catalogComposeFragment(data []byte) ([]byte, error) {
 			return nil, errors.New("catalog secret aliases must be declared external")
 		}
 	}
+	for alias, config := range fragment.Configs {
+		if !ValidName(alias) || !bundlePath.MatchString(config.File) {
+			return nil, errors.New("catalog configs must use relative bundle file paths")
+		}
+	}
 	for alias := range fragment.Volumes {
 		if !ValidName(alias) {
 			return nil, errors.New("invalid catalog volume alias")
 		}
 	}
 	for _, service := range fragment.Services {
+		for _, ref := range service.Configs {
+			if !ValidName(ref.Source) || !validAttachmentTarget(ref.Target, true) {
+				return nil, errors.New("catalog config references require a source alias and an absolute target")
+			}
+		}
 		for _, ref := range service.Secrets {
 			if !ValidName(ref.Source) || !validAttachmentTarget(ref.Target, false) {
 				return nil, errors.New("catalog secret references require a source alias and a target filename")
@@ -102,6 +118,7 @@ type CatalogStack struct {
 	Image, PanelNetwork, CoreURL string
 	Labels                       map[string]string
 	Volumes                      map[string]CatalogVolume
+	ConfigNames                  map[string]string
 }
 
 // RenderCatalogStack compiles the supported subset without resolving the panel's environment.
@@ -118,6 +135,10 @@ func RenderCatalogStack(ctx context.Context, bundle ModuleBundle, spec CatalogSt
 			return "", 0, fmt.Errorf("module Compose file %q: %w", file, err)
 		}
 		content, err = externalCatalogVolumes(content, spec.Volumes)
+		if err != nil {
+			return "", 0, err
+		}
+		content, err = externalCatalogConfigs(content, spec.ConfigNames)
 		if err != nil {
 			return "", 0, err
 		}
@@ -141,6 +162,7 @@ func RenderCatalogStack(ctx context.Context, bundle ModuleBundle, spec CatalogSt
 func protectCatalogStack(rendered []byte, spec CatalogStack) (string, int, error) {
 	var document struct {
 		Services map[string]map[string]any `yaml:"services"`
+		Configs  map[string]map[string]any `yaml:"configs"`
 		Secrets  map[string]map[string]any `yaml:"secrets"`
 		Volumes  map[string]map[string]any `yaml:"volumes"`
 	}
@@ -183,6 +205,9 @@ func protectCatalogStack(rendered []byte, spec CatalogStack) (string, int, error
 	}
 	if len(document.Volumes) > 0 {
 		protected["volumes"] = document.Volumes
+	}
+	if len(document.Configs) > 0 {
+		protected["configs"] = document.Configs
 	}
 	out, err := yaml.Marshal(protected)
 	return strings.ReplaceAll(string(out), "$", "$$"), len(document.Services), err
