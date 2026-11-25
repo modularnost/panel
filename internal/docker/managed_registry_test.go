@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/moby/moby/api/pkg/authconfig"
@@ -78,7 +79,7 @@ func TestRegistryProbePullsAnonymouslyFirst(t *testing.T) {
 		{"insecure", "", "insecure_registry", 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			pulls := 0
+			var pulls atomic.Int32
 			daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case r.URL.Path == "/_ping":
@@ -90,12 +91,12 @@ func TestRegistryProbePullsAnonymouslyFirst(t *testing.T) {
 						_, _ = io.WriteString(w, `{"RegistryConfig":{}}`)
 					}
 				case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/images/create"):
-					pulls++
+					attempt := pulls.Add(1)
 					auth := r.Header.Get("X-Registry-Auth")
-					if r.URL.Query().Get("fromImage") != host+"/probe" || r.URL.Query().Get("tag") != digest || pulls == 1 && auth != "" || pulls == 2 && auth != "encoded" {
-						t.Errorf("unexpected pull query or credentials, attempt %d", pulls)
+					if r.URL.Query().Get("fromImage") != host+"/probe" || r.URL.Query().Get("tag") != digest || attempt == 1 && auth != "" || attempt == 2 && auth != "encoded" {
+						t.Errorf("unexpected pull query or credentials, attempt %d", attempt)
 					}
-					if pulls == 1 && tt.failure != "" {
+					if attempt == 1 && tt.failure != "" {
 						_, _ = io.WriteString(w, `{"errorDetail":{"message":"`+tt.failure+`"}}`)
 					} else {
 						_, _ = io.WriteString(w, `{"status":"complete"}`)
@@ -113,8 +114,8 @@ func TestRegistryProbePullsAnonymouslyFirst(t *testing.T) {
 			}
 			defer c.Close()
 			result, err := c.RegistryProbe(t.Context(), host, image, "encoded")
-			if err != nil || result != tt.result || pulls != tt.pulls {
-				t.Fatalf("result=%q err=%v pulls=%d, want %q and %d pulls", result, err, pulls, tt.result, tt.pulls)
+			if count := int(pulls.Load()); err != nil || result != tt.result || count != tt.pulls {
+				t.Fatalf("result=%q err=%v pulls=%d, want %q and %d pulls", result, err, count, tt.result, tt.pulls)
 			}
 		})
 	}
