@@ -4,11 +4,14 @@ import { Link } from "react-router";
 import { api, call } from "../../api/client";
 import { atLeast, useMe } from "../../auth";
 import { Button } from "../../components/Button";
+import { Chip } from "../../components/Chip";
 import { Dialog } from "../../components/Dialog";
 import { Select } from "../../components/Select";
 import { Table } from "../../components/Table";
 import { networksKey, useNetworks } from "../Networks";
 import { useService } from "./Layout";
+
+type Draft = { version: string; add: string[]; remove: string[] };
 
 export function ServiceNetworks() {
   const { id } = useService();
@@ -18,78 +21,109 @@ export function ServiceNetworks() {
   const current = useQuery({ queryKey: key, queryFn: () => call(api.getServiceNetworks(id)) });
   const networks = useNetworks();
   const [selected, setSelected] = useState("");
-  const [draft, setDraft] = useState<{ version: string; add: string[]; remove: string[] }>();
+  const [draft, setDraft] = useState<Draft>();
   const [review, setReview] = useState<{ compose?: string }>();
   const state = current.data;
   const choices = networks.data?.filter((n) => n.scope === "swarm" && !n.protected && !n.config_only &&
     (!n.stack || n.stack === state?.stack) && !state?.attachments.some((a) => a.id === n.id) && !draft?.add.includes(n.id)) ?? [];
   const net = (networkID: string) => networks.data?.find((n) => n.id === networkID);
+  const nameOf = (networkID: string) => net(networkID)?.name ?? networkID;
   const canEdit = admin && (state?.source === "service" || state?.source === "compose");
+  const pending = draft ? draft.add.length + draft.remove.length : 0;
   const change = useMutation({
-    mutationFn: (preview: boolean) => call(api.changeServiceNetworks(id, { ...draft!, preview })),
-    onSuccess: async (result, preview) => {
+    mutationFn: ({ draft, preview }: { draft: Draft; preview: boolean }) => call(api.changeServiceNetworks(id, { ...draft, preview })),
+    onSuccess: async (result, { preview }) => {
       if (preview) {
         setReview(result);
-      } else {
-        setReview(undefined);
-        setDraft(undefined);
-        await Promise.all([client.invalidateQueries({ queryKey: key }), client.invalidateQueries({ queryKey: networksKey })]);
+        return;
       }
+      setReview(undefined);
+      setDraft(undefined);
+      setSelected("");
+      await Promise.all([client.invalidateQueries({ queryKey: key }), client.invalidateQueries({ queryKey: networksKey })]);
     },
   });
+
   function toggle(networkID: string, field: "add" | "remove") {
     if (!state) return;
     change.reset();
     setDraft((old) => {
       const next = old ?? { version: state.version, add: [], remove: [] };
-      return { ...next, [field]: next[field].includes(networkID) ? next[field].filter((id) => id !== networkID) : [...next[field], networkID] };
+      const ids = next[field];
+      const updated = { ...next, [field]: ids.includes(networkID) ? ids.filter((id) => id !== networkID) : [...ids, networkID] };
+      return updated.add.length + updated.remove.length ? updated : undefined;
     });
   }
+
   return (
     <>
       <h2>Networks</h2>
       {(current.isPending || networks.isPending) && <p>Loading…</p>}
       {(current.error || networks.error) && <p className="error" role="alert">{(current.error ?? networks.error)?.message}</p>}
-      {state?.source === "compose" && <p>Changes deploy the updated Compose file for <Link to={`/stacks/${encodeURIComponent(state.stack ?? "")}`}>{state.stack}</Link>.</p>}
       {state?.source === "external" && <p>Update the service’s <code>networks</code> in the source Compose file and redeploy <Link to={`/stacks/${encodeURIComponent(state.stack ?? "")}`}>{state.stack}</Link>. For a shared network, declare it with <code>external: true</code>.</p>}
       {state?.source === "system" && <p>The panel installer manages these connections.</p>}
       {state && networks.data && <>
         {state.attachments.length + (draft?.add.length ?? 0) > 0 ? (
           <Table scrollLabel="Service networks">
-            <thead><tr><th scope="col">Network</th><th scope="col">Aliases</th>{canEdit && <th scope="col">Change</th>}</tr></thead>
+            <thead><tr><th scope="col">Network</th><th scope="col">Aliases</th>{canEdit && <th scope="col">Actions</th>}</tr></thead>
             <tbody>
               {state.attachments.map((a) => {
                 const n = net(a.id);
                 const removing = draft?.remove.includes(a.id);
                 return <tr key={a.id}>
-                  <th scope="row">{n ? <Link to={`/networks/${n.id}`}>{n.name}</Link> : <span className="mono">{a.id}</span>}</th>
+                  <th scope="row">
+                    {n ? <Link to={`/networks/${n.id}`}>{n.name}</Link> : <span className="mono">{a.id}</span>}
+                    {removing && <> <Chip>Pending disconnection</Chip></>}
+                  </th>
                   <td>{a.automatic ? "Automatic" : a.aliases.join(", ") || "—"}</td>
-                  {canEdit && <td>{n && !n.protected && !a.automatic && <Button variant="text" onClick={() => toggle(a.id, "remove")}>{removing ? "Keep connected" : "Disconnect"}</Button>}{removing && <span className="muted"> Pending disconnect</span>}</td>}
+                  {canEdit && <td>{n && !n.protected && !a.automatic && (
+                    <Button variant="text" disabled={change.isPending} onClick={() => toggle(a.id, "remove")}>
+                      {removing ? "Undo" : "Disconnect…"}
+                    </Button>
+                  )}</td>}
                 </tr>;
               })}
-              {draft?.add.map((id) => <tr key={id}><th scope="row">{net(id)?.name ?? id}</th><td>—</td><td><Button variant="text" onClick={() => toggle(id, "add")}>Undo</Button><span className="muted"> Pending connection</span></td></tr>)}
+              {draft?.add.map((networkID) => <tr key={networkID}>
+                <th scope="row">{nameOf(networkID)} <Chip>Pending connection</Chip></th>
+                <td>—</td>
+                <td><Button variant="text" disabled={change.isPending} onClick={() => toggle(networkID, "add")}>Undo</Button></td>
+              </tr>)}
             </tbody>
           </Table>
-        ) : <p>No explicit network attachments.</p>}
-        {canEdit && <div className="toolbar">
-          <Select label="Available network" value={selected} onChange={setSelected} disabled={!choices.length}>
+        ) : <p>No explicit network connections.</p>}
+        {canEdit && (choices.length > 0 ? <div className="toolbar">
+          <Select label="Network to connect" value={selected} onChange={setSelected} disabled={change.isPending}>
             <option value="">Select a network</option>
             {choices.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
           </Select>
-          <Button disabled={!choices.some((n) => n.id === selected)} onClick={() => { toggle(selected, "add"); setSelected(""); }}>Connect network</Button>
-          <Button disabled={change.isPending || !draft || draft.add.length + draft.remove.length === 0} onClick={() => change.mutate(true)}>Review changes</Button>
-          {draft && <Button variant="text" onClick={() => { setDraft(undefined); change.reset(); void current.refetch(); }}>Discard changes</Button>}
+          <Button variant="outlined" disabled={change.isPending || !choices.some((n) => n.id === selected)}
+            onClick={() => { toggle(selected, "add"); setSelected(""); }}>
+            Add to changes
+          </Button>
+        </div> : <p className="muted">No other networks available.</p>)}
+        {canEdit && draft && <div className="banner toolbar service-network-changes">
+          <span role="status">{pending === 1 ? "1 pending change" : `${pending} pending changes`}</span>
+          <Button variant="text" disabled={change.isPending}
+            onClick={() => { setDraft(undefined); setSelected(""); change.reset(); void current.refetch(); }}>
+            Discard
+          </Button>
+          <Button disabled={change.isPending} onClick={() => change.mutate({ draft, preview: true })}>
+            {change.isPending && !review ? "Checking…" : "Apply changes"}
+          </Button>
         </div>}
       </>}
       {change.isError && !review && <p className="error" role="alert">{change.error.message}</p>}
-      {change.isSuccess && !draft && <p role="status">Network changes applied.</p>}
+      {change.isSuccess && !change.variables.preview && <p role="status">Network changes applied.</p>}
       {review && draft && <Dialog headline="Apply network changes?" onDismiss={() => { if (!change.isPending) setReview(undefined); }} actions={<>
-        <Button variant="text" disabled={change.isPending} onClick={() => setReview(undefined)}>Cancel</Button>
-        <Button disabled={change.isPending} onClick={() => change.mutate(false)}>Apply changes</Button>
+        <Button variant="text" autoFocus disabled={change.isPending} onClick={() => setReview(undefined)}>Cancel</Button>
+        <Button disabled={change.isPending} onClick={() => change.mutate({ draft, preview: false })}>
+          {change.isPending ? "Applying…" : "Apply changes"}
+        </Button>
       </>}>
+        {draft.add.length > 0 && <p><strong>Connect</strong> {draft.add.map(nameOf).join(", ")}</p>}
+        {draft.remove.length > 0 && <p><strong>Disconnect</strong> {draft.remove.map(nameOf).join(", ")}</p>}
+        {state?.source === "compose" && <p>This redeploys the <strong>{state.stack}</strong> stack with the updated Compose file.</p>}
         <p>Swarm may replace running tasks while the service changes networks.</p>
-        {draft.add.length > 0 && <p>Connect {draft.add.map((id) => net(id)?.name ?? id).join(", ")}</p>}
-        {draft.remove.length > 0 && <p>Disconnect {draft.remove.map((id) => net(id)?.name ?? id).join(", ")}</p>}
         {review.compose && <details><summary>Updated Compose file</summary><pre>{review.compose}</pre></details>}
         {change.isError && <p className="error" role="alert">{change.error.message}</p>}
       </Dialog>}

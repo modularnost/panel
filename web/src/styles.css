@@ -465,6 +465,14 @@ pre.notes {
   flex-wrap: wrap;
 }
 
+.service-network-changes {
+  align-items: center;
+}
+
+.service-network-changes > span {
+  margin-inline-end: auto;
+}
+
 .network-heading {
   justify-content: space-between;
 }
