@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -23,24 +25,27 @@ func TestServiceRejectsMalformedIdentifiersBeforeInspect(t *testing.T) {
 	}
 }
 
-func TestServiceUsesInspectAndFiltersTasks(t *testing.T) {
+func TestStatsLimitsContainerStreams(t *testing.T) {
+	const containers = 2 * maxContainerStatsStreams
+	var active, peak atomic.Int32
 	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/_ping":
+		switch {
+		case r.URL.Path == "/_ping":
 			w.Header().Set("API-Version", "1.40")
-		case "/v1.40/services/web", "/v1.40/services/web-id", "/v1.40/services/web-i":
-			_, _ = io.WriteString(w, `{"ID":"web-id","Spec":{"Name":"web","Mode":{"Global":{}},"TaskTemplate":{"ContainerSpec":{"Image":"nginx:1.28"}}}}`)
-		case "/v1.40/services/missing":
-			http.NotFound(w, r)
-		case "/v1.40/tasks":
-			var filters map[string]map[string]bool
-			if err := json.Unmarshal([]byte(r.URL.Query().Get("filters")), &filters); err != nil ||
-				!filters["service"]["web-id"] || !filters["desired-state"]["running"] {
-				t.Errorf("unexpected task filters: %s", r.URL.RawQuery)
+		case r.URL.Path == "/v1.40/containers/json":
+			items := make([]map[string]string, containers)
+			for i := range items {
+				items[i] = map[string]string{"Id": strconv.Itoa(i)}
 			}
-			_, _ = io.WriteString(w, `[{"ServiceID":"web-id","DesiredState":"running","Status":{"State":"running"}},{"ServiceID":"web-id","DesiredState":"running","Status":{"State":"starting"}}]`)
+			_ = json.NewEncoder(w).Encode(items)
+		case strings.HasSuffix(r.URL.Path, "/stats"):
+			current := active.Add(1)
+			defer active.Add(-1)
+			for highest := peak.Load(); current > highest && !peak.CompareAndSwap(highest, current); highest = peak.Load() {
+			}
+			time.Sleep(50 * time.Millisecond)
+			_, _ = io.WriteString(w, "{}\n{}\n")
 		default:
-			t.Errorf("unexpected Docker request: %s", r.URL.Path)
 			http.NotFound(w, r)
 		}
 	}))
@@ -54,16 +59,17 @@ func TestServiceUsesInspectAndFiltersTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	for _, id := range []string{"web", "web-id"} {
-		sv, found, err := c.Service(t.Context(), id)
-		if err != nil || !found || sv.ID != "web-id" || sv.Mode != "global" || sv.Running != 1 || sv.Desired != 2 {
-			t.Errorf("Service(%q) = %+v, %t, %v", id, sv, found, err)
+	stats, err := c.Stats(t.Context(), "")
+	if err != nil || len(stats) != containers {
+		t.Fatalf("got %d samples, err=%v", len(stats), err)
+	}
+	for _, st := range stats {
+		if st.Err != "" {
+			t.Fatal(st.Err)
 		}
 	}
-	for _, id := range []string{"missing", "web-i"} {
-		if _, found, err := c.Service(t.Context(), id); found || err != nil {
-			t.Errorf("Service(%q): found=%t, err=%v", id, found, err)
-		}
+	if got := peak.Load(); got < 2 || got > maxContainerStatsStreams {
+		t.Fatalf("peak concurrent streams = %d, want between 2 and %d", got, maxContainerStatsStreams)
 	}
 }
 

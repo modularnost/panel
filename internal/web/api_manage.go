@@ -77,19 +77,12 @@ func (s *Server) registerManage(api huma.API) {
 	}, func(_ context.Context, in *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
-		hooks, err := s.DB.Webhooks()
+		found, err := s.DB.DeleteWebhook(in.ID)
 		if err != nil {
 			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
-		found := false
-		for _, h := range hooks {
-			found = found || h.ID == in.ID
-		}
 		if !found {
 			return nil, problem(http.StatusNotFound, "not_found", "no such webhook")
-		}
-		if err := s.DB.DeleteWebhook(in.ID); err != nil {
-			return nil, backendProblem(http.StatusInternalServerError, "internal", err)
 		}
 		return nil, nil
 	})

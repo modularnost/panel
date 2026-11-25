@@ -27,7 +27,7 @@ export function Stack() {
   const stack = useQuery({
     queryKey: ["stack", name],
     queryFn: () => call(api.getStack(name)),
-    refetchInterval: 3000,
+    refetchInterval: ({ state: { data } }) => data && data.running < data.desired ? 3000 : 10_000,
   });
 
   const refresh = () => {

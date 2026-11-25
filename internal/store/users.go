@@ -136,6 +136,12 @@ func (d *DB) Users() ([]User, error) {
 	return out, rows.Err()
 }
 
+func (d *DB) UserByID(id int64) (User, bool) {
+	var u User
+	err := d.QueryRow(`SELECT id, username, role FROM users WHERE id=?`, id).Scan(&u.ID, &u.Username, &u.Role)
+	return u, err == nil
+}
+
 func (d *DB) CountUsers() (int, error) {
 	var n int
 	return n, d.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
@@ -268,9 +274,8 @@ func (d *DB) RevokeSessions(userID int64) error {
 	return err
 }
 
-func (d *DB) DeleteToken(id int64) error {
-	_, err := d.Exec(`DELETE FROM api_tokens WHERE id=?`, id)
-	return err
+func (d *DB) DeleteNamedToken(id int64) (bool, error) {
+	return deleted(d.Exec(`DELETE FROM api_tokens WHERE id=? AND name != ''`, id))
 }
 
 func (d *DB) DeleteTokenByValue(token string) error {
