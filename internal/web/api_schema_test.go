@@ -113,6 +113,11 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"CatalogVolumeSelection":      catalogVolumeSelection{},
 		"ServiceVolumeInputBody":      serviceVolumeInput{}.Body,
 
+		"Config":           docker.Config{},
+		"ConfigAttachment": docker.ConfigAttachment{},
+		"ConfigValue":      configValue{},
+		"ConfigDetail":     configDetail{},
+
 		"UserCreate":            apiUserCreate{},
 		"UserPatch":             apiUserPatch{},
 		"TokenCreate":           apiTokenCreate{},

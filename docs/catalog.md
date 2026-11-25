@@ -165,3 +165,21 @@ Subsequent installs reuse the recorded node and volume name. If a recorded
 node is unavailable or its volume is missing, installation stops. Volumes
 survive uninstall and failed installation and can be deleted explicitly once
 unused.
+
+## Swarm Configs
+
+Administrators can list configs at `GET /api/v1/configs`, inspect a config at
+`GET /api/v1/configs/{id}`, and create an immutable version with
+`POST /api/v1/configs`. Creation accepts a name and base64-encoded `data`.
+Inspecting a config returns its contents and consumer services.
+
+Use `PUT /api/v1/services/{id}/configs` with an absolute container `target`
+and the `resource` name or ID. Set the same target to a new version to swap
+the config. Omit `resource` to detach it. Use `DELETE /api/v1/configs/{id}`
+after all consumers have detached.
+
+A catalog bundle can declare `configs: {caddy: {file: assets/Caddyfile}}`
+and use `configs: [{source: caddy, target: /etc/caddy/Caddyfile}]` on a
+service. Paths are relative to the root of the approved bundle. The panel
+creates a version from that file and passes only its reference to Compose.
+On an unsuccessful install it removes unused configs created by the attempt.
