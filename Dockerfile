@@ -28,7 +28,8 @@ FROM alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34
 # The CLI is what implements `docker stack deploy`: compose is a client-side
 # format the daemon API knows nothing about. iptables is for the node firewall
 # (ADR 9), which only ever runs as the same binary with the host's network.
-RUN apk add --no-cache docker-cli iptables ip6tables
+RUN apk upgrade --no-cache \
+    && apk add --no-cache docker-cli iptables ip6tables
 COPY --from=build /panel /healthcheck /
 ENV PANEL_DB=/data/modularnost.db
 VOLUME /data
