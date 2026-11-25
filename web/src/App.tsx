@@ -95,7 +95,7 @@ function Shell() {
           Stacks
         </NavLink>
         <NavLink to="/networks" className="item">
-          <Icon name="hub" />
+          <Icon name="lan" />
           Networks
         </NavLink>
         <NavLink to="/resources" className="item">
