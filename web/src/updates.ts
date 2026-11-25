@@ -20,6 +20,17 @@ export function useUpdates(enabled: boolean, watch = false) {
   });
 }
 
+export const backupCommand = [
+  'docker volume inspect panel_panel-data >/dev/null &&',
+  'backup_dir=$(mktemp -d "$PWD/panel-backup.XXXXXXXX") &&',
+  'docker run --rm \\',
+  '  --mount type=volume,source=panel_panel-data,target=/data,readonly \\',
+  '  --mount "type=bind,source=$backup_dir,target=/backup" \\',
+  "  alpine:3.22 sh -ec 'apk add --no-cache sqlite >/dev/null",
+  '    sqlite3 -batch -bail -readonly /data/modularnost.db ".backup /backup/modularnost.db"\' &&',
+  'printf "Backup saved to %s/modularnost.db\\n" "$backup_dir"',
+].join("\n");
+
 // installCommand is the manual update: the installer takes the image tag, which
 // is the release tag without the "v".
 export function installCommand(tag: string): string {

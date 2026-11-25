@@ -148,10 +148,16 @@ the stack is named anything other than `panel`.
 On a cluster with multiple managers, pin the panel to the manager that holds
 its SQLite volume. To update a stack managed outside the panel, change the
 image tag for the panel and agents in that stack's Compose and redeploy it.
-Back up the database volume first. The panel's **Updates** page changes the
+Back up the database volume first. **Settings → Updates** changes the
 running services and can rewrite the installer-managed Compose when
 `PANEL_STACK_FILE` is mounted. It cannot rewrite the Compose stored in
 Portainer.
+
+Expand a version under **Release notes** to read its formatted changelog.
+Expand **Manual update** for a SQLite backup command and the installer command.
+Run the backup on the node that holds the database volume. Keep the backup
+directory outside that volume. If a migration ran, restoring the old image
+also requires restoring the pre-update database.
 
 When upgrading across a change to the internal token format, redeploy the
 whole panel stack on the same version, including the agents and firewall.
