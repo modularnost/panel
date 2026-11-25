@@ -23,9 +23,8 @@ declared by the bundle. The preflight response reports the panel's overlay
 network.
 
 The catalog stack entry point is a service named `module` listening on port
-`8080`. The panel assigns
-the approved catalog image to that service, joins it to the panel overlay, and
-waits for all services and the module manifest. Sidecar images use SHA-256
+`8080`. The panel assigns the approved catalog image to that service, joins it
+to the panel overlay, and waits for all services and the module manifest. Sidecar images use SHA-256
 digests. Supported service settings are `image`, `command`, `entrypoint`,
 `environment` with literal values, and `healthcheck`.
 

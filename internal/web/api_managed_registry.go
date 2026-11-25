@@ -19,10 +19,9 @@ import (
 	"modularnost/internal/store"
 )
 
-type CatalogInstall = apiCatalogInstall
-
 type ManagedRegistryPlan struct {
-	CatalogInstall
+	Version        string `json:"version" minLength:"1"`
+	Revision       string `json:"revision" pattern:"^[a-f0-9]{64}$"`
 	Endpoint       string `json:"endpoint" minLength:"1" maxLength:"255"`
 	BuildNetwork   string `json:"build_network" minLength:"1" maxLength:"63"`
 	PullNetwork    string `json:"pull_network" minLength:"1" maxLength:"63"`
@@ -55,7 +54,8 @@ func (s *Server) managedRegistryInputs(ctx context.Context, id string, in Manage
 	if id != "builder" || entry.Install.Kind != modules.CatalogSwarmStack {
 		return entry, docker.ManagedRegistry{}, problem(http.StatusUnprocessableEntity, "registry_unavailable", "Managed registry provisioning requires an approved Builder stack")
 	}
-	if err := in.confirm(entry); err != nil {
+	confirmation := apiCatalogInstall{Version: in.Version, Revision: in.Revision}
+	if err := confirmation.confirm(entry); err != nil {
 		return entry, docker.ManagedRegistry{}, err
 	}
 	if s.RegistryEncryption == nil {

@@ -485,11 +485,11 @@
           }
         },
         "required": [
+          "version",
+          "revision",
           "endpoint",
           "build_network",
-          "pull_network",
-          "version",
-          "revision"
+          "pull_network"
         ],
         "type": "object"
       },
@@ -547,11 +547,11 @@
           "probe_image",
           "username",
           "token",
+          "version",
+          "revision",
           "endpoint",
           "build_network",
-          "pull_network",
-          "version",
-          "revision"
+          "pull_network"
         ],
         "type": "object"
       },
