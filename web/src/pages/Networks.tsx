@@ -120,10 +120,11 @@ export function NetworkDetail() {
       {detail.isPending && <p>Loading…</p>}
       {detail.isError && <p className="error" role="alert">{detail.error.message}</p>}
       {n && <>
-        <h1>{n.name}</h1>
-        <p>{n.driver} · {nodeName || "Swarm"}{n.protected && <> <Chip>System</Chip></>}</p>
+        <h1>{n.name}{n.protected && <> <Chip>System</Chip></>}</h1>
         {n.stack && <p>Stack <Link to={`/stacks/${encodeURIComponent(n.stack)}`}>{n.stack}</Link></p>}
         <dl className="facts">
+          <dt>Driver</dt><dd>{n.driver}</dd>
+          <dt>Location</dt><dd>{nodeName || "Swarm"}</dd>
           <dt>Network ID</dt><dd className="mono">{n.id}</dd>
           <dt>Subnets</dt><dd>{n.subnets.map((s) => <div key={s.subnet}>{s.subnet}{s.gateway && ` · Gateway ${s.gateway}`}</div>)}{!n.subnets.length && "—"}</dd>
           <dt>Internal</dt><dd>{n.internal ? "Yes" : "No"}</dd>
