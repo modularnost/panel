@@ -24,7 +24,7 @@
     "gen:api": "swagger-typescript-api generate --path ../api/openapi.json --output src/api --name generated.ts --unwrap-response-data --enum-style union --silent",
     "dev": "bun run gen:api && vite",
     "typecheck": "bun run gen:api && tsc --noEmit",
-    "build": "bun run gen:api && tsc --noEmit && vite build",
+    "build": "bun run gen:api && tsc --noEmit && vite build && bun gzip-assets.mjs",
     "test": "vitest run"
   }
 }

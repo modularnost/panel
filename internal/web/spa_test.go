@@ -52,6 +52,30 @@ func TestSPAHandlerWithoutABuild(t *testing.T) {
 	}
 }
 
+func TestSPAAssetEncodingNegotiation(t *testing.T) {
+	h := spaHandler(fstest.MapFS{
+		"assets/app.js":    {Data: []byte("plain")},
+		"assets/app.js.gz": {Data: []byte("compressed")},
+	})
+	for _, tc := range []struct {
+		accept, wantEncoding, wantBody string
+	}{
+		{"br, gzip", "gzip", "compressed"},
+		{"*;q=0.5, gzip;q=0", "", "plain"},
+		{"br", "", "plain"},
+		{"*;q=0.5", "gzip", "compressed"},
+	} {
+		req := httptest.NewRequest("GET", "/assets/app.js", nil)
+		req.Header.Set("Accept-Encoding", tc.accept)
+		rec := httptest.NewRecorder()
+		h(rec, req)
+		if rec.Code != 200 || rec.Header().Get("Content-Encoding") != tc.wantEncoding || rec.Body.String() != tc.wantBody ||
+			rec.Header().Get("Vary") != "Accept-Encoding" || !strings.Contains(rec.Header().Get("Content-Type"), "javascript") {
+			t.Errorf("Accept-Encoding %q: %d %v %q", tc.accept, rec.Code, rec.Header(), rec.Body)
+		}
+	}
+}
+
 func TestLegacyAppPathsRedirectToTheRoot(t *testing.T) {
 	h := (&Server{}).Routes()
 	for in, want := range map[string]string{
