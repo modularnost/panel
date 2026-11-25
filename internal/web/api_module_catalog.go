@@ -122,6 +122,7 @@ func (in apiCatalogInstall) confirm(entry modules.CatalogEntry) error {
 
 func (s *Server) registerModuleCatalog(api huma.API) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
+	s.registerManagedRegistry(api, admin)
 	huma.Register(api, huma.Operation{
 		OperationID: "get-module-catalog", Method: http.MethodGet, Path: "/api/v1/module-catalog",
 		Summary: "Curated modules and catalog freshness", Middlewares: admin, Security: signedIn,

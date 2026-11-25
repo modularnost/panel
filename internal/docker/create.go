@@ -119,6 +119,10 @@ func (c *Client) CreateService(ctx context.Context, n NewService) (string, error
 // DeployStack runs `docker stack deploy`: compose is a client-side format the
 // daemon API does not know, so the image ships the CLI.
 func (c *Client) DeployStack(ctx context.Context, name, compose string, values map[string]string, auth *registry.AuthConfig) (string, error) {
+	return c.deployStack(ctx, name, compose, values, auth, true)
+}
+
+func (c *Client) deployStack(ctx context.Context, name, compose string, values map[string]string, auth *registry.AuthConfig, prune bool) (string, error) {
 	if !ValidName(name) {
 		return "", fmt.Errorf("stack name %q: letters, digits, dot, dash and underscore only", name)
 	}
@@ -131,8 +135,10 @@ func (c *Client) DeployStack(ctx context.Context, name, compose string, values m
 	}
 	args := []string{"stack", "deploy",
 		"--compose-file", "-", // read the file from stdin, nothing hits the disk
-		"--prune", // services dropped from the file leave the cluster
 		"--detach=true"}
+	if prune {
+		args = append(args, "--prune")
+	}
 	var env []string
 	if auth != nil {
 		dir, err := os.MkdirTemp("", "panel-registry-")

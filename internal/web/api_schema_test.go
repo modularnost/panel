@@ -100,6 +100,8 @@ func TestSchemasMatchResponseTypes(t *testing.T) {
 		"CatalogInstall":             apiCatalogInstall{},
 		"ModuleCatalogOutputBody":    moduleCatalogOutput{}.Body,
 		"CatalogPreflightOutputBody": catalogPreflightOutput{}.Body,
+		"ManagedRegistryPlan":        ManagedRegistryPlan{},
+		"ManagedRegistryVerifyBody":  managedRegistryVerifyBody{},
 
 		"Secret":                      docker.Secret{},
 		"SecretAttachment":            docker.SecretAttachment{},

@@ -22,12 +22,43 @@ from the approved image digest, and checks any registry credential requirement
 declared by the bundle. The preflight response reports the panel's overlay
 network.
 
-Stack installation currently supports stateless Compose services. The entry
-point is a service named `module` listening on port `8080`. The panel assigns
-the approved catalog image to that service, joins it to the panel overlay, and
-waits for all services and the module manifest. Sidecar images use SHA-256
+The catalog stack entry point is a service named `module` listening on port
+`8080`. The panel assigns the approved catalog image to that service, joins it
+to the panel overlay, and waits for all services and the module manifest. Sidecar images use SHA-256
 digests. Supported service settings are `image`, `command`, `entrypoint`,
 `environment` with literal values, and `healthcheck`.
+
+## Builder registry
+
+An administrator can provision the registry and its pull proxy for an approved
+Builder stack before deploying Builder. Configure encrypted registry credentials
+on the panel. Create an internal Swarm overlay for build traffic and a separate
+private overlay for the pull route. Supply the Builder bundle's external TLS
+and bcrypt-user secrets using the
+[Builder installation guide](https://github.com/modularnost/builder_module/blob/main/docs/install.md).
+The panel installs the bundled mTLS registry and the TLS pull proxy. Both stay
+on the original manager, and the registry uses the named volume
+`modularnost-builder-registry_data`.
+
+Use `PUT /api/v1/module-catalog/builder/registry` with the catalog `version` and
+`revision`, the exact pull `endpoint` (host with optional port), and the
+`build_network` and `pull_network` names. For Traefik's Swarm provider, supply
+the private `pull_entrypoint` and the panel configures an SNI route with TLS
+passthrough. With an external router, configure TCP passthrough to
+`builder-registry-pull:443` on the pull network. Set up private DNS to reach the
+chosen router. The registry and proxy publish no host ports. Install the pull
+CA for the exact endpoint on each eligible Docker daemon if its certificate
+uses a private CA.
+
+Seed a small, prebuilt image through the internal mTLS registry. Use
+`POST /api/v1/module-catalog/builder/registry/verify` with the same fields plus
+the `worker` node ID, the digest-pinned `probe_image` on that endpoint, and
+`username` and `token`. Choose a clean active worker with a panel agent for the
+first check. Repeat the check on eligible workers to confirm their routing and
+trust. The worker must see an authentication failure without a credential and
+success with it. Only then does the panel save the encrypted pull credential
+for the exact endpoint. Retry provisioning with the original inputs after a
+failed attempt. A retry preserves existing services and registry data.
 
 ## Bundled examples
 

@@ -452,6 +452,109 @@
         ],
         "type": "object"
       },
+      "ManagedRegistryPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "build_network": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "endpoint": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pull_entrypoint": {
+            "description": "Traefik Swarm private TCP entry point; omit for an external passthrough router",
+            "maxLength": 63,
+            "type": "string"
+          },
+          "pull_network": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "revision",
+          "endpoint",
+          "build_network",
+          "pull_network"
+        ],
+        "type": "object"
+      },
+      "ManagedRegistryVerifyBody": {
+        "additionalProperties": false,
+        "properties": {
+          "build_network": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "endpoint": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "probe_image": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pull_entrypoint": {
+            "description": "Traefik Swarm private TCP entry point; omit for an external passthrough router",
+            "maxLength": 63,
+            "type": "string"
+          },
+          "pull_network": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "username": {
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "worker": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "worker",
+          "probe_image",
+          "username",
+          "token",
+          "version",
+          "revision",
+          "endpoint",
+          "build_network",
+          "pull_network"
+        ],
+        "type": "object"
+      },
       "Module": {
         "additionalProperties": false,
         "properties": {
@@ -2767,6 +2870,106 @@
           }
         ],
         "summary": "Verify module stack prerequisites and read the approved deployment bundle"
+      }
+    },
+    "/api/v1/module-catalog/{id}/registry": {
+      "put": {
+        "operationId": "provision-module-registry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManagedRegistryPlan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Provision the registry and private pull proxy from the approved Builder bundle"
+      }
+    },
+    "/api/v1/module-catalog/{id}/registry/verify": {
+      "post": {
+        "operationId": "verify-module-registry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManagedRegistryVerifyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify a worker pull and save credentials for the exact endpoint"
       }
     },
     "/api/v1/modules": {
