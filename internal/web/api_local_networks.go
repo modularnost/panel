@@ -80,13 +80,20 @@ func (s *Server) registerLocalNetworks(api huma.API, viewer, admin huma.Middlewa
 	huma.Register(api, huma.Operation{OperationID: "create-node-network", Method: http.MethodPost, Path: "/api/v1/network-nodes/{node}/networks", DefaultStatus: http.StatusCreated, Summary: "Create a local network on a node", Middlewares: admin, Security: signedIn}, func(ctx context.Context, in *struct {
 		Node string `path:"node" pattern:"^[a-z0-9]+$"`
 		Body docker.NewLocalNetwork
-	}) (*networkCreated, error) { out := &networkCreated{}; result := &agent.NetworkCreated{}; err := s.withNetworkNode(ctx, in.Node, func() error {
-		var err error
-		result.ID, err = s.Docker.CreateLocalNetwork(ctx, in.Body)
-		return err
-	}, http.MethodPost, "/networks", in.Body, result); if err != nil {
-		return nil, networkProblem(err)
-	}; out.Body.ID = result.ID; return out, nil })
+	}) (*networkCreated, error) {
+		out := &networkCreated{}
+		result := &agent.NetworkCreated{}
+		err := s.withNetworkNode(ctx, in.Node, func() error {
+			var err error
+			result.ID, err = s.Docker.CreateLocalNetwork(ctx, in.Body)
+			return err
+		}, http.MethodPost, "/networks", in.Body, result)
+		if err != nil {
+			return nil, networkProblem(err)
+		}
+		out.Body.ID = result.ID
+		return out, nil
+	})
 	huma.Register(api, huma.Operation{OperationID: "remove-node-network", Method: http.MethodDelete, Path: "/api/v1/network-nodes/{node}/networks/{id}", Summary: "Remove an unused local network on a node", Middlewares: admin, Security: signedIn}, func(ctx context.Context, in *nodeNetworkPath) (*struct{}, error) {
 		err := s.withNetworkNode(ctx, in.Node, func() error { return s.Docker.RemoveLocalNetwork(ctx, in.ID) }, http.MethodDelete, "/networks/"+in.ID, nil, nil)
 		if err != nil {
