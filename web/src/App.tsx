@@ -29,6 +29,7 @@ const NetworkDetail = lazy(() => import("./pages/Networks").then((page) => ({ de
 const NetworkNew = lazy(() => import("./pages/Networks").then((page) => ({ default: page.NetworkNew })));
 const Volumes = lazy(() => import("./pages/Volumes").then((page) => ({ default: page.Volumes })));
 const VolumeDetail = lazy(() => import("./pages/Volumes").then((page) => ({ default: page.VolumeDetail })));
+const Secrets = lazy(() => import("./pages/Secrets").then((page) => ({ default: page.Secrets })));
 const ServiceNetworks = lazy(() => import("./pages/service/Networks").then((page) => ({ default: page.ServiceNetworks })));
 const ServiceVolumes = lazy(() => import("./pages/service/Volumes").then((page) => ({ default: page.ServiceVolumes })));
 const Nodes = lazy(() => import("./pages/Nodes").then((page) => ({ default: page.Nodes })));
@@ -105,6 +106,12 @@ function Shell() {
           <Icon name="hard_drive" />
           Volumes
         </NavLink>
+        {isAdmin && (
+          <NavLink to="/secrets" className="item">
+            <Icon name="lock" />
+            Secrets
+          </NavLink>
+        )}
         <NavLink to="/resources" className="item">
           <Icon name="monitoring" />
           Resources
@@ -204,6 +211,7 @@ export function App() {
           <Route path="networks/node/:node/:id" element={<NetworkDetail />} />
           <Route path="volumes" element={<Volumes />} />
           <Route path="volumes/:node/:name" element={<VolumeDetail />} />
+          <Route path="secrets/:id?" element={<Secrets />} />
           <Route path="nodes" element={<Nodes />} />
           <Route path="ports" element={<Ports />} />
           <Route path="webhooks" element={<Webhooks />} />

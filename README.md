@@ -305,6 +305,9 @@ at the registry when removing access.
   labels; Traefik picks them up on its own.
 - **Webhooks** — `POST /hook/<secret>` from CI.
 - **Deploy history** — the one thing Swarm itself doesn't keep.
+- **Secrets** — admins can create secrets, inspect service attachments, and
+  preview rotation for standalone services. Edit the Compose file to change
+  a stack's secret references.
 - **Resources** — current CPU and memory of every replica, cluster-wide and per
   service. Current numbers only: history, graphs and alerts belong in Grafana or
   in a module.
