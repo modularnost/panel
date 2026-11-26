@@ -532,6 +532,15 @@ pre {
   border-radius: var(--md-sys-shape-extra-small);
 }
 
+.config-content {
+  max-block-size: 24rem;
+  overflow: auto;
+  padding: 16px;
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-extra-small);
+}
+
 /* Scrollable tabs: on a narrow screen the row scrolls instead of wrapping. */
 .tabs {
   display: flex;

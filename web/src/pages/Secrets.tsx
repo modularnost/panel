@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { ApiError, api, call } from "../api/client";
-import type { Secret, SecretAttachment, Service } from "../api/generated";
+import type { Secret, SecretAttachment } from "../api/generated";
 import { atLeast, useMe } from "../auth";
 import { ActivityTime } from "../components/ActivityTime";
 import { Button } from "../components/Button";
@@ -11,17 +11,12 @@ import { useDialogs } from "../components/Dialogs";
 import { Select } from "../components/Select";
 import { Table } from "../components/Table";
 import { TextField } from "../components/TextField";
+import { isStandaloneService, resourceJSONBytes, resourceMaxBytes, resourceNamePattern } from "../swarmResources";
 
 const secretQuery = { queryKey: ["secrets"], queryFn: () => call(api.listSecrets()) } as const;
 const serviceQuery = { queryKey: ["services"], queryFn: () => call(api.listServices()) } as const;
-const filename = "[A-Za-z0-9][A-Za-z0-9_.\\-]{0,62}";
-const maxBytes = 500 * 1024;
 const secretPath = (id: string) => "/secrets/" + encodeURIComponent(id);
 const attachmentKey = (ref: SecretAttachment) => JSON.stringify([ref.service, ref.target]);
-
-export function isStandaloneService(service?: Pick<Service, "stack">): boolean {
-  return !!service && !service.stack;
-}
 
 function containerPath(target: string): string {
   if (!target) return "—";
@@ -30,15 +25,7 @@ function containerPath(target: string): string {
 
 export function secretTarget(target: string): string | undefined {
   const name = target.replace(/^\/run\/secrets\//, "");
-  return new RegExp(`^${filename}$`).test(name) ? name : undefined;
-}
-
-export function encodeSecret(bytes: Uint8Array): string {
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
-  }
-  return btoa(binary);
+  return new RegExp(`^${resourceNamePattern}$`).test(name) ? name : undefined;
 }
 
 export function Secrets() {
@@ -113,7 +100,7 @@ function CreateSecret({ onClose, onCreated }: { onClose: () => void; onCreated: 
     text.value = "";
     upload.value = "";
     const size = file?.size ?? value.length;
-    if ((value.length > 0 && file) || size === 0 || size > maxBytes) {
+    if ((value.length > 0 && file) || size === 0 || size > resourceMaxBytes) {
       setError("Enter a value or choose a file, up to 500 KiB.");
       return;
     }
@@ -121,8 +108,7 @@ function CreateSecret({ onClose, onCreated }: { onClose: () => void; onCreated: 
     setError("");
     try {
       const bytes = file ? new Uint8Array(await file.arrayBuffer()) : value;
-      // The generator maps format: byte to Blob, but the JSON wire value is base64.
-      const result = await call(api.createSecret({ name: name.trim(), data: encodeSecret(bytes) as unknown as Blob }));
+      const result = await call(api.createSecret({ name: name.trim(), data: resourceJSONBytes(bytes) }));
       await onCreated(result.id);
     } catch (error) {
       setError(error instanceof ApiError && error.status === 409
@@ -139,7 +125,7 @@ function CreateSecret({ onClose, onCreated }: { onClose: () => void; onCreated: 
       <Button form={formID} disabled={pending}>{pending ? "Creating…" : "Create secret"}</Button>
     </>}>
       <form id={formID} className="form" autoComplete="off" onSubmit={create}>
-        <TextField label="Name" value={name} onChange={setName} pattern={filename} placeholder="api-key-v2" required autoFocus />
+        <TextField label="Name" value={name} onChange={setName} pattern={resourceNamePattern} placeholder="api-key-v2" required autoFocus />
         <label className="field" htmlFor={formID + "-value"}>
           Value
           <input id={formID + "-value"} name="value" type="password" autoComplete="new-password" />
@@ -317,7 +303,7 @@ function SecretDetail({ secret, secrets }: { secret: Secret; secrets: Secret[] }
             <option value="">Choose a service…</option>
             {standalone.map((svc) => <option key={svc.id} value={svc.name}>{svc.name}</option>)}
           </Select>
-          <TextField label="Target filename" value={target} onChange={setTarget} pattern={filename}
+          <TextField label="Target filename" value={target} onChange={setTarget} pattern={resourceNamePattern}
             supportingText="Mounted under /run/secrets. Swarm may restart service tasks." required disabled={pending} />
           {attachError && <p className="error" role="alert">{attachError}</p>}
         </form>

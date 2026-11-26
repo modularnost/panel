@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { encodeSecret, isStandaloneService, secretTarget } from "./Secrets";
+import { secretTarget } from "./Secrets";
+import { encodeResourceData, isStandaloneService } from "../swarmResources";
 
 describe("manual secret changes", () => {
   it("requires a known standalone service", () => {
@@ -22,10 +23,10 @@ describe("secretTarget", () => {
   });
 });
 
-describe("encodeSecret", () => {
+describe("encodeResourceData", () => {
   it("encodes UTF-8 bytes", () => {
     const bytes = new TextEncoder().encode("🔐");
-    expect(encodeSecret(bytes)).toBe("8J+UkA==");
+    expect(encodeResourceData(bytes)).toBe("8J+UkA==");
   });
 
   it("round-trips binary data across chunk boundaries", () => {
@@ -33,7 +34,7 @@ describe("encodeSecret", () => {
     for (let i = 0; i < bytes.length; i++) {
       bytes[i] = (i * 31 + 7) & 0xff;
     }
-    const decoded = Uint8Array.from(atob(encodeSecret(bytes)), (char) => char.charCodeAt(0));
+    const decoded = Uint8Array.from(atob(encodeResourceData(bytes)), (char) => char.charCodeAt(0));
     expect(decoded).toEqual(bytes);
   });
 });

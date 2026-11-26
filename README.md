@@ -308,6 +308,9 @@ at the registry when removing access.
 - **Secrets** — admins can create secrets, inspect service attachments, and
   preview rotation for standalone services. Edit the Compose file to change
   a stack's secret references.
+- **Configs** — admins can inspect and download config contents, create
+  replacement versions and update standalone service references. Update
+  Compose to change a stack's config references.
 - **Resources** — current CPU and memory of every replica, cluster-wide and per
   service. Current numbers only: history, graphs and alerts belong in Grafana or
   in a module.
