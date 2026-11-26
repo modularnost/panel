@@ -511,6 +511,27 @@ pre {
   align-self: flex-start;
 }
 
+.form .field {
+  display: grid;
+  gap: 6px;
+  min-inline-size: 0;
+  font: var(--md-sys-typescale-label-large);
+}
+
+.form .field input {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  font: inherit;
+}
+
+.form .field input[type="password"] {
+  padding: 12px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-extra-small);
+}
+
 /* Scrollable tabs: on a narrow screen the row scrolls instead of wrapping. */
 .tabs {
   display: flex;
