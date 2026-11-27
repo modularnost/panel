@@ -222,8 +222,16 @@ Content-Type: application/json
 It answers `204`. Every browser that has that page open asks for it again, at
 most once a second, and as its own viewer. No permission is needed, but the path
 must be a `ui` contribution of the module that is calling: anything else is
-`404`. An event says "ask again", not what changed. Nobody looking costs
-nothing, so report after every update.
+`404`. An event says "ask again", not what changed. The panel sends a first
+event after registering each browser connection, including reconnects.
+
+Modules that sample through `GET /internal/stats` can add `?page_interest=1`
+to that request. On success, the `X-Panel-Watched-Pages` response header gives
+a snapshot of the caller's subscribed paths as form-encoded `path` values
+(`path=%2F&path=%2Fservice`, for example), or `none` if nobody is subscribed.
+After storing the sample, report changes only for paths listed in the hint.
+If the header is absent or unrecognized, report as usual. A viewer that connects
+after the snapshot fetches the page on connect and receives later updates.
 
 ## Who is looking
 

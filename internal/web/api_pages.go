@@ -135,8 +135,12 @@ func (s *Server) registerPages(api huma.API, viewer huma.Middlewares) {
 		}
 		changed, stop := s.Pages.Subscribe(m.Name, p)
 		defer stop()
-		var last time.Time
+		// A sample may have changed before the stream registered.
 		for {
+			if send.Data(apiPageChanged{Path: p}) != nil {
+				return
+			}
+			last := time.Now()
 			select {
 			case <-ctx.Done():
 				return
@@ -148,10 +152,6 @@ func (s *Server) registerPages(api huma.API, viewer huma.Middlewares) {
 					return
 				case <-time.After(wait):
 				}
-			}
-			last = time.Now()
-			if send.Data(apiPageChanged{Path: p}) != nil {
-				return
 			}
 		}
 	})
