@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -56,12 +57,20 @@ func (s *Server) apiServices(w http.ResponseWriter, r *http.Request, _ modules.M
 	writeJSON(w, svcs)
 }
 
-func (s *Server) apiStats(w http.ResponseWriter, r *http.Request, _ modules.Module) {
+func (s *Server) apiStats(w http.ResponseWriter, r *http.Request, m modules.Module) {
 	// An optional ?service= narrows it to one service.
 	stats, err := s.Metrics.Stats(r.Context(), r.FormValue("service"))
 	if err != nil {
 		fail(w, err)
 		return
+	}
+	if r.FormValue("page_interest") == "1" {
+		hint := "none"
+		if paths := s.Pages.WatchedPaths(m.Name); len(paths) > 0 {
+			hint = url.Values{"path": paths}.Encode()
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Panel-Watched-Pages", hint)
 	}
 	writeJSON(w, stats)
 }

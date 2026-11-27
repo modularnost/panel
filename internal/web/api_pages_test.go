@@ -1,13 +1,18 @@
 package web
 
 import (
+	"bufio"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"modularnost/internal/agent"
+	"modularnost/internal/docker"
 	"modularnost/internal/modules"
 	"modularnost/internal/store"
 )
@@ -21,6 +26,92 @@ type uiFixture struct {
 	reg    *modules.Registry
 	seen   struct{ method, path, query, user, role, body string }
 	answer string
+}
+
+func TestModulePageStreamRefreshesOnConnectAndReconnect(t *testing.T) {
+	f := newUIFixture(t)
+	for range 2 {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.base+"/api/v1/modules/m/events?path=/", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := f.c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		scanner := bufio.NewScanner(resp.Body)
+		var event, data string
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "event:") {
+				event = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			}
+			if strings.HasPrefix(line, "data:") {
+				data = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+				break
+			}
+		}
+		if resp.StatusCode != http.StatusOK || event != "changed" || data != `{"path":"/"}` {
+			t.Fatalf("first SSE event: %d %q %q (%v)", resp.StatusCode, event, data, scanner.Err())
+		}
+		cancel()
+	}
+}
+
+func TestModuleStatsHintsOnlyItsWatchedPagesOnRequest(t *testing.T) {
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/_ping":
+			w.Header().Set("API-Version", "1.51")
+		case strings.HasSuffix(r.URL.Path, "/containers/json"):
+			_, _ = io.WriteString(w, `[]`)
+		case strings.HasSuffix(r.URL.Path, "/info"):
+			_, _ = io.WriteString(w, `{}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer daemon.Close()
+	t.Setenv("DOCKER_HOST", daemon.URL)
+	t.Setenv("DOCKER_API_VERSION", "")
+	t.Setenv("DOCKER_TLS_VERIFY", "")
+	t.Setenv("DOCKER_CERT_PATH", "")
+	dk, err := docker.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dk.Close()
+	reg := modules.NewRegistry(nil, "secret")
+	reg.Pin(modules.Module{Name: "m", Manifest: modules.Manifest{Permissions: []string{"stats:read"}}})
+	s := &Server{Modules: reg, Metrics: agent.NewCollector("", "", "", dk)}
+	handler := s.Routes()
+	_, stopOther := s.Pages.Subscribe("other", "/other")
+	defer stopOther()
+	assertHint := func(query, token string, status int, hint, cache string) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/internal/stats"+query, nil)
+		req.Header.Set("X-Panel-Module", "m")
+		req.Header.Set("X-Panel-Token", token)
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != status || res.Header().Get("X-Panel-Watched-Pages") != hint || res.Header().Get("Cache-Control") != cache {
+			t.Fatalf("stats %s: got %d %v %s", query, res.Code, res.Header(), res.Body)
+		}
+	}
+	token := reg.Token("m")
+	assertHint("?page_interest=1", "", http.StatusUnauthorized, "", "")
+	assertHint("?page_interest=1", token, http.StatusOK, "none", "no-store")
+	_, stop := s.Pages.Subscribe("m", "/service")
+	defer stop()
+	_, stopRoot := s.Pages.Subscribe("m", "/")
+	defer stopRoot()
+	assertHint("", token, http.StatusOK, "", "")
+	assertHint("?page_interest=1", token, http.StatusOK, "path=%2F&path=%2Fservice", "no-store")
+	stop()
+	assertHint("?page_interest=1", token, http.StatusOK, "path=%2F", "no-store")
 }
 
 func newUIFixture(t *testing.T) *uiFixture {

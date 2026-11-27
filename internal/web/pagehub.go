@@ -1,6 +1,9 @@
 package web
 
-import "sync"
+import (
+	"slices"
+	"sync"
+)
 
 type pageKey struct{ module, path string }
 
@@ -47,4 +50,17 @@ func (h *PageHub) Notify(module, path string) {
 		default:
 		}
 	}
+}
+
+func (h *PageHub) WatchedPaths(module string) []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var paths []string
+	for key := range h.subs {
+		if key.module == module {
+			paths = append(paths, key.path)
+		}
+	}
+	slices.Sort(paths)
+	return paths
 }
