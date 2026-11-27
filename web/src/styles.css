@@ -60,7 +60,7 @@ body {
 
 .app {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 232px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -76,8 +76,7 @@ body {
   gap: 2px;
 }
 
-.bar,
-.scrim {
+.bar {
   display: none;
 }
 
@@ -95,7 +94,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 56px;
+  min-height: 56px;
   padding: 0 16px;
   border-radius: var(--md-sys-shape-full);
   color: var(--md-sys-color-on-surface-variant);
@@ -107,15 +106,50 @@ body {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 
-.item.active {
+.item[aria-current="page"] {
   background: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
+  font-weight: 650;
 }
 
-.item.sub {
-  height: 40px;
-  padding-left: 32px;
-  gap: 12px;
+.side-nav, .group-links {
+  display: grid;
+  gap: 2px;
+}
+
+.group-trigger, .service-more > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+:is(.group-trigger, .service-more > summary)::-webkit-details-marker {
+  display: none;
+}
+
+.group-chevron {
+  display: inline-flex;
+  margin-inline-start: auto;
+}
+
+.side-group[open] > summary .group-chevron {
+  rotate: 90deg;
+}
+
+.side-group[data-active]:not([open]) > summary {
+  box-shadow: inset 3px 0 var(--md-sys-color-primary);
+}
+
+.group-links {
+  margin: 2px 0 6px 25px;
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.group-links .item {
+  min-height: 48px;
+  padding: 5px 10px;
+  gap: 8px;
+  overflow-wrap: anywhere;
 }
 
 .who {
@@ -316,6 +350,8 @@ pre {
 
 .btn:focus-visible,
 .item:focus-visible,
+.service-more > summary:focus-visible,
+.dashboard-total:focus-visible,
 .tab-item:focus-visible {
   outline: 3px solid var(--md-sys-color-secondary);
   outline-offset: 2px;
@@ -723,6 +759,193 @@ pre {
   border-bottom-color: var(--md-sys-color-primary);
 }
 
+.service-tabs {
+  overflow: visible;
+  align-items: center;
+}
+
+.service-tabs > .tab-item {
+  position: relative;
+  justify-content: center;
+  min-block-size: 48px;
+  border: 0;
+}
+
+.service-tabs > [aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 16px 0;
+  block-size: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--md-sys-color-primary);
+}
+
+.service-more {
+  position: relative;
+  min-inline-size: 0;
+  max-inline-size: 15rem;
+  margin-inline-start: 8px;
+}
+
+.service-more > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-block-size: 48px;
+  min-inline-size: 48px;
+  padding-inline: 12px;
+  border-radius: var(--md-sys-shape-full);
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-large);
+}
+
+.service-more > summary:hover,
+.service-more[open] > summary {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.service-more > summary.active {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.service-more > summary > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-more > summary > svg {
+  rotate: 90deg;
+}
+
+.service-more[open] > summary > svg {
+  rotate: -90deg;
+}
+
+.service-more-links {
+  position: absolute;
+  z-index: 2;
+  inset: calc(100% + 4px) 0 auto auto;
+  inline-size: min(16rem, calc(100vw - 24px));
+  max-block-size: min(19rem, 45vh);
+  overflow: auto;
+  padding: 5px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: var(--md-sys-shape-extra-small);
+  box-shadow: 0 5px 24px #0003;
+}
+
+.service-more-links > .tab-item {
+  display: flex;
+  min-block-size: 48px;
+  line-height: 20px;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: var(--md-sys-shape-small);
+  overflow-wrap: anywhere;
+}
+
+.service-more-links > [aria-current="page"] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-weight: 650;
+}
+
+@media (max-width: 520px) {
+  .service-more { margin-inline-start: auto; }
+  .service-tabs > .tab-item, .service-more > summary { padding-inline: 9px; }
+  .service-tabs > [aria-current="page"]::after { inset-inline: 9px; }
+  .service-tabs > .tab-item > .icon { display: none; }
+}
+
+.dashboard {
+  max-inline-size: 75rem;
+}
+
+.dashboard-totals, .dashboard-panels {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-totals {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  margin-block-end: 22px;
+}
+
+.dashboard-panels {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  align-items: start;
+}
+
+.dashboard-total, .dashboard-panel {
+  padding: 16px;
+  border-radius: var(--md-sys-shape-medium);
+  min-inline-size: 0;
+}
+
+.dashboard-total {
+  display: grid;
+  gap: 8px;
+  color: var(--md-sys-color-on-surface);
+  background: var(--md-sys-color-surface-container-highest);
+  text-decoration: none;
+}
+
+.dashboard-panel { border: 1px solid var(--md-sys-color-outline-variant); }
+.dashboard-total:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container-highest));
+}
+.dashboard-total > span { display: flex; align-items: center; gap: 8px; }
+.dashboard-total strong { font: var(--md-sys-typescale-headline-medium); }
+.dashboard-total small { font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-on-surface-variant); }
+.dashboard-problem { color: var(--md-sys-color-error); }
+
+.dashboard-panel-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dashboard-panel h2 { margin: 0; }
+.dashboard-panel p:last-child { margin-block-end: 0; }
+
+.dashboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.dashboard-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-block: 10px;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-list > li + li { border-block-start: 1px solid var(--md-sys-color-outline-variant); }
+.dashboard-list > li:last-child { padding-block-end: 0; }
+
+@media (max-width: 520px) {
+  .dashboard-totals { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
+  .dashboard-total, .dashboard-panel { padding: 14px; }
+}
+
+@media (max-width: 440px) {
+  .dashboard-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-total:last-child {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
 .login {
   max-width: 360px;
   margin: 15vh auto 0;
@@ -733,6 +956,29 @@ pre {
   flex-direction: column;
   gap: 16px;
 }
+
+.side-dialog {
+  inset: 0 auto 0 0;
+  margin: 0;
+  inline-size: min(360px, calc(100vw - 40px));
+  max-inline-size: none;
+  block-size: 100%;
+  max-block-size: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0 var(--md-sys-shape-large) var(--md-sys-shape-large) 0;
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+}
+
+.side-dialog::backdrop {
+  background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent);
+}
+
+.side-dialog .side { position: static; height: 100%; }
+.side-heading { display: flex; align-items: center; justify-content: space-between; }
+.side-heading > .btn.icon, .bar > .btn.icon { min-inline-size: 48px; min-block-size: 48px; }
+body:has(.side-dialog[open]) { overflow: hidden; }
 
 @media (max-width: 840px) {
   .app {
@@ -756,42 +1002,7 @@ pre {
     padding: 0;
   }
 
-  /* Closed, the drawer is hidden as well as moved, so Tab does not reach it. */
-  .side {
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 30;
-    width: min(280px, 85vw);
-    height: auto;
-    border-radius: 0 var(--md-sys-shape-large) var(--md-sys-shape-large) 0;
-    transform: translateX(-100%);
-    visibility: hidden;
-    transition:
-      transform 250ms ease,
-      visibility 0s 250ms;
-  }
-
-  .side.open {
-    transform: none;
-    visibility: visible;
-    transition: transform 250ms ease;
-  }
-
-  .scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-    display: block;
-    background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 250ms;
-  }
-
-  .scrim.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
+  .desktop-side { display: none; }
 
   .main {
     padding: 16px 12px;

@@ -1,11 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useState } from "react";
-import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { ApiError, api, call, retryableQueryError } from "./api/client";
 import { RefreshWarning } from "./components/RefreshWarning";
-import { modulePath, useModules } from "./modules";
+import { useModules } from "./modules";
 import { atLeast, useMe } from "./auth";
 import { usePanelVersion, useUpdates } from "./updates";
+import { Dashboard } from "./pages/Dashboard";
 import { Deploys } from "./pages/Deploys";
 import { Login } from "./pages/Login";
 import { ModuleInstall } from "./pages/ModuleInstall";
@@ -19,8 +20,7 @@ import { ServiceWebhooks } from "./pages/service/Webhooks";
 import { Services } from "./pages/Services";
 import { Button } from "./components/Button";
 import { DialogsProvider } from "./components/Dialogs";
-import { Chip } from "./components/Chip";
-import { Icon } from "./components/Icon";
+import { SidebarNav } from "./components/SidebarNav";
 
 const ModulePage = lazy(() => import("./pages/ModulePage").then((page) => ({ default: page.ModulePage })));
 const ModuleCatalog = lazy(() => import("./pages/ModuleCatalog").then((page) => ({ default: page.ModuleCatalog })));
@@ -55,18 +55,19 @@ function Shell() {
   const pending = updates.data?.releases.length ?? 0;
   const version = usePanelVersion();
   const [drawer, setDrawer] = useState(false);
+  const mobileNav = useRef<HTMLDialogElement>(null);
 
-  useEffect(() => setDrawer(false), [location.pathname]);
+  useEffect(() => mobileNav.current?.close(), [location.pathname]);
   useEffect(() => {
-    if (!drawer) return;
-    const close = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [drawer]);
+    const compact = window.matchMedia("(max-width: 840px)");
+    const resize = () => { if (!compact.matches) mobileNav.current?.close(); };
+    compact.addEventListener("change", resize);
+    return () => compact.removeEventListener("change", resize);
+  }, []);
 
   if (me.isPending) return null;
   if (me.error instanceof ApiError && me.error.status === 401) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/login" state={{ from: location.pathname + location.search + location.hash }} replace />;
   }
   if (me.isError && (me.data === undefined || !retryableQueryError(me.error))) {
     return <p className="error">{me.error.message}</p>;
@@ -78,104 +79,49 @@ function Shell() {
     window.location.assign("/login");
   };
 
+  const sidebar = (
+    <>
+      <SidebarNav role={me.data.role} modules={modules.data} pendingUpdates={pending} />
+      <div className="who">
+        {me.data.username} · {me.data.role}
+        <Button variant="text" onClick={logout}>Sign out</Button>
+        {version.data && <div className="mono">{version.data}</div>}
+      </div>
+    </>
+  );
+
   return (
     <div className="app">
       <header className="bar">
-        <Button variant="icon" aria-label="Menu" aria-expanded={drawer} onClick={() => setDrawer(true)}>
+        <Button variant="icon" aria-label="Menu" aria-controls="mobile-nav" aria-expanded={drawer} onClick={() => {
+          mobileNav.current?.showModal();
+          setDrawer(true);
+        }}>
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
             <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="currentColor" />
           </svg>
         </Button>
         <span className="brand">modularnost</span>
       </header>
-      <div className={`scrim${drawer ? " open" : ""}`} onClick={() => setDrawer(false)} />
-      <aside className={`side${drawer ? " open" : ""}`}>
+      <aside className="side desktop-side">
         <span className="brand">modularnost</span>
-        <NavLink to="/" end className="item">
-          <Icon name="dns" />
-          Services
-        </NavLink>
-        <NavLink to="/stacks" className="item">
-          <Icon name="layers" />
-          Stacks
-        </NavLink>
-        <NavLink to="/networks" className="item">
-          <Icon name="lan" />
-          Networks
-        </NavLink>
-        <NavLink to="/volumes" className="item">
-          <Icon name="hard_drive" />
-          Volumes
-        </NavLink>
-        {isAdmin && (
-          <>
-            <NavLink to="/secrets" className="item">
-              <Icon name="lock" />
-              Secrets
-            </NavLink>
-            <NavLink to="/configs" className="item">
-              <Icon name="description" />
-              Configs
-            </NavLink>
-          </>
-        )}
-        <NavLink to="/resources" className="item">
-          <Icon name="monitoring" />
-          Resources
-        </NavLink>
-        <NavLink to="/deploys" className="item">
-          <Icon name="rocket_launch" />
-          Deploys
-        </NavLink>
-        <NavLink to="/modules" end className="item">
-          <Icon name="extension" />
-          Modules
-        </NavLink>
-        {atLeast(me.data?.role, "admin") && (
-          <>
-            <NavLink to="/nodes" className="item">
-              <Icon name="hub" />
-              Nodes
-            </NavLink>
-            <NavLink to="/ports" className="item">
-              <Icon name="dns" />
-              Ports
-            </NavLink>
-            <NavLink to="/webhooks" className="item">
-              <Icon name="webhook" />
-              Webhooks
-            </NavLink>
-            <NavLink to="/users" className="item">
-              <Icon name="group" />
-              Users
-            </NavLink>
-          </>
-        )}
-        <NavLink to="/settings" className="item">
-          <Icon name="settings" />
-          Settings{pending > 0 && <Chip tone="ok"> {pending}</Chip>}
-        </NavLink>
-        {modules.data
-          ?.filter((m) => m.ok)
-          .flatMap((m) =>
-            m.contributions
-              .filter((c) => c.slot === "nav" && atLeast(me.data?.role, c.role))
-              .map((c) => ({ key: `${m.name}${c.path}`, title: c.title, to: modulePath(m.name, c.path) })),
-          )
-          .map((e) => (
-            <NavLink key={e.key} to={e.to} className="item sub">
-              <Icon name="extension" size={20} />
-              {e.title}
-            </NavLink>
-          ))}
-        <div className="who">
-          {me.data.username} · {me.data.role}
-          <Button variant="text" onClick={logout}>
-            Sign out
-          </Button>
-          {version.data && <div className="mono">{version.data}</div>}
-        </div>
+        {sidebar}
       </aside>
+      <dialog className="side-dialog" id="mobile-nav" aria-label="Navigation" ref={mobileNav} onClose={() => setDrawer(false)} onClick={(e) => {
+        if (e.target === e.currentTarget || (e.target instanceof Element && e.target.closest("a"))) e.currentTarget.close();
+      }}>
+        <div className="side">
+          <div className="side-heading">
+            <span className="brand">modularnost</span>
+            <Button variant="icon" aria-label="Close navigation" onClick={() => mobileNav.current?.close()}>
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                <path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" strokeWidth="2" />
+              </svg>
+            </Button>
+          </div>
+          {sidebar}
+        </div>
+      </dialog>
       <main className="main">
         <RefreshWarning error={me.error} />
         <Suspense fallback={<p role="status">Loading…</p>}>
@@ -192,7 +138,8 @@ export function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route element={<Shell />}>
-          <Route index element={<Services />} />
+          <Route index element={<Dashboard />} />
+          <Route path="services" element={<Services />} />
           <Route path="services/:id" element={<ServiceLayout />}>
             <Route index element={<Overview />} />
             <Route path="logs" element={<Logs />} />

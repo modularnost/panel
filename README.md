@@ -290,6 +290,8 @@ at the registry when removing access.
 
 ## What it does
 
+- **Overview** — the first page after sign-in shows replica counts, services
+  below their replica targets, and recent deployments.
 - **Services** — stacks, replicas, image and digest. Read live from the Docker
   API and never mirrored into the database, so the UI can't lie about the
   cluster. Each service has its own page: overview, logs, deploy history,
