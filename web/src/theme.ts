@@ -8,7 +8,9 @@ import {
 } from "@material/material-color-utilities";
 
 export const DEFAULT_SEED = "#040b4d";
+export type ThemeMode = "system" | "light" | "dark";
 const SEED_KEY = "panel.seed";
+const THEME_KEY = "panel.theme";
 
 // The roles of the M3 color system, as --md-sys-color-<name> custom properties:
 // the names @material/web components read as well.
@@ -59,15 +61,28 @@ function declarations(seed: string, dark: boolean): string {
     .join("");
 }
 
-// themeCss is the light scheme on :root and the dark one when the system asks for it.
-export function themeCss(seed: string): string {
+// themeCss is the light scheme on :root and the dark one when the system asks for it,
+// unless overridden by an explicit light or dark mode.
+export function themeCss(seed: string, mode: ThemeMode = "system"): string {
+  if (mode === "light") return `:root{color-scheme:light;${declarations(seed, false)}}`;
+  if (mode === "dark") return `:root{color-scheme:dark;${declarations(seed, true)}}`;
   return (
-    `:root{${declarations(seed, false)}}` +
+    `:root{color-scheme:light dark;${declarations(seed, false)}}` +
     `@media (prefers-color-scheme: dark){:root{${declarations(seed, true)}}}`
   );
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
+
+export function storedTheme(): ThemeMode {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    if (t === "light" || t === "dark" || t === "system") return t;
+  } catch {
+    // storage can be blocked; system default is fine
+  }
+  return "system";
+}
 
 export function storedSeed(): string {
   try {
@@ -79,16 +94,27 @@ export function storedSeed(): string {
   return DEFAULT_SEED;
 }
 
-// applyTheme paints the whole interface from one seed color; calling it again
-// with another seed repaints without a reload.
-export function applyTheme(seed: string = storedSeed()): void {
+// applyTheme paints the whole interface from one seed color and mode; calling it again
+// repaints without a reload.
+export function applyTheme(seed: string = storedSeed(), mode: ThemeMode = storedTheme()): void {
+  if (mode === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = mode;
   let el = document.getElementById("m3-theme");
   if (!el) {
     el = document.createElement("style");
     el.id = "m3-theme";
     document.head.append(el);
   }
-  el.textContent = themeCss(HEX.test(seed) ? seed : DEFAULT_SEED);
+  el.textContent = themeCss(HEX.test(seed) ? seed : DEFAULT_SEED, mode);
+}
+
+export function setTheme(mode: ThemeMode): void {
+  try {
+    localStorage.setItem(THEME_KEY, mode);
+  } catch {
+    // applied for this page view only
+  }
+  applyTheme(storedSeed(), mode);
 }
 
 export function setSeed(seed: string): void {
@@ -98,5 +124,5 @@ export function setSeed(seed: string): void {
   } catch {
     // applied for this page view only
   }
-  applyTheme(seed);
+  applyTheme(seed, storedTheme());
 }

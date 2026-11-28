@@ -80,6 +80,7 @@ type joinOutput struct{ Body apiJoin }
 
 func (s *Server) registerCluster(api huma.API, viewer huma.Middlewares) {
 	admin := huma.Middlewares{s.humaAuth(api, store.RoleAdmin)}
+	s.registerNodeUsage(api, viewer)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "list-stats", Method: http.MethodGet, Path: "/api/v1/stats",

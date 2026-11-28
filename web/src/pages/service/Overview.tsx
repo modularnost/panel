@@ -34,7 +34,7 @@ export function Overview() {
     mutationFn: () => call(api.deleteService(s.id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
-      navigate("/", { replace: true });
+      navigate("/services", { replace: true });
     },
   });
 

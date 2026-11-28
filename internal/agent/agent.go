@@ -42,6 +42,9 @@ func Routes(secret, node string, dk *docker.Client) http.Handler {
 	registerNetworkRoutes(mux, dk, auth)
 	registerVolumeRoutes(mux, dk, auth)
 	registerRegistryProbeRoute(mux, dk, secret, auth)
+	mux.HandleFunc("GET /host-usage", auth(func(w http.ResponseWriter, r *http.Request) {
+		localOperationResponse(w, ReadHostUsage(r.Context()), nil)
+	}))
 	mux.HandleFunc("GET /stats", auth(func(w http.ResponseWriter, r *http.Request) {
 		stats, err := dk.Stats(r.Context(), r.FormValue("service"))
 		if err != nil {
