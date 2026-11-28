@@ -20,6 +20,7 @@ import { ServiceWebhooks } from "./pages/service/Webhooks";
 import { Services } from "./pages/Services";
 import { Button } from "./components/Button";
 import { DialogsProvider } from "./components/Dialogs";
+import { Icon } from "./components/Icon";
 import { SidebarNav } from "./components/SidebarNav";
 
 const ModulePage = lazy(() => import("./pages/ModulePage").then((page) => ({ default: page.ModulePage })));
@@ -83,9 +84,17 @@ function Shell() {
     <>
       <SidebarNav role={me.data.role} modules={modules.data} pendingUpdates={pending} />
       <div className="who">
-        {me.data.username} · {me.data.role}
-        <Button variant="text" onClick={logout}>Sign out</Button>
-        {version.data && <div className="mono">{version.data}</div>}
+        <div className="who-account">
+          <span className="who-avatar" aria-hidden="true">{me.data.username.slice(0, 1).toUpperCase()}</span>
+          <div className="who-meta">
+            <span className="who-name">{me.data.username}</span>
+            <span className="who-role">{me.data.role}</span>
+          </div>
+          <Button variant="icon" aria-label="Sign out" title="Sign out" onClick={logout}>
+            <Icon name="logout" size={20} />
+          </Button>
+        </div>
+        {version.data && <div className="who-version mono">{version.data}</div>}
       </div>
     </>
   );

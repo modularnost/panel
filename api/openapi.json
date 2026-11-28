@@ -1296,6 +1296,59 @@
         ],
         "type": "object"
       },
+      "NodeUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "availability": {
+            "type": "string"
+          },
+          "cpu_percent": {
+            "description": "Busy time as a percentage of all node CPUs",
+            "format": "double",
+            "type": "number"
+          },
+          "disk_available": {
+            "description": "Available space on the Docker data filesystem in bytes",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "disk_total": {
+            "description": "Capacity of the Docker data filesystem in bytes",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "memory_available": {
+            "description": "Memory available to new processes in bytes",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "memory_total": {
+            "description": "Total physical memory in bytes",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "availability"
+        ],
+        "type": "object"
+      },
       "PageChanged": {
         "additionalProperties": false,
         "properties": {
@@ -4128,6 +4181,45 @@
           }
         ],
         "summary": "Network details and attached workloads"
+      }
+    },
+    "/api/v1/node-usage": {
+      "get": {
+        "operationId": "list-node-usage",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NodeUsage"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Current host resource usage for Swarm nodes"
       }
     },
     "/api/v1/nodes": {

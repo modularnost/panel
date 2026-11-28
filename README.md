@@ -227,6 +227,7 @@ still permits Docker API calls. Keep the socket private.
 | `PANEL_MODULE_SECRET` | new on every start | signs module and agent tokens; pin it if you run agents |
 | `PANEL_AGENT_SERVICE` | unset | agent service name, e.g. `panel_agent`; unset means single-node |
 | `PANEL_AGENT_PORT` | `8080` | port the agents listen on |
+| `PANEL_HOST_DISK_PATH` | unset | optional mount on the Docker data filesystem for the Overview disk reading |
 | `PANEL_MODE` | unset | `agent` runs this binary as a node agent instead of the panel |
 | `PANEL_UPDATE_CHECK` | on | `off` stops the panel from asking GitHub for new releases |
 | `PANEL_STACK_FILE` | unset | the installer's compose file, mounted into the panel: an update from the panel retags its image lines |
@@ -290,8 +291,8 @@ at the registry when removing access.
 
 ## What it does
 
-- **Overview** — the first page after sign-in shows replica counts, services
-  below their replica targets, and recent deployments.
+- **Overview** — running workloads grouped by stack, services below their
+  replica targets, node resource usage, and recent deployments.
 - **Services** — stacks, replicas, image and digest. Read live from the Docker
   API and never mirrored into the database, so the UI can't lie about the
   cluster. Each service has its own page: overview, logs, deploy history,
@@ -358,6 +359,13 @@ socket, exactly as before — no agent to deploy.
 
 The built-in agent reads local Docker stats. Its endpoint stays on the
 overlay network and requires a token derived from the shared secret.
+
+Overview reports Linux host CPU and memory independently of container stats.
+For free space on the Docker data filesystem, create an empty directory on
+that filesystem on each node, bind-mount it read-only into the panel and
+agents, and point `PANEL_HOST_DISK_PATH` at the mount inside the containers.
+With Docker-in-Docker on one machine, the Swarm nodes share the underlying
+kernel, so their host CPU and memory readings describe that machine.
 
 ### Resource sizing
 

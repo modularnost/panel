@@ -57,6 +57,41 @@
   justify-self: start;
 }
 
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-full);
+  overflow: hidden;
+}
+
+.segmented-btn {
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: var(--md-sys-typescale-label-large);
+  cursor: pointer;
+}
+
+.segmented-btn + .segmented-btn {
+  border-inline-start: 1px solid var(--md-sys-color-outline);
+}
+
+.segmented-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+
+.segmented-btn[aria-pressed="true"] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.segmented-btn:focus-visible {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: -2px;
+}
+
 .settings-version {
   font: var(--md-sys-typescale-headline-small);
   overflow-wrap: anywhere;
